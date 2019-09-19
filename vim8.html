@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="zh">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="author" content="Yori Fang" />
+
+        <meta property="og:type" content="article" />
+        <meta name="twitter:card" content="summary">
+
+<meta name="keywords" content="virtualization, utils, " />
+
+<meta property="og:title" content="VIM8 Customized Configuration "/>
+<meta property="og:url" content="https://kernelgo.org/vim8.html" />
+<meta property="og:description" content="vim8" />
+<meta property="og:site_name" content="kernelgo" />
+<meta property="og:article:author" content="Yori Fang" />
+<meta property="og:article:published_time" content="2019-03-08T23:00:00+08:00" />
+<meta property="og:article:modified_time" content="2019-03-08T23:00:00+08:00" />
+<meta name="twitter:title" content="VIM8 Customized Configuration ">
+<meta name="twitter:description" content="vim8">
+
+        <title>VIM8 Customized Configuration  · kernelgo
+</title>
+        <link href="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/css/bootstrap-combined.min.css" rel="stylesheet">
+        <link href="//netdna.bootstrapcdn.com/font-awesome/4.0.1/css/font-awesome.css" rel="stylesheet">
+<link rel="stylesheet" href="https://kernelgo.org/theme/css/style.min.css?0d6ab362">
+<script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+     (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+     m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+     })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+    ga('create', 'UA-107392039-1', 'auto');
+    ga('send', 'pageview');
+</script>
+
+
+
+    </head>
+    <body>
+        <div id="content-sans-footer">
+        <div class="navbar navbar-static-top">
+            <div class="navbar-inner">
+                <div class="container-fluid">
+                    <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                    </a>
+                    <a class="brand" href="https://kernelgo.org/"><span class=site-name>kernelgo</span></a>
+                    <div class="nav-collapse collapse">
+                        <ul class="nav pull-right top-menu">
+                            <li ><a href="https://kernelgo.org">Home</a></li>
+                            <li ><a href="https://kernelgo.org/pages/about.html">About</a></li>
+                            <li ><a href="https://kernelgo.org/categories">Categories</a></li>
+                            <li ><a href="https://kernelgo.org/tags">Tags</a></li>
+                            <li ><a href="https://kernelgo.org/archives">Archives</a></li>
+                            <li><form class="navbar-search" action="https://kernelgo.org/search.html" onsubmit="return validateForm(this.elements['q'].value);"> <input type="text" class="search-query" placeholder="Search" name="q" id="tipue_search_input"></form></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="container-fluid">
+            <div class="row-fluid">
+                <div class="span1"></div>
+                <div class="span10">
+<article itemscope>
+<div class="row-fluid">
+    <header class="page-header span10 offset2">
+    <h1><a href="https://kernelgo.org/vim8.html"> VIM8 Customized Configuration  </a></h1>
+    </header>
+</div>
+
+<div class="row-fluid">
+        <div class="span8 offset2 article-content">
+
+            
+            <h3>是时候秀一下我的VIM8自定义配置了！</h3>
+<p>我个人是位忠实的vim用户，在浏览开源软件源代码的时候和在写作代码的时候我大部分时间都在使用vim，
+它的很多优点使我很享受软件开发的乐趣，我很喜欢折腾一个自己喜欢的vim配置文件然后用它来工作．</p>
+<p>VIM8已经发布一两年了，已逐渐趋于稳定，所以是时候舍弃VIM7转投功能强大的VIM8了.
+VIM8最强大的地方是给我们带来了期待已久的异步任务机制．
+异步任务机制的强大之处在于它允许各种插件创建异步任务而不会阻塞当前的编辑，
+例如:允许ctags再后台为我们生成和更新符号表，允许ale再后台自动给我们编辑的文件做语法校验。
+由于这些过程是异步的，用户感知不到。
+折腾了一天之后我终于配置好了一个我心仪的版本，是时候秀一下我的VIM8配置文件了!</p>
+<p><img alt="vfio-pci-bar" src="../images/vim8.svg"></p>
+<h3>1.安装vim8</h3>
+<p>我们选择从源码安装vim8，因为我们需要让vim8支持python解释器和ruby解释器．</p>
+<div class="highlight"><pre><span></span>git clone https://github.com/vim/vim.git 
+<span class="nb">cd</span> vim
+./configure --with-features<span class="o">=</span>huge <span class="se">\</span>
+            --enable-multibyte <span class="se">\</span>
+            --enable-rubyinterp<span class="o">=</span>yes <span class="se">\</span>
+            --enable-pythoninterp<span class="o">=</span>yes <span class="se">\</span>
+            --with-python-config-dir<span class="o">=</span>/usr/lib/python2.7/config <span class="se">\</span>
+            --enable-python3interp<span class="o">=</span>yes <span class="se">\</span>
+            --with-python3-config-dir<span class="o">=</span>/usr/lib/python3.5/config <span class="se">\</span>
+            --enable-luainterp<span class="o">=</span>yes <span class="se">\</span>
+            --enable-gui<span class="o">=</span>gtk2 <span class="se">\</span>
+        --with-ruby-command<span class="o">=</span><span class="k">$(</span>which ruby<span class="k">)</span> <span class="se">\</span>
+            --enable-cscope
+make -j <span class="o">&amp;&amp;</span> sudo make install
+</pre></div>
+
+
+<h3>2.配置vim8前的准备工作</h3>
+<p>配置VIM8之前，我们需要先安装一下新的插件管理器<code>plug.vim</code>．</p>
+<div class="highlight"><pre><span></span>curl -fLo ~/.vim/autoload/plug.vim --create-dirs <span class="se">\</span>
+    https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
+</pre></div>
+
+
+<p>或者</p>
+<div class="highlight"><pre><span></span>mkdir -pv ~/.vim/autoload
+wget https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim -O ~/.vim/autoload/plug.vim
+</pre></div>
+
+
+<p>安装 GNU Global和 Universal ctags</p>
+<div class="highlight"><pre><span></span><span class="n">git</span> <span class="n">clone</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="p">.</span><span class="n">com</span><span class="o">/</span><span class="n">universal</span><span class="o">-</span><span class="n">ctags</span><span class="o">/</span><span class="n">ctags</span><span class="p">.</span><span class="n">git</span>
+<span class="n">cd</span> <span class="n">ctags</span>
+<span class="n">sh</span> <span class="n">autogen</span><span class="p">.</span><span class="n">sh</span>
+<span class="p">.</span><span class="o">/</span><span class="n">configure</span>
+<span class="n">make</span> <span class="o">-</span><span class="n">j</span>
+<span class="n">sudo</span> <span class="n">make</span> <span class="n">install</span>
+
+<span class="n">wget</span> <span class="n">http</span><span class="p">:</span><span class="o">//</span><span class="n">tamacom</span><span class="p">.</span><span class="n">com</span><span class="o">/</span><span class="k">global</span><span class="o">/</span><span class="k">global</span><span class="o">-</span><span class="mi">6</span><span class="p">.</span><span class="mi">6</span><span class="p">.</span><span class="mi">3</span><span class="p">.</span><span class="n">tar</span><span class="p">.</span><span class="n">gz</span> <span class="c1">--no-check-certificate</span>
+<span class="n">tar</span> <span class="n">xf</span> <span class="k">global</span><span class="o">-</span><span class="mi">6</span><span class="p">.</span><span class="mi">6</span><span class="p">.</span><span class="mi">3</span><span class="p">.</span><span class="n">tar</span><span class="p">.</span><span class="n">gz</span>
+<span class="n">cd</span> <span class="k">global</span><span class="o">-</span><span class="mi">6</span><span class="p">.</span><span class="mi">6</span><span class="p">.</span><span class="mi">3</span>
+<span class="n">sed</span> <span class="o">-</span><span class="n">i</span> <span class="ss">&quot;s/(int i = 0;/(i = 0;/g&quot;</span> <span class="n">gtags</span><span class="o">-</span><span class="n">cscope</span><span class="o">/</span><span class="n">find</span><span class="p">.</span><span class="k">c</span>
+<span class="n">sed</span> <span class="o">-</span><span class="n">i</span> <span class="ss">&quot;/regex_t reg;/a\int i;&quot;</span> <span class="n">gtags</span><span class="o">-</span><span class="n">cscope</span><span class="o">/</span><span class="n">find</span><span class="p">.</span><span class="k">c</span>
+<span class="p">.</span><span class="o">/</span><span class="n">configure</span>
+<span class="n">make</span> <span class="o">-</span><span class="n">j</span>
+<span class="n">sudo</span> <span class="n">make</span> <span class="n">install</span>
+
+<span class="n">pip</span> <span class="n">install</span> <span class="n">pygments</span>  <span class="o">#</span> <span class="err">这个一定要安装！！！</span>
+</pre></div>
+
+
+<h3>3.配置vim8的插件系统</h3>
+<p>先配置一下<code>plug.vim</code>，然后让<code>plug.vim</code>帮助我们自动管理插件，编辑~/.vimrc文件．</p>
+<div class="highlight"><pre><span></span><span class="s2">&quot;</span><span class="s"> Specify a directory for plugins</span>
+<span class="s2">&quot;</span><span class="s"> - For Neovim: ~/.local/share/nvim/plugged</span>
+<span class="s2">&quot;</span><span class="s"> - Avoid using standard Vim directory names like &#39;plugin&#39;</span>
+<span class="k">call</span> <span class="nl">plug</span>#<span class="nv">begin</span><span class="ss">(</span><span class="s1">&#39;</span><span class="s">~/.vim/plugged</span><span class="s1">&#39;</span><span class="ss">)</span>
+
+<span class="s2">&quot;</span><span class="s"> All of your Plugs must be added before the following line</span>
+<span class="k">call</span> <span class="nl">plug</span>#<span class="k">end</span><span class="ss">()</span>              <span class="s2">&quot;</span><span class="s"> required</span>
+</pre></div>
+
+
+<p>plug#begin到plug#end之间的内容是受<code>plug.vim</code>管理的，我们大部分的配置文件都放在这里．
+下面开始安装插件：</p>
+<div class="highlight"><pre><span></span><span class="s s-Atom">if</span> <span class="nf">exists</span><span class="p">(</span><span class="s s-Atom">&#39;&amp;colorcolumn&#39;</span><span class="p">)</span>
+    <span class="s s-Atom">set</span> <span class="s s-Atom">colorcolumn</span><span class="o">=</span><span class="mi">80</span>
+<span class="s s-Atom">endif</span>
+<span class="s s-Atom">set</span> <span class="s s-Atom">paste</span>
+<span class="s s-Atom">syntax</span> <span class="s s-Atom">on</span>             <span class="s2">&quot; syntax highlight</span>
+<span class="s2">set nu</span>
+<span class="s2">set nocompatible              &quot;</span> <span class="s s-Atom">be</span> <span class="s s-Atom">iMproved</span><span class="p">,</span> <span class="s s-Atom">required</span>
+<span class="s s-Atom">filetype</span> <span class="s s-Atom">off</span>                  <span class="s2">&quot; required</span>
+<span class="s2">set t_Co=256</span>
+<span class="s2">set backspace=indent,eol,start</span>
+
+<span class="s2">call plug#begin(&#39;~/.vim/plugged&#39;)</span>
+
+<span class="s2">&quot;</span> <span class="s s-Atom">basic</span> <span class="s s-Atom">plug</span>
+<span class="nv">Plug</span> <span class="s s-Atom">&#39;tpope/vim-fugitive&#39;</span>             <span class="s2">&quot; git support</span>
+<span class="s2">Plug &#39;vim-scripts/L9&#39;</span>
+<span class="s2">Plug &#39;rstacruz/sparkup&#39;, {&#39;rtp&#39;: &#39;vim/&#39;}</span>
+
+<span class="s2">&quot;</span> <span class="s s-Atom">utils</span>
+<span class="nv">Plug</span> <span class="s s-Atom">&#39;vim-scripts/DrawIt&#39;</span>
+<span class="nv">Plug</span> <span class="s s-Atom">&#39;mbriggs/mark.vim&#39;</span>
+<span class="nv">Plug</span> <span class="s s-Atom">&#39;vim-scripts/tabbar&#39;</span>
+<span class="nv">Plug</span> <span class="s s-Atom">&#39;wesleyche/Trinity&#39;</span>
+<span class="nv">Plug</span> <span class="s s-Atom">&#39;vim-scripts/Smart-Tabs&#39;</span>
+<span class="nv">Plug</span> <span class="s s-Atom">&#39;nvie/vim-togglemouse&#39;</span>
+<span class="nv">Plug</span> <span class="s s-Atom">&#39;tpope/vim-unimpaired&#39;</span>
+<span class="nv">Plug</span> <span class="s s-Atom">&#39;scrooloose/syntastic&#39;</span>
+<span class="nv">Plug</span> <span class="s s-Atom">&#39;bronson/vim-trailing-whitespace&#39;</span>
+<span class="nv">Plug</span> <span class="s s-Atom">&#39;tpope/vim-surround&#39;</span>
+<span class="nv">Plug</span> <span class="s s-Atom">&#39;junegunn/vim-easy-align&#39;</span>
+<span class="nv">Plug</span> <span class="s s-Atom">&#39;Lokaltog/vim-easymotion&#39;</span>
+<span class="nv">Plug</span> <span class="s s-Atom">&#39;Yggdroot/indentLine&#39;</span>
+<span class="nv">Plug</span> <span class="s s-Atom">&#39;itchyny/lightline.vim&#39;</span>
+
+<span class="s2">&quot; YCM</span>
+<span class="s2">Plug &#39;Valloric/YouCompleteMe&#39;</span>
+
+<span class="s2">&quot;</span> <span class="s s-Atom">file</span> <span class="s s-Atom">lookup</span>
+<span class="nv">Plug</span> <span class="s s-Atom">&#39;vim-scripts/command-t&#39;</span>
+<span class="nv">Plug</span> <span class="s s-Atom">&#39;Yggdroot/LeaderF&#39;</span><span class="p">,</span> <span class="p">{</span> <span class="s s-Atom">&#39;do&#39;:</span> <span class="s s-Atom">&#39;./install.sh&#39;</span> <span class="p">}</span>
+
+<span class="s2">&quot; async grama check</span>
+<span class="s2">&quot;</span><span class="nv">Plug</span> <span class="s s-Atom">&#39;w0rp/ale&#39;</span>
+<span class="nv">Plug</span> <span class="s s-Atom">&#39;skywind3000/asyncrun.vim&#39;</span>
+
+<span class="s2">&quot; language specific enhance</span>
+<span class="s2">Plug &#39;vim-scripts/c.vim&#39;</span>
+<span class="s2">Plug &#39;vim-scripts/a.vim&#39;</span>
+<span class="s2">Plug &#39;octol/vim-cpp-enhanced-highlight&#39;</span>
+<span class="s2">Plug &#39;jnwhiteh/vim-golang&#39;</span>
+<span class="s2">Plug &#39;rust-lang/rust.vim&#39;</span>
+<span class="s2">Plug &#39;pangloss/vim-javascript&#39;</span>
+
+<span class="s2">&quot;</span> <span class="s s-Atom">color</span>
+<span class="s2">&quot;Plug &#39;sunuslee/vim-plugin-random-colorscheme-picker&#39;</span>
+<span class="s2">Plug &#39;altercation/vim-colors-solarized&#39;</span>
+<span class="s2">Plug &#39;crusoexia/vim-monokai&#39;</span>
+<span class="s2">Plug &#39;flazz/vim-colorschemes&#39;         &quot;</span> <span class="s s-Atom">vim</span> <span class="s s-Atom">colorschemes</span>
+<span class="nv">Plug</span> <span class="s s-Atom">&#39;rafi/awesome-vim-colorschemes&#39;</span>  <span class="s2">&quot; vim colorschemes</span>
+<span class="s2">Plug &#39;lifepillar/vim-solarized8&#39;      &quot;</span> <span class="s s-Atom">solarized8</span>
+
+<span class="s2">&quot; gtags and gnu global support</span>
+<span class="s2">Plug &#39;vim-scripts/gtags.vim&#39;</span>
+<span class="s2">Plug &#39;vim-scripts/autopreview&#39;</span>
+<span class="s2">Plug &#39;vim-scripts/genutils&#39;</span>
+<span class="s2">Plug &#39;ludovicchabant/vim-gutentags&#39;</span>
+<span class="s2">Plug &#39;skywind3000/gutentags_plus&#39;</span>
+
+<span class="s2">&quot;</span> <span class="s s-Atom">gutentags</span> <span class="s s-Atom">config</span>
+<span class="s s-Atom">set</span> <span class="s s-Atom">cscopeprg=&#39;gtags-cscope&#39;</span>
+<span class="s s-Atom">set</span> <span class="s s-Atom">tags=./.tags</span><span class="p">;.</span><span class="s s-Atom">tags</span>
+<span class="s s-Atom">let</span> <span class="err">$</span><span class="nv">GTAGSLABEL</span> <span class="o">=</span> <span class="s s-Atom">&#39;native&#39;</span>
+<span class="s s-Atom">let</span> <span class="err">$</span><span class="nv">GTAGSCONF</span> <span class="o">=</span> <span class="s s-Atom">&#39;/usr/local/share/gtags/gtags.conf&#39;</span>
+<span class="s s-Atom">let</span> <span class="nn">g</span><span class="p">:</span><span class="s s-Atom">gutentags_project_root</span> <span class="o">=</span> <span class="p">[</span><span class="s s-Atom">&#39;.git&#39;</span><span class="p">,</span><span class="s s-Atom">&#39;.root&#39;</span><span class="p">,</span><span class="s s-Atom">&#39;.svn&#39;</span><span class="p">,</span><span class="s s-Atom">&#39;.hg&#39;</span><span class="p">,</span><span class="s s-Atom">&#39;.project&#39;</span><span class="p">]</span>
+<span class="s s-Atom">let</span> <span class="nn">g</span><span class="p">:</span><span class="s s-Atom">gutentags_ctags_tagfile</span> <span class="o">=</span> <span class="s s-Atom">&#39;.tags&#39;</span>
+<span class="s s-Atom">let</span> <span class="nn">g</span><span class="p">:</span><span class="s s-Atom">gutentags_modules</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="s s-Atom">if</span> <span class="nf">executable</span><span class="p">(</span><span class="s s-Atom">&#39;gtags-cscope&#39;</span><span class="p">)</span> <span class="s s-Atom">&amp;&amp;</span> <span class="nf">executable</span><span class="p">(</span><span class="s s-Atom">&#39;gtags&#39;</span><span class="p">)</span>
+    <span class="s s-Atom">let</span> <span class="nn">g</span><span class="p">:</span><span class="s s-Atom">gutentags_modules</span> <span class="s s-Atom">+=</span> <span class="p">[</span><span class="s s-Atom">&#39;gtags_cscope&#39;</span><span class="p">]</span>
+<span class="s s-Atom">endif</span>
+<span class="s s-Atom">if</span> <span class="nf">executable</span><span class="p">(</span><span class="s s-Atom">&#39;ctags&#39;</span><span class="p">)</span>
+    <span class="s s-Atom">let</span> <span class="nn">g</span><span class="p">:</span><span class="s s-Atom">gutentags_modules</span> <span class="s s-Atom">+=</span> <span class="p">[</span><span class="s s-Atom">&#39;ctags&#39;</span><span class="p">]</span>
+<span class="s s-Atom">endif</span>
+<span class="s s-Atom">let</span> <span class="nn">g</span><span class="p">:</span><span class="s s-Atom">gutentags_cache_dir</span> <span class="o">=</span> <span class="nf">expand</span><span class="p">(</span><span class="s s-Atom">&#39;~/.cache/tags&#39;</span><span class="p">)</span>
+<span class="s s-Atom">let</span> <span class="nn">g</span><span class="p">:</span><span class="s s-Atom">gutentags_ctags_extra_args</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="s s-Atom">let</span> <span class="nn">g</span><span class="p">:</span><span class="s s-Atom">gutentags_ctags_extra_args</span> <span class="o">=</span> <span class="p">[</span><span class="s s-Atom">&#39;--fields=+niazS&#39;</span><span class="p">,</span> <span class="s s-Atom">&#39;--extra=+q&#39;</span><span class="p">]</span>
+<span class="s s-Atom">let</span> <span class="nn">g</span><span class="p">:</span><span class="s s-Atom">gutentags_ctags_extra_args</span> <span class="s s-Atom">+=</span> <span class="p">[</span><span class="s s-Atom">&#39;--c++-kinds=+px&#39;</span><span class="p">]</span>
+<span class="s s-Atom">let</span> <span class="nn">g</span><span class="p">:</span><span class="s s-Atom">gutentags_ctags_extra_args</span> <span class="s s-Atom">+=</span> <span class="p">[</span><span class="s s-Atom">&#39;--c-kinds=+px&#39;</span><span class="p">]</span>
+
+<span class="s s-Atom">let</span> <span class="nn">g</span><span class="p">:</span><span class="s s-Atom">gutentags_ctags_extra_args</span> <span class="s s-Atom">+=</span> <span class="p">[</span><span class="s s-Atom">&#39;--output-format=e-ctags&#39;</span><span class="p">]</span>
+<span class="s s-Atom">let</span> <span class="nn">g</span><span class="p">:</span><span class="s s-Atom">gutentags_auto_add_gtags_cscope</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="s s-Atom">let</span> <span class="nn">g</span><span class="p">:</span><span class="s s-Atom">gutentags_plus_switch</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="s s-Atom">let</span> <span class="nn">g</span><span class="p">:</span><span class="s s-Atom">asyncrun_bell</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="s s-Atom">let</span> <span class="nn">g</span><span class="p">:</span><span class="s s-Atom">gutentags_define_advanced_commands</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="s s-Atom">let</span> <span class="nn">g</span><span class="p">:</span><span class="s s-Atom">gutentags_generate_on_empty_buffer</span> <span class="o">=</span> <span class="mi">1</span>    <span class="s2">&quot; open database</span>
+
+<span class="s2">&quot;</span><span class="s s-Atom">let</span> <span class="nn">g</span><span class="p">:</span><span class="s s-Atom">gutentags_trace</span> <span class="o">=</span> <span class="mi">1</span>
+
+<span class="nv">Plug</span> <span class="s s-Atom">&#39;skywind3000/vim-preview&#39;</span>
+<span class="s2">&quot;press shift + p to Preview, press p to close </span>
+<span class="s2">autocmd FileType qf nnoremap &lt;silent&gt;&lt;buffer&gt; p :PreviewQuickfix&lt;cr&gt;</span>
+<span class="s2">autocmd FileType qf nnoremap &lt;silent&gt;&lt;buffer&gt; P :PreviewClose&lt;cr&gt;</span>
+<span class="s2">noremap &lt;Leader&gt;u :PreviewScroll -1&lt;cr&gt;     &quot;</span> <span class="s s-Atom">pageup</span> 
+<span class="s s-Atom">noremap</span> <span class="o">&lt;</span><span class="s s-Atom">leader</span><span class="o">&gt;</span><span class="s s-Atom">d</span> <span class="s s-Atom">:</span><span class="nv">PreviewScroll</span> <span class="o">+</span><span class="mi">1</span><span class="o">&lt;</span><span class="s s-Atom">cr</span><span class="o">&gt;</span>     <span class="s2">&quot; pagedown</span>
+<span class="s2">noremap &lt;silent&gt; &lt;leader&gt;gs :GscopeFind s &lt;C-R&gt;&lt;C-W&gt;&lt;cr&gt;</span>
+<span class="s2">noremap &lt;silent&gt; &lt;leader&gt;gg :GscopeFind g &lt;C-R&gt;&lt;C-W&gt;&lt;cr&gt;</span>
+<span class="s2">noremap &lt;silent&gt; &lt;leader&gt;gc :GscopeFind c &lt;C-R&gt;&lt;C-W&gt;&lt;cr&gt;</span>
+<span class="s2">noremap &lt;silent&gt; &lt;leader&gt;gt :GscopeFind t &lt;C-R&gt;&lt;C-W&gt;&lt;cr&gt;</span>
+<span class="s2">noremap &lt;silent&gt; &lt;leader&gt;ge :GscopeFind e &lt;C-R&gt;&lt;C-W&gt;&lt;cr&gt;</span>
+<span class="s2">noremap &lt;silent&gt; &lt;leader&gt;gf :GscopeFind f &lt;C-R&gt;=expand(&quot;</span><span class="o">&lt;</span><span class="s s-Atom">cfile&gt;</span><span class="s2">&quot;)&lt;cr&gt;&lt;cr&gt;</span>
+<span class="s2">noremap &lt;silent&gt; &lt;leader&gt;gi :GscopeFind i &lt;C-R&gt;=expand(&quot;</span><span class="o">&lt;</span><span class="s s-Atom">cfile&gt;</span><span class="s2">&quot;)&lt;cr&gt;&lt;cr&gt;</span>
+<span class="s2">noremap &lt;silent&gt; &lt;leader&gt;gd :GscopeFind d &lt;C-R&gt;&lt;C-W&gt;&lt;cr&gt;</span>
+<span class="s2">noremap &lt;silent&gt; &lt;leader&gt;ga :GscopeFind a &lt;C-R&gt;&lt;C-W&gt;&lt;cr&gt;</span>
+
+<span class="s2">&quot;</span> <span class="nv">LeaderF</span>
+<span class="s s-Atom">let</span> <span class="nn">g</span><span class="p">:</span><span class="nv">Lf_ShortcutF</span> <span class="o">=</span> <span class="s s-Atom">&#39;&lt;c-p&gt;&#39;</span>
+<span class="s s-Atom">noremap</span> <span class="o">&lt;</span><span class="nv">Leader</span><span class="o">&gt;</span><span class="s s-Atom">ff</span> <span class="s s-Atom">:</span><span class="nv">LeaderfFunction</span><span class="o">&lt;</span><span class="s s-Atom">cr</span><span class="o">&gt;</span>
+<span class="s s-Atom">noremap</span> <span class="o">&lt;</span><span class="nv">Leader</span><span class="o">&gt;</span><span class="s s-Atom">fb</span> <span class="s s-Atom">:</span><span class="nv">LeaderfBuffer</span><span class="o">&lt;</span><span class="s s-Atom">cr</span><span class="o">&gt;</span>
+<span class="s s-Atom">noremap</span> <span class="o">&lt;</span><span class="nv">Leader</span><span class="o">&gt;</span><span class="s s-Atom">ft</span> <span class="s s-Atom">:</span><span class="nv">LeaderfTag</span><span class="o">&lt;</span><span class="s s-Atom">cr</span><span class="o">&gt;</span>
+<span class="s s-Atom">noremap</span> <span class="o">&lt;</span><span class="nv">Leader</span><span class="o">&gt;</span><span class="s s-Atom">fm</span> <span class="s s-Atom">:</span><span class="nv">LeaderfMru</span><span class="o">&lt;</span><span class="s s-Atom">cr</span><span class="o">&gt;</span>
+<span class="s s-Atom">noremap</span> <span class="o">&lt;</span><span class="nv">Leader</span><span class="o">&gt;</span><span class="s s-Atom">fl</span> <span class="s s-Atom">:</span><span class="nv">LeaderfLine</span><span class="o">&lt;</span><span class="s s-Atom">cr</span><span class="o">&gt;</span>
+
+<span class="s s-Atom">let</span> <span class="nn">g</span><span class="p">:</span><span class="nv">Lf_StlSeparator</span> <span class="o">=</span> <span class="p">{</span> <span class="s s-Atom">&#39;left&#39;:</span> <span class="s s-Atom">&#39;&#39;</span><span class="p">,</span> <span class="s s-Atom">&#39;right&#39;:</span> <span class="s s-Atom">&#39;&#39;</span><span class="p">,</span> <span class="s s-Atom">&#39;font&#39;:</span> <span class="s s-Atom">&#39;&#39;</span> <span class="p">}</span>
+<span class="s s-Atom">let</span> <span class="nn">g</span><span class="p">:</span><span class="nv">Lf_RootMarkers</span> <span class="o">=</span> <span class="p">[</span><span class="s s-Atom">&#39;.project&#39;</span><span class="p">,</span> <span class="s s-Atom">&#39;.root&#39;</span><span class="p">,</span> <span class="s s-Atom">&#39;.svn&#39;</span><span class="p">,</span> <span class="s s-Atom">&#39;.git&#39;</span><span class="p">]</span>
+<span class="s s-Atom">let</span> <span class="nn">g</span><span class="p">:</span><span class="nv">Lf_WorkingDirectoryMode</span> <span class="o">=</span> <span class="s s-Atom">&#39;Ac&#39;</span>
+<span class="s s-Atom">let</span> <span class="nn">g</span><span class="p">:</span><span class="nv">Lf_WindowHeight</span> <span class="o">=</span> <span class="mf">0.30</span>
+<span class="s s-Atom">let</span> <span class="nn">g</span><span class="p">:</span><span class="nv">Lf_CacheDirectory</span> <span class="o">=</span> <span class="nf">expand</span><span class="p">(</span><span class="s s-Atom">&#39;~/.vim/cache&#39;</span><span class="p">)</span>
+<span class="s s-Atom">let</span> <span class="nn">g</span><span class="p">:</span><span class="nv">Lf_ShowRelativePath</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="s s-Atom">let</span> <span class="nn">g</span><span class="p">:</span><span class="nv">Lf_HideHelp</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="s s-Atom">let</span> <span class="nn">g</span><span class="p">:</span><span class="nv">Lf_StlColorscheme</span> <span class="o">=</span> <span class="s s-Atom">&#39;powerline&#39;</span>
+<span class="s s-Atom">let</span> <span class="nn">g</span><span class="p">:</span><span class="nv">Lf_PreviewResult</span> <span class="o">=</span> <span class="p">{</span><span class="s s-Atom">&#39;Function&#39;:</span><span class="mi">0</span><span class="p">,</span> <span class="s s-Atom">&#39;BufTag&#39;:</span><span class="mi">0</span><span class="p">}</span>
+
+<span class="s s-Atom">let</span> <span class="nn">g</span><span class="p">:</span><span class="nv">Lf_NormalMap</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s s-Atom">\</span> <span class="s2">&quot;File&quot;</span><span class="s s-Atom">:</span>   <span class="p">[[</span><span class="s2">&quot;&lt;ESC&gt;&quot;</span><span class="p">,</span> <span class="s s-Atom">&#39;:exec g:Lf_py &quot;fileExplManager.quit()&quot;&lt;CR&gt;&#39;</span><span class="p">]],</span>
+    <span class="s s-Atom">\</span> <span class="s2">&quot;Buffer&quot;</span><span class="s s-Atom">:</span> <span class="p">[[</span><span class="s2">&quot;&lt;ESC&gt;&quot;</span><span class="p">,</span> <span class="s s-Atom">&#39;:exec g:Lf_py &quot;bufExplManager.quit()&quot;&lt;CR&gt;&#39;</span><span class="p">]],</span>
+    <span class="s s-Atom">\</span> <span class="s2">&quot;Mru&quot;</span><span class="s s-Atom">:</span>    <span class="p">[[</span><span class="s2">&quot;&lt;ESC&gt;&quot;</span><span class="p">,</span> <span class="s s-Atom">&#39;:exec g:Lf_py &quot;mruExplManager.quit()&quot;&lt;CR&gt;&#39;</span><span class="p">]],</span>
+    <span class="s s-Atom">\</span> <span class="s2">&quot;Tag&quot;</span><span class="s s-Atom">:</span>    <span class="p">[[</span><span class="s2">&quot;&lt;ESC&gt;&quot;</span><span class="p">,</span> <span class="s s-Atom">&#39;:exec g:Lf_py &quot;tagExplManager.quit()&quot;&lt;CR&gt;&#39;</span><span class="p">]],</span>
+    <span class="s s-Atom">\</span> <span class="s2">&quot;Function&quot;</span><span class="s s-Atom">:</span>    <span class="p">[[</span><span class="s2">&quot;&lt;ESC&gt;&quot;</span><span class="p">,</span> <span class="s s-Atom">&#39;:exec g:Lf_py &quot;functionExplManager.quit()&quot;&lt;CR&gt;&#39;</span><span class="p">]],</span>
+    <span class="s s-Atom">\</span> <span class="s2">&quot;Colorscheme&quot;</span><span class="s s-Atom">:</span>    <span class="p">[[</span><span class="s2">&quot;&lt;ESC&gt;&quot;</span><span class="p">,</span> <span class="s s-Atom">&#39;:exec g:Lf_py &quot;colorschemeExplManager.quit()&quot;&lt;CR&gt;&#39;</span><span class="p">]],</span>
+    <span class="s s-Atom">\</span> <span class="p">}</span>
+<span class="s2">&quot; latex support</span>
+<span class="s2">Plug &#39;lervag/vimtex&#39;</span>
+<span class="s2">let g:tex_flavor=&#39;latex&#39;</span>
+<span class="s2">let g:vimtex_view_method=&#39;zathura&#39;</span>
+<span class="s2">let g:vimtex_quickfix_mode=0</span>
+<span class="s2">set conceallevel=1</span>
+<span class="s2">let g:tex_conceal=&#39;abdmg&#39;</span>
+
+<span class="s2">&quot;</span> <span class="nv">UltiSnips</span>
+<span class="nv">Plug</span> <span class="s s-Atom">&#39;sirver/ultisnips&#39;</span>
+<span class="s s-Atom">let</span> <span class="nn">g</span><span class="p">:</span><span class="nv">UltiSnipsExpandTrigger</span> <span class="o">=</span> <span class="s s-Atom">&#39;&lt;tab&gt;&#39;</span>
+<span class="s s-Atom">let</span> <span class="nn">g</span><span class="p">:</span><span class="nv">UltiSnipsJumpForwardTrigger</span> <span class="o">=</span> <span class="s s-Atom">&#39;&lt;tab&gt;&#39;</span>
+<span class="s s-Atom">let</span> <span class="nn">g</span><span class="p">:</span><span class="nv">UltiSnipsJumpBackwardTrigger</span> <span class="o">=</span> <span class="s s-Atom">&#39;&lt;s-tab&gt;&#39;</span>
+
+<span class="s2">&quot; All of your Plugs must be added before the following line</span>
+<span class="s2">call plug#end()              &quot;</span> <span class="s s-Atom">required</span>
+
+
+<span class="s s-Atom">filetype</span> <span class="s s-Atom">plugin</span> <span class="s s-Atom">indent</span> <span class="s s-Atom">on</span>    <span class="s2">&quot; required</span>
+<span class="s2">&quot;</span> <span class="nv">To</span> <span class="s s-Atom">ignore</span> <span class="s s-Atom">plugin</span> <span class="s s-Atom">indent</span> <span class="s s-Atom">changes</span><span class="p">,</span> <span class="s s-Atom">instead</span> <span class="nn">use</span><span class="p">:</span>
+<span class="s2">&quot;filetype plugin on</span>
+
+<span class="s2">&quot;</span> <span class="nv">Put</span> <span class="s s-Atom">your</span> <span class="s s-Atom">non</span><span class="o">-</span><span class="nv">Plug</span> <span class="s s-Atom">stuff</span> <span class="s s-Atom">after</span> <span class="s s-Atom">this</span> <span class="s s-Atom">line</span>
+<span class="s s-Atom">set</span> <span class="s s-Atom">tabstop</span><span class="o">=</span><span class="mi">8</span>
+<span class="s s-Atom">set</span> <span class="s s-Atom">softtabstop</span><span class="o">=</span><span class="mi">8</span>
+<span class="s s-Atom">set</span> <span class="s s-Atom">shiftwidth</span><span class="o">=</span><span class="mi">4</span>
+<span class="s2">&quot;set expandtab</span>
+<span class="s2">set hls</span>
+<span class="s2">set encoding=utf-8</span>
+<span class="s2">set listchars=tab:&gt;-,trail:-</span>
+
+<span class="s2">&quot;</span> <span class="s s-Atom">set</span> <span class="nv">F5</span><span class="p">,</span> <span class="nv">F6</span> <span class="s s-Atom">to</span> <span class="s s-Atom">find</span> <span class="s s-Atom">function</span> <span class="s s-Atom">and</span> <span class="s s-Atom">symbol</span>
+<span class="s s-Atom">nnoremap</span> <span class="o">&lt;</span><span class="nv">F5</span><span class="o">&gt;</span> <span class="s s-Atom">:</span><span class="nv">GscopeFind</span> <span class="s s-Atom">gs</span> 
+<span class="s s-Atom">nnoremap</span> <span class="o">&lt;</span><span class="nv">F9</span><span class="o">&gt;</span> <span class="s s-Atom">:</span><span class="nv">GscopeFind</span> <span class="s s-Atom">gg</span> 
+<span class="s s-Atom">nnoremap</span> <span class="o">&lt;</span><span class="nv">F4</span><span class="o">&gt;</span> <span class="s s-Atom">:ccl</span> <span class="o">&lt;</span><span class="nv">CR</span><span class="o">&gt;</span>
+<span class="s s-Atom">nnoremap</span> <span class="o">&lt;</span><span class="nv">F2</span><span class="o">&gt;</span> <span class="s s-Atom">:let</span> <span class="nn">g</span><span class="p">:</span><span class="s s-Atom">gutentags_trace</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">&lt;</span><span class="nv">CR</span><span class="o">&gt;</span>
+<span class="s s-Atom">nnoremap</span> <span class="o">&lt;</span><span class="nv">F3</span><span class="o">&gt;</span> <span class="s s-Atom">:let</span> <span class="nn">g</span><span class="p">:</span><span class="s s-Atom">gutentags_trace</span> <span class="o">=</span> <span class="mi">0</span> <span class="o">&lt;</span><span class="nv">CR</span><span class="o">&gt;</span>
+
+<span class="err">&quot;</span> <span class="s s-Atom">color</span> <span class="s s-Atom">desert</span>
+<span class="s s-Atom">color</span> <span class="nv">Tomorrow</span><span class="o">-</span><span class="nv">Night</span><span class="o">-</span><span class="nv">Bright</span>
+</pre></div>
+
+
+<p>更新配置文件之后调用 vim +PlugInstall +qall 安装全部插件，执行这个命令Plug会自动下载全部的插件到vim插件目录下。</p>
+<div class="highlight"><pre><span></span>vim +PlugInstall +qall
+</pre></div>
+
+
+<p>这里最重要的一组插件是<code>vim-gutentags.vim</code>和<code>gutentags_plus.vim</code>，
+通过这两个插件配合安装GNU Global和 universal ctags工具，
+可以为我们自动异步生成项目的符号表，
+可以很方便地查找符号定义和调用关系，
+再也不用我们去手动生成和维护tags更新了．
+具体配置方式参考:</p>
+<p><a href="https://zhuanlan.zhihu.com/p/36279445">https://zhuanlan.zhihu.com/p/36279445</a></p>
+<p>YCM插件需要自己去编译一下，具体步骤见：</p>
+<p><a href="https://github.com/ycm-core/YouCompleteMe#installation">https://github.com/ycm-core/YouCompleteMe#installation</a></p>
+<p>其他插件的搭配也非常合理和高效，具体的使用方式参考该插件的help doc.</p>
+<p>不早了，洗洗睡了！</p>
+            <div>
+</div>
+
+            <section>
+    <p id="post-share-links">
+    Share on:
+    <a href="https://twitter.com/intent/tweet?text=VIM8%20Customized%20Configuration&url=https%3A//kernelgo.org/vim8.html&hashtags=virtualization" target="_blank" title="Share on Twitter">Twitter</a>
+    ❄
+    <a href="https://www.facebook.com/sharer/sharer.php?u=https%3A//kernelgo.org/vim8.html" target="_blank" title="Share on Facebook">Facebook</a>
+    ❄
+    <a href="" target="_blank" title="Share on Google Plus">Google+</a>
+    ❄
+    <a href="mailto:?subject=VIM8%20Customized%20Configuration&amp;body=https%3A//kernelgo.org/vim8.html" target="_blank" title="Share via Email">Email</a>
+    </p>
+</section>
+
+            <section>
+<div class="accordion" id="accordion2">
+    <div class="accordion-group">
+        <div class="accordion-heading">
+            <a class="accordion-toggle disqus-comment-count" data-toggle="collapse" data-parent="#accordion2"
+                href="https://kernelgo.org/vim8.html#disqus_thread",
+                id="disqus-accordion-toggle">
+                Comments
+            </a>
+        </div>
+        <div id="disqus_thread" class="accordion-body collapse">
+            <div class="accordion-inner">
+                <div class="comments">
+                    <div id="disqus_thread"></div>
+<script type="text/javascript">
+    var disqus_shortname = 'kernelgo';
+        var disqus_identifier = 'https://kernelgo.org/vim8.html';
+    var disqus_url = 'https://kernelgo.org/vim8.html';
+
+    (function() {
+         var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+         dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+         (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+     })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</section>
+
+            <hr/>
+<section>
+    <h2>Related Posts</h2>
+<ul class="related-posts-list">
+<li><a href="https://kernelgo.org/posted-interrupt.html" title="VT-d Posted Interrupt">VT-d Posted Interrupt</a></li>
+<li><a href="https://kernelgo.org/vfio-introduction.html" title="VFIO Introduction">VFIO Introduction</a></li>
+<li><a href="https://kernelgo.org/vtd_interrupt_remapping_code_analysis.html" title="VT-d Interrupt Remapping Code Analysis">VT-d Interrupt Remapping Code Analysis</a></li>
+<li><a href="https://kernelgo.org/vtd-posted-interrupt-code-analysis.html" title="VT-d Interrupt Posting Code Analysis">VT-d Interrupt Posting Code Analysis</a></li>
+<li><a href="https://kernelgo.org/reading2019.html" title="Article Archive 2019 Reading Plan">Article Archive 2019 Reading Plan</a></li>
+</ul>
+<hr />
+</section>
+            <aside>
+            <nav>
+            <ul class="articles-timeline">
+                <li class="previous-article">« <a href="https://kernelgo.org/vtd-posted-interrupt-code-analysis.html" title="Previous: VT-d Interrupt Posting Code Analysis">VT-d Interrupt Posting Code Analysis</a></li>
+                <li class="next-article"><a href="https://kernelgo.org/x86-nmi.html" title="Next: Virt NMI Emulation">Virt NMI Emulation</a> »</li>
+            </ul>
+            </nav>
+            </aside>
+        </div>
+        <section>
+        <div class="span2" style="float:right;font-size:0.9em;">
+            <h4>Published</h4>
+            <time itemprop="dateCreated" datetime="2019-03-08T23:00:00+08:00">Mar 8, 2019</time>
+
+<h4>Last Updated</h4>
+<time datetime="2019-03-08T23:00:00+08:00">Mar 8, 2019</time>
+
+            <h4>Category</h4>
+            <a class="category-link" href="https://kernelgo.org/categories.html#utils-ref">utils</a>
+            <h4>Tags</h4>
+            <ul class="list-of-tags tags-in-article">
+                <li><a href="https://kernelgo.org/tags#virtualization-ref">virtualization
+                    <span>14</span>
+</a></li>
+            </ul>
+<h4>Contact</h4>
+    <a href="https://github.com/fangying" title="My github Profile" class="sidebar-social-links" target="_blank">
+    <i class="fa fa-github sidebar-social-links"></i></a>
+    <a href="#" title="My Another social link Profile" class="sidebar-social-links" target="_blank">
+    <i class="fa fa-another social link sidebar-social-links"></i></a>
+        </div>
+        </section>
+</div>
+</article>
+                </div>
+                <div class="span1"></div>
+            </div>
+        </div>
+        <div id="push"></div>
+    </div>
+<footer>
+<div id="footer">
+    <ul class="footer-content">
+        <li class="elegant-license"><span xmlns:dct="http://purl.org/dc/terms/" property="dct:title"> kernelgo"</span> by <a xmlns:cc="http://creativecommons.org/ns#" href="https://kernelgo.org" property="cc:attributionName" rel="cc:attributionURL">Yori Fang</a> is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/3.0/deed.en_US">Creative Commons Attribution-ShareAlike 3.0 Unported License</a>.</li>
+        <li class="elegant-power">Powered by <a href="http://getpelican.com/" title="Pelican Home Page">Pelican</a>. Theme: <a href="https://github.com/Pelican-Elegant/elegant/" title="Theme Elegant Home Page">Elegant</a></li>
+    </ul>
+</div>
+</footer>            <script src="//code.jquery.com/jquery.min.js"></script>
+        <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/js/bootstrap.min.js"></script>
+        <script>
+            function validateForm(query)
+            {
+                return (query.length > 0);
+            }
+        </script>
+
+            <script type="text/javascript">
+var disqus_shortname = 'kernelgo';
+(function () {
+    var s = document.createElement('script'); s.async = true;
+    s.type = 'text/javascript';
+    s.src = '//' + disqus_shortname + '.disqus.com/count.js';
+    (document.getElementsByTagName('HEAD')[0] || document.getElementsByTagName('BODY')[0]).appendChild(s);
+}());
+</script>
+<script  language="javascript" type="text/javascript">
+function uncollapse() {
+    if (window.location.hash.match(/^#comment-\d+$/)) {
+        $('#disqus_thread').collapse('show');
+    }
+}
+</script>
+<script type="text/javascript" language="JavaScript">
+uncollapse();
+window.onhashchange=function(){
+    if (window.location.hash.match(/^#comment-\d+$/))
+        window.location.reload(true);
+}
+</script>
+<script>
+$('#disqus_thread').on('shown', function () {
+    var link = document.getElementById('disqus-accordion-toggle');
+    var old_innerHTML = link.innerHTML;
+    $(link).fadeOut(500, function() {
+        $(this).text('Click here to hide comments').fadeIn(500);
+    });
+    $('#disqus_thread').on('hidden', function () {
+        $(link).fadeOut(500, function() {
+            $(this).text(old_innerHTML).fadeIn(500);
+        });
+    })
+})
+</script>
+
+
+    </body>
+    <!-- Theme: Elegant built for Pelican
+    License : MIT -->
+</html>

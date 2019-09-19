@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="author" content="Yori Fang" />
+
+        <meta property="og:type" content="article" />
+        <meta name="twitter:card" content="summary">
+
+<meta name="keywords" content="virtualization, virtualization, " />
+
+<meta property="og:title" content="VT-d Interrupt Remapping "/>
+<meta property="og:url" content="https://kernelgo.org/interrupt-remapping.html" />
+<meta property="og:description" content="VT-d Interrupt Remapping" />
+<meta property="og:site_name" content="kernelgo" />
+<meta property="og:article:author" content="Yori Fang" />
+<meta property="og:article:published_time" content="2017-09-22T23:00:00+08:00" />
+<meta property="og:article:modified_time" content="2017-09-22T23:00:00+08:00" />
+<meta name="twitter:title" content="VT-d Interrupt Remapping ">
+<meta name="twitter:description" content="VT-d Interrupt Remapping">
+
+        <title>VT-d Interrupt Remapping  · kernelgo
+</title>
+        <link href="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/css/bootstrap-combined.min.css" rel="stylesheet">
+        <link href="//netdna.bootstrapcdn.com/font-awesome/4.0.1/css/font-awesome.css" rel="stylesheet">
+<link rel="stylesheet" href="https://kernelgo.org/theme/css/style.min.css?0d6ab362">
+<script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+     (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+     m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+     })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+    ga('create', 'UA-107392039-1', 'auto');
+    ga('send', 'pageview');
+</script>
+
+
+
+    </head>
+    <body>
+        <div id="content-sans-footer">
+        <div class="navbar navbar-static-top">
+            <div class="navbar-inner">
+                <div class="container-fluid">
+                    <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                    </a>
+                    <a class="brand" href="https://kernelgo.org/"><span class=site-name>kernelgo</span></a>
+                    <div class="nav-collapse collapse">
+                        <ul class="nav pull-right top-menu">
+                            <li ><a href="https://kernelgo.org">Home</a></li>
+                            <li ><a href="https://kernelgo.org/pages/about.html">About</a></li>
+                            <li ><a href="https://kernelgo.org/categories">Categories</a></li>
+                            <li ><a href="https://kernelgo.org/tags">Tags</a></li>
+                            <li ><a href="https://kernelgo.org/archives">Archives</a></li>
+                            <li><form class="navbar-search" action="https://kernelgo.org/search.html" onsubmit="return validateForm(this.elements['q'].value);"> <input type="text" class="search-query" placeholder="Search" name="q" id="tipue_search_input"></form></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="container-fluid">
+            <div class="row-fluid">
+                <div class="span1"></div>
+                <div class="span10">
+<article itemscope>
+<div class="row-fluid">
+    <header class="page-header span10 offset2">
+    <h1><a href="https://kernelgo.org/interrupt-remapping.html"> VT-d Interrupt Remapping  </a></h1>
+    </header>
+</div>
+
+<div class="row-fluid">
+        <div class="span8 offset2 article-content">
+
+            
+            <p>Intel VT-d 虚拟化方案主要目的是解决IO虚拟化中的安全和性能这两个问题，这其中最为核心的技术就是DMA Remapping和Interrupt Remapping。
+DMA Remapping通过IOMMU页表方式将直通设备对内存的访问限制到特定的domain中，在提高IO性能的同时完成了直通设备的隔离，保证了直通设备DMA的安全性。Interrupt Remapping则提供IO设备的中断重映射和路由功能，来达到中断隔离和中断迁移的目的，提升了虚拟化环境下直通设备的中断处理效率。</p>
+<p>思考一下为什么要搞中断重映射这么一套东西呢？直通设备的中断不能直通到虚拟机内部吗？
+我们知道直通场景下直通设备的MSI/MSI-X Msg信息都是由Guest直接分配的，那么问题来了设备发送中断的时候写的Msg地址是GPA，肯定不能直接往host上投递，否则就乱套了。在虚拟化场景下，直通设备的中断是无法直接投递到Guest中的，那么我们该怎么办？我们可以由IOMMU截获中断，先将其中断映射到host的某个中断上，然后再重定向（由VMM投递）到Guest内部。明白这一点，很重要！</p>
+<p>下面对VT-d Interrupt Remapping机制进行一点分析，主要参考资料是<a href="https://www.intel.com/content/www/us/en/embedded/technology/virtualization/vt-directed-io-spec.html">Intel VT-d SPEC Chapter 5</a>。</p>
+<h3>1 Interrupt Remapping 简介</h3>
+<p>Interrupt Remapping的出现改变了x86体系结构上的中断投递方式，外部中断源发出的中断请求格式发生了较大的改变，
+中断请求会先被中断重映射硬件截获后再通过查询中断重映射表的方式最终投递到目标CPU上。
+这些外部设备中断源则包括了中断控制器(I/OxAPICs)以及MSI/MSIX兼容设备PCI/PCIe设备等。
+Interrupt Remapping是需要硬件来支持的，这里的硬件应该主要是指的IOMMU（尽管intel手册并没有直接说明），Interrupt Remapping的Capability是通过Extended Capability Register来报告的。</p>
+<p>在没有使能Interrupt Remapping的情况下，设备中断请求格式称之为<em>Compatibility format</em>，其结构主要包含一个32bit的Address和一个32bit的Data字段，Address字段包含了中断要投递的目标CPU的APIC ID信息，Data字段主要包含了要投递的vecotr号和投递方式。结构如下图：</p>
+<p><img alt="Compatibility format" src="images/Compatibility-format-interrupt-request.png"></p>
+<p>其中Address的bit 4为Interrupt Format位，用来标志这个Request是Compatibility format（bit4=0）还是Remapping format (bit 4=1)。</p>
+<p>在开启了Interrupt Remapping之后，设备的中断请求格式称之为<em>Remapping format</em>，其结构同样由一个32bit的Address和一个32bit的Data字段构成。但与Compatibility format不同的是此时Adress字段不再包含目标CPU的APIC ID信息而是提供了一个16bit的HANDLE索引，并且Address的bit 4为"1"表示Request为Remapping format。同时bit 3是一个标识位(SHV)，用来标志Request是否包含了SubHandle，当该位置位时表示Data字段的低16bit为SubHandle索引。Remapping format的中断请求格式如下图：</p>
+<p><img alt="Remapping format" src="images/remapping-format-interrupt-request.png"></p>
+<p>在Interrupt Remapping模式下，硬件查询系统软件在内存中预设的中断重映射表(Interrupt Remapping Table)来投递中断。中断重映射表由中断重映射表项(Interrupt Remapping Table Entry)构成，每个IRTE占用128bit（具体格式介绍见文末），中断重映射表的基地址存放在Interrupt Remapping Table Address Register中。硬件通过下面的方式去计算中断的interrupt_index：</p>
+<div class="highlight"><pre><span></span><span class="k">if</span> <span class="ss">(</span><span class="nv">address</span>.<span class="nv">SHV</span> <span class="o">==</span> <span class="mi">0</span><span class="ss">)</span> {
+    <span class="nv">interrupt_index</span> <span class="o">=</span> <span class="nv">address</span>.<span class="nv">handle</span><span class="c1">;</span>
+} <span class="k">else</span> {
+    <span class="nv">interrupt_index</span> <span class="o">=</span> <span class="ss">(</span><span class="nv">address</span>.<span class="nv">handle</span> <span class="o">+</span> <span class="nv">data</span>.<span class="nv">subhandle</span><span class="ss">)</span><span class="c1">;</span>
+}
+</pre></div>
+
+
+<p>中断重映射硬件通过interrupt_index去重映射表中索引对应的IRTE，中断重映射硬件可以缓存那些经常使用的IRTE以提升性能。(注:由于handle为16bit，故每个IRT包含65536个IRTE，占用1MB内存空间)</p>
+<h3>2 外设的中断投递方式和中断处理</h3>
+<p>针对不同的中断源，需要采用不同的方式来投递Remapping格式的中断。</p>
+<p>对I/OxAPIC而言，其Remapping格式中断投递格式如下图，软件需要按图中的格式来发起Remapping中断请求，这就要求需要修改“中断重定向表项”(Interrupt Redirection Table Entry)，读者可以参考<a href="http://wiki.osdev.org/IOAPIC">wiki</a>对比下RTE相比于Compatibility格式有哪些不同。值得注意的是bit48这里需要设置为"1"用来标志此RTE为Remapping format，并且RTE的bit10:8固定为000b(即没有SubHandle)。而且vector字段必须和IRTE的vector字段相同！</p>
+<p><img alt="I/OxAPIC Request Format" src="images/ioxapic-programming.png"></p>
+<p>对于MSI和MSI-X而言，其Remapping格式中断投递格式如下图，值得注意的是在Remapping格式下MSI中断支持multiple vector（大于32个中断向量），但软件必须连续分配N个连续的IRTE并且interrupt_index对应HANDLE号必须为N个连续的IRTE的首个。同样bit 4必须为"1"用来表示中断请求为Remapping格式。Data位全部设置为"0"。</p>
+<p><img alt="MSI/MSI-X Request Format" src="images/msix-programming.png"></p>
+<p>中断重映射的硬件处理步骤如下：</p>
+<ul>
+<li>硬件识别到物理地址0xFEEx_xxxx范围内的DWORD写请时，将该请求认定为中断请求；</li>
+<li>当Interrupt Remapping没有使能时，所有的中断都按照Compatibility format来处理；</li>
+<li>
+<p>当Intgrrupt Remapping被使能时，中断请求处理流程如下：</p>
+<ol>
+<li>
+<p>如果来的中断请求为Compatibility format：</p>
+<p>先检测IRTA寄存器的EIME位，如果该位为“1”那么Compatibility format的中断被blocked，否则Compatibility format中断请求都按照pass-through方式处理（传统方式）。</p>
+</li>
+<li>
+<p>如果来的中断请求为Remapping format：</p>
+<p>先检测reserved fileds是否为0，如果检查失败那么中断请求被blocked。接着硬件按照上面提到的算法计算出interrupt_index并检测其是否合法，如果该interrupt_index合法那么根据interrupt_index索引中断重映射表找到对应的IRTE，然后检测IRTE中的Present位，如果Preset位为0那么中断请求被blocked，如果Present位为1，硬件校验IRTE其他field合法后按照IRTE的约定产生一条中断请求。</p>
+</li>
+</ol>
+</li>
+</ul>
+<p>中断重映射的软件处理步骤如下：</p>
+<ul>
+<li>分配一个IRTE并且按照IRTE的格式要求填好IRTE的每个属性；</li>
+<li>按照Remapping format的要求对中断源进行编程，在合适的时候触发一个Remapping format格式的中断请求。</li>
+</ul>
+<p><img alt="Interrupt Remapping Figure" src="images/interrupt-remapping-fig.png"></p>
+<h3>附：Remapping格式中断重映射表项的格式</h3>
+<p>Interrupt Remapping格式的中断重映射表项的格式为（下篇会介绍Interrupt Posting格式的中断重映射表项）:</p>
+<p><img alt="VT-d Interrupt Remapping Table Entry" src="images/irte-for-remapped-interrupts.png"></p>
+<p>其中比较关键的中断描述信息为：</p>
+<ul>
+<li>Present域(P)：0b表示此IRTE还没有被分配到任何的中断源，索引到此IRTE的Remapping中断将被blocked掉，1b表示此IRTE是有效的，已经被分配到某个设备。</li>
+<li>Destination Mode域(DM)：0b表示Destination ID域为Physical APIC-ID，1b表示Destination ID域是Logical APIC-ID。</li>
+<li>IRTE Mode域(IM)：0b表示此中断请求是一个Remapped Interrupt中断请求，1b表示此中断请求是一个Posted Interrupt中断请求。</li>
+<li>Vector域(V)：共8个Byte表示了此Remapped Interrupt中断请求的vector号(Remapped Interrupt)。</li>
+<li>Destination ID域(DST)：表示此中断请求的目标CPU，根据当前Host中断方式不同具有不同的格式。xAPIC Mode (Cluster)为bit[40:47]， xAPIC Mode (Flat)和xAPIC Mode (Physical)为bit[47:40]， x2APIC Mode (Cluster)和x2APIC Mode (Physical)为bit[31:0]。</li>
+<li>SID, SQ, SVT则联合起来表示了中断请求的设备PCI/PCI-e request-id信息。</li>
+</ul>
+            <div>
+</div>
+
+            <section>
+    <p id="post-share-links">
+    Share on:
+    <a href="https://twitter.com/intent/tweet?text=VT-d%20Interrupt%20Remapping&url=https%3A//kernelgo.org/interrupt-remapping.html&hashtags=virtualization" target="_blank" title="Share on Twitter">Twitter</a>
+    ❄
+    <a href="https://www.facebook.com/sharer/sharer.php?u=https%3A//kernelgo.org/interrupt-remapping.html" target="_blank" title="Share on Facebook">Facebook</a>
+    ❄
+    <a href="" target="_blank" title="Share on Google Plus">Google+</a>
+    ❄
+    <a href="mailto:?subject=VT-d%20Interrupt%20Remapping&amp;body=https%3A//kernelgo.org/interrupt-remapping.html" target="_blank" title="Share via Email">Email</a>
+    </p>
+</section>
+
+            <section>
+<div class="accordion" id="accordion2">
+    <div class="accordion-group">
+        <div class="accordion-heading">
+            <a class="accordion-toggle disqus-comment-count" data-toggle="collapse" data-parent="#accordion2"
+                href="https://kernelgo.org/interrupt-remapping.html#disqus_thread",
+                id="disqus-accordion-toggle">
+                Comments
+            </a>
+        </div>
+        <div id="disqus_thread" class="accordion-body collapse">
+            <div class="accordion-inner">
+                <div class="comments">
+                    <div id="disqus_thread"></div>
+<script type="text/javascript">
+    var disqus_shortname = 'kernelgo';
+        var disqus_identifier = 'https://kernelgo.org/interrupt-remapping.html';
+    var disqus_url = 'https://kernelgo.org/interrupt-remapping.html';
+
+    (function() {
+         var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+         dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+         (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+     })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</section>
+
+            <hr/>
+<section>
+    <h2>Related Posts</h2>
+<ul class="related-posts-list">
+<li><a href="https://kernelgo.org/posted-interrupt.html" title="VT-d Posted Interrupt">VT-d Posted Interrupt</a></li>
+<li><a href="https://kernelgo.org/vfio-introduction.html" title="VFIO Introduction">VFIO Introduction</a></li>
+<li><a href="https://kernelgo.org/vtd_interrupt_remapping_code_analysis.html" title="VT-d Interrupt Remapping Code Analysis">VT-d Interrupt Remapping Code Analysis</a></li>
+<li><a href="https://kernelgo.org/vtd-posted-interrupt-code-analysis.html" title="VT-d Interrupt Posting Code Analysis">VT-d Interrupt Posting Code Analysis</a></li>
+<li><a href="https://kernelgo.org/reading2019.html" title="Article Archive 2019 Reading Plan">Article Archive 2019 Reading Plan</a></li>
+</ul>
+<hr />
+</section>
+            <aside>
+            <nav>
+            <ul class="articles-timeline">
+                <li class="previous-article">« <a href="https://kernelgo.org/kprobe.html" title="Previous: kprobe kretprobe example">kprobe kretprobe example</a></li>
+                <li class="next-article"><a href="https://kernelgo.org/posted-interrupt.html" title="Next: VT-d Posted Interrupt">VT-d Posted Interrupt</a> »</li>
+            </ul>
+            </nav>
+            </aside>
+        </div>
+        <section>
+        <div class="span2" style="float:right;font-size:0.9em;">
+            <h4>Published</h4>
+            <time itemprop="dateCreated" datetime="2017-09-22T23:00:00+08:00">Sep 22, 2017</time>
+
+<h4>Last Updated</h4>
+<time datetime="2017-09-22T23:00:00+08:00">Sep 22, 2017</time>
+
+            <h4>Category</h4>
+            <a class="category-link" href="https://kernelgo.org/categories.html#virtualization-ref">virtualization</a>
+            <h4>Tags</h4>
+            <ul class="list-of-tags tags-in-article">
+                <li><a href="https://kernelgo.org/tags#virtualization-ref">virtualization
+                    <span>14</span>
+</a></li>
+            </ul>
+<h4>Contact</h4>
+    <a href="https://github.com/fangying" title="My github Profile" class="sidebar-social-links" target="_blank">
+    <i class="fa fa-github sidebar-social-links"></i></a>
+    <a href="#" title="My Another social link Profile" class="sidebar-social-links" target="_blank">
+    <i class="fa fa-another social link sidebar-social-links"></i></a>
+        </div>
+        </section>
+</div>
+</article>
+                </div>
+                <div class="span1"></div>
+            </div>
+        </div>
+        <div id="push"></div>
+    </div>
+<footer>
+<div id="footer">
+    <ul class="footer-content">
+        <li class="elegant-license"><span xmlns:dct="http://purl.org/dc/terms/" property="dct:title"> kernelgo"</span> by <a xmlns:cc="http://creativecommons.org/ns#" href="https://kernelgo.org" property="cc:attributionName" rel="cc:attributionURL">Yori Fang</a> is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/3.0/deed.en_US">Creative Commons Attribution-ShareAlike 3.0 Unported License</a>.</li>
+        <li class="elegant-power">Powered by <a href="http://getpelican.com/" title="Pelican Home Page">Pelican</a>. Theme: <a href="https://github.com/Pelican-Elegant/elegant/" title="Theme Elegant Home Page">Elegant</a></li>
+    </ul>
+</div>
+</footer>            <script src="//code.jquery.com/jquery.min.js"></script>
+        <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/js/bootstrap.min.js"></script>
+        <script>
+            function validateForm(query)
+            {
+                return (query.length > 0);
+            }
+        </script>
+
+            <script type="text/javascript">
+var disqus_shortname = 'kernelgo';
+(function () {
+    var s = document.createElement('script'); s.async = true;
+    s.type = 'text/javascript';
+    s.src = '//' + disqus_shortname + '.disqus.com/count.js';
+    (document.getElementsByTagName('HEAD')[0] || document.getElementsByTagName('BODY')[0]).appendChild(s);
+}());
+</script>
+<script  language="javascript" type="text/javascript">
+function uncollapse() {
+    if (window.location.hash.match(/^#comment-\d+$/)) {
+        $('#disqus_thread').collapse('show');
+    }
+}
+</script>
+<script type="text/javascript" language="JavaScript">
+uncollapse();
+window.onhashchange=function(){
+    if (window.location.hash.match(/^#comment-\d+$/))
+        window.location.reload(true);
+}
+</script>
+<script>
+$('#disqus_thread').on('shown', function () {
+    var link = document.getElementById('disqus-accordion-toggle');
+    var old_innerHTML = link.innerHTML;
+    $(link).fadeOut(500, function() {
+        $(this).text('Click here to hide comments').fadeIn(500);
+    });
+    $('#disqus_thread').on('hidden', function () {
+        $(link).fadeOut(500, function() {
+            $(this).text(old_innerHTML).fadeIn(500);
+        });
+    })
+})
+</script>
+
+
+    </body>
+    <!-- Theme: Elegant built for Pelican
+    License : MIT -->
+</html>

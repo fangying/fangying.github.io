@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="zh">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="author" content="Yori Fang" />
+
+        <meta property="og:type" content="article" />
+        <meta name="twitter:card" content="summary">
+
+<meta name="keywords" content="virtualization, virtualization, " />
+
+<meta property="og:title" content="Insight Into VFIO "/>
+<meta property="og:url" content="https://kernelgo.org/vfio-insight.html" />
+<meta property="og:description" content="VFIO Insight Into VFIO" />
+<meta property="og:site_name" content="kernelgo" />
+<meta property="og:article:author" content="Yori Fang" />
+<meta property="og:article:published_time" content="2018-05-28T23:00:00+08:00" />
+<meta property="og:article:modified_time" content="2018-05-28T23:00:00+08:00" />
+<meta name="twitter:title" content="Insight Into VFIO ">
+<meta name="twitter:description" content="VFIO Insight Into VFIO">
+
+        <title>Insight Into VFIO  · kernelgo
+</title>
+        <link href="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/css/bootstrap-combined.min.css" rel="stylesheet">
+        <link href="//netdna.bootstrapcdn.com/font-awesome/4.0.1/css/font-awesome.css" rel="stylesheet">
+<link rel="stylesheet" href="https://kernelgo.org/theme/css/style.min.css?0d6ab362">
+<script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+     (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+     m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+     })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+    ga('create', 'UA-107392039-1', 'auto');
+    ga('send', 'pageview');
+</script>
+
+
+
+    </head>
+    <body>
+        <div id="content-sans-footer">
+        <div class="navbar navbar-static-top">
+            <div class="navbar-inner">
+                <div class="container-fluid">
+                    <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                    </a>
+                    <a class="brand" href="https://kernelgo.org/"><span class=site-name>kernelgo</span></a>
+                    <div class="nav-collapse collapse">
+                        <ul class="nav pull-right top-menu">
+                            <li ><a href="https://kernelgo.org">Home</a></li>
+                            <li ><a href="https://kernelgo.org/pages/about.html">About</a></li>
+                            <li ><a href="https://kernelgo.org/categories">Categories</a></li>
+                            <li ><a href="https://kernelgo.org/tags">Tags</a></li>
+                            <li ><a href="https://kernelgo.org/archives">Archives</a></li>
+                            <li><form class="navbar-search" action="https://kernelgo.org/search.html" onsubmit="return validateForm(this.elements['q'].value);"> <input type="text" class="search-query" placeholder="Search" name="q" id="tipue_search_input"></form></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="container-fluid">
+            <div class="row-fluid">
+                <div class="span1"></div>
+                <div class="span10">
+<article itemscope>
+<div class="row-fluid">
+    <header class="page-header span10 offset2">
+    <h1><a href="https://kernelgo.org/vfio-insight.html"> Insight Into VFIO  </a></h1>
+    </header>
+</div>
+
+<div class="row-fluid">
+        <div class="span8 offset2 article-content">
+
+            
+            <p>本文则主要探讨一下VFIO实现中的关键点，主要包括：</p>
+<ul>
+<li>VFIO中如实现对直通设备的I/O地址空间访问的？</li>
+<li>VFIO中如何实现MSI/MSI-X，Interrupt Remapping，以及Posted Interrupt的支持？</li>
+<li>VFIO中是如何建立DMA Remapping映射关系？</li>
+<li>VFIO中又是如何支持设备热插拔的？</li>
+</ul>
+<p>上面4个问题你能回答上来吗？</p>
+<hr>
+<h3>1.VFIO中如实现对直通设备的I/O地址空间访问？</h3>
+<p>在设备直通的场景下guest OS到底该如何访问设备I/O空间？
+有两种方法可选：</p>
+<p>方法A：直接呈现，将设备在主机上的PCI BAR呈现给guest，并通过VMCS的I/O bitmap和EPT页表使guest访问设备的PIO和MMIO都不引起VM-Exit，这样guest驱动程序可以直接访问设备的I/O地址空间。</p>
+<p>方法B：建立转换表，呈现虚拟的PCI BAR给guest，当guest访问到虚拟机的I/O地址空间时VMM截获操作并通过转换表将I/O请求转发到设备在主机上的I/O地址空间上。</p>
+<p>方法A看起来很高效，因为直接呈现的方式下不引入VM-Exit，但实际上是有问题的！
+<strong>原因是</strong>：
+设备的PCI BAR空间是由host的BIOS配置并由host操作系统直接使用的，
+guest的PCI BAR空间是由guest的虚拟BIOS（例如Seabios）配置的，
+那么问题来了，到底该由谁来配置设备的PCI BAR空间呢？肯定不能两个都生效否则就打架了！
+我们应该阻止guest来修改真实设备的PCI BAR地址以防止造成host上PCI设备的BAR空间冲突导致可能出现的严重后果。</p>
+<p>所以我们要选择方案B，建立转换表，明白这一点很重要！</p>
+<p>对于直通设备的PIO访问而言，通过设置VMCS的I/O bitmap控制guest访问退出到VMM中然后通过转换表（模拟的方式）将PIO操作转发到真实物理设备上。对于MMIO的访问，可以通过EPT方式将虚拟的MMIO地址空间映射到物理设备的MMIO地址空间上，这样guest访问MMIO时并不需要VM-Exit。</p>
+<p><strong>直通设备的PCI Config Space模拟</strong></p>
+<p>PCI配置空间是用来报告设备I/O信息的区域，可以通过PIO或者MMIO方式进行访问。
+设备直通场景的配置空间并不直接呈现给guest而是由VFIO配合qemu进行模拟的。</p>
+<p>vfio_realize函数中，
+QEMU会读取物理设备的PCI配置空间以此为基础然后对配置空间做些改动然后呈现给虚拟机。</p>
+<div class="highlight"><pre><span></span>    <span class="cm">/* Get a copy of config space */</span>  <span class="c1">// 读取设备的原始PCI Config Space信息</span>
+    <span class="n">ret</span> <span class="o">=</span> <span class="n">pread</span><span class="p">(</span><span class="n">vdev</span><span class="o">-&gt;</span><span class="n">vbasedev</span><span class="p">.</span><span class="n">fd</span><span class="p">,</span> <span class="n">vdev</span><span class="o">-&gt;</span><span class="n">pdev</span><span class="p">.</span><span class="n">config</span><span class="p">,</span>
+                <span class="n">MIN</span><span class="p">(</span><span class="n">pci_config_size</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vdev</span><span class="o">-&gt;</span><span class="n">pdev</span><span class="p">),</span> <span class="n">vdev</span><span class="o">-&gt;</span><span class="n">config_size</span><span class="p">),</span>
+                <span class="n">vdev</span><span class="o">-&gt;</span><span class="n">config_offset</span><span class="p">);</span>   <span class="c1">// 调用vfio-pci内核中的vfio_pci_read实现</span>
+    <span class="p">......</span>              
+    <span class="cm">/* vfio emulates a lot for us, but some bits need extra love */</span>
+    <span class="n">vdev</span><span class="o">-&gt;</span><span class="n">emulated_config_bits</span> <span class="o">=</span> <span class="n">g_malloc0</span><span class="p">(</span><span class="n">vdev</span><span class="o">-&gt;</span><span class="n">config_size</span><span class="p">);</span>
+    <span class="c1">// 我们可以选择性的Enable/Disable一些Capability</span>
+    <span class="cm">/* QEMU can choose to expose the ROM or not */</span>
+    <span class="n">memset</span><span class="p">(</span><span class="n">vdev</span><span class="o">-&gt;</span><span class="n">emulated_config_bits</span> <span class="o">+</span> <span class="n">PCI_ROM_ADDRESS</span><span class="p">,</span> <span class="mh">0xff</span><span class="p">,</span> <span class="mi">4</span><span class="p">);</span>
+    <span class="cm">/* QEMU can also add or extend BARs */</span>
+    <span class="n">memset</span><span class="p">(</span><span class="n">vdev</span><span class="o">-&gt;</span><span class="n">emulated_config_bits</span> <span class="o">+</span> <span class="n">PCI_BASE_ADDRESS_0</span><span class="p">,</span> <span class="mh">0xff</span><span class="p">,</span> <span class="mi">6</span> <span class="o">*</span> <span class="mi">4</span><span class="p">);</span>
+    <span class="c1">// 调用vfio_add_emulated_word修改模拟的PCI配置空间信息</span>
+    <span class="n">vfio_add_emulated_word</span>
+    <span class="cm">/*</span>
+<span class="cm">     * Clear host resource mapping info.  If we choose not to register a</span>
+<span class="cm">     * BAR, such as might be the case with the option ROM, we can get</span>
+<span class="cm">     * confusing, unwritable, residual addresses from the host here.</span>
+<span class="cm">     */</span>
+    <span class="n">memset</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vdev</span><span class="o">-&gt;</span><span class="n">pdev</span><span class="p">.</span><span class="n">config</span><span class="p">[</span><span class="n">PCI_BASE_ADDRESS_0</span><span class="p">],</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">24</span><span class="p">);</span>
+    <span class="n">memset</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vdev</span><span class="o">-&gt;</span><span class="n">pdev</span><span class="p">.</span><span class="n">config</span><span class="p">[</span><span class="n">PCI_ROM_ADDRESS</span><span class="p">],</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">4</span><span class="p">);</span>
+    <span class="n">vfio_bars_prepare</span><span class="p">(</span><span class="n">vdev</span><span class="p">);</span>    <span class="c1">// 重点分析</span>
+    <span class="n">vfio_bars_register</span><span class="p">(</span><span class="n">vdev</span><span class="p">);</span>   <span class="c1">// 重点分析</span>
+    <span class="n">vfio_add_capabilities</span><span class="p">(</span><span class="n">vdev</span><span class="p">,</span> <span class="n">errp</span><span class="p">);</span>
+</pre></div>
+
+
+<p>通常MSI/MSIX等信息都需要被QEMU修改，因为这些都是QEMU使用VFIO去模拟的。</p>
+<p><strong>直通设备MMIO（BAR空间）映射</strong></p>
+<p>vfio_realize函数中会对直通设备的MMIO空间进行映射，大致包含以下几个步骤:</p>
+<ul>
+<li>调用vfio_populate_device从VFIO中查询出设备的BAR空间信息</li>
+<li>把设备的MMIO（BAR空间）重映射（mmap）到QEMU进程的虚拟地址空间</li>
+<li>将该段虚拟机地址空间标记为RAM类型注册给虚拟机</li>
+</ul>
+<p>这样一来，guest访问MMIO地址空间时直接通过EPT翻译到HPA不需要VM-Exit。我们分析下具体流程：</p>
+<div class="highlight"><pre><span></span><span class="n">vfio_realize</span>
+    <span class="o">|-&gt;</span> <span class="n">vfio_populate_device</span>
+            <span class="o">|-&gt;</span> <span class="n">vfio_region_setup</span>  
+                    <span class="o">|-&gt;</span> <span class="n">vfio_get_region_info</span>   <span class="c1">// call ioct VFIO_DEVICE_GET_REGION_INFO</span>
+                    <span class="o">|-&gt;</span> <span class="n">memory_region_init_io</span>  <span class="c1">// init region-&gt;mem MR as I/O</span>
+    <span class="o">|-&gt;</span> <span class="n">vfio_bars_prepare</span> <span class="o">-&gt;</span> <span class="n">vfio_bar_prepare</span>  <span class="c1">// probe info of each pci bar from PCI cfg space</span>
+    <span class="o">|-&gt;</span> <span class="n">vfio_bars_register</span> <span class="o">-&gt;</span> <span class="n">vfio_bar_register</span>
+            <span class="o">|-&gt;</span> <span class="n">memory_region_init_io</span> <span class="c1">// int bar-&gt;mr</span>
+            <span class="o">|-&gt;</span> <span class="n">memory_region_add_subregion</span> <span class="c1">// add bar-&gt;mr into region-&gt;mem MR</span>
+            <span class="o">|-&gt;</span> <span class="n">vfio_region_mmap</span>
+                <span class="o">|-&gt;</span> <span class="n">mmap</span> <span class="c1">// map device bar space into QEMU process address space -&gt; iova</span>
+                <span class="o">|-&gt;</span> <span class="n">memory_region_init_ram_device_ptr</span> <span class="c1">// register iova into VM  physical AS</span>
+                <span class="o">|-&gt;</span> <span class="n">memory_region_add_subregion</span> <span class="c1">// add region-&gt;mmaps[i].mem into region-&gt;mem MR</span>
+            <span class="o">|-&gt;</span> <span class="n">pci_register_bar</span>
+</pre></div>
+
+
+<p>为了方便理解这个过程，我画了一张示意图：</p>
+<p><img alt="vfio-pci-bar" src="../images/vfio_pci_bar.svg"></p>
+<p>QEMU首先调用vfio_region_mmap，
+通过mmap region-&gt;vbasedev-&gt;fd 把设备MMIO映射到QEMU进程的虚拟地址空间，
+这实际上通过调用vfio-pci内核驱动vfio_pci_mmap -&gt; remap_pfn_range，
+<em>remap_pfn_range</em>是内核提供的API，
+可以将一段连续的物理地址空间映射到进程的虚拟地址空间，
+这里用它将设备的BAR空间的MMIO先映射到QEMU进程的虚拟地址空间再注册给虚拟机。</p>
+<div class="highlight"><pre><span></span><span class="k">static</span> <span class="kt">int</span> <span class="nf">vfio_pci_mmap</span><span class="p">(</span><span class="kt">void</span> <span class="o">*</span><span class="n">device_data</span><span class="p">,</span> <span class="k">struct</span> <span class="n">vm_area_struct</span> <span class="o">*</span><span class="n">vma</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">req_len</span> <span class="o">=</span> <span class="n">vma</span><span class="o">-&gt;</span><span class="n">vm_end</span> <span class="o">-</span> <span class="n">vma</span><span class="o">-&gt;</span><span class="n">vm_start</span><span class="p">;</span>     <span class="c1">// MMIO size</span>
+    <span class="n">vma</span><span class="o">-&gt;</span><span class="n">vm_pgoff</span> <span class="o">=</span> <span class="p">(</span><span class="n">pci_resource_start</span><span class="p">(</span><span class="n">pdev</span><span class="p">,</span> <span class="n">index</span><span class="p">)</span> <span class="o">&gt;&gt;</span> <span class="n">PAGE_SHIFT</span><span class="p">)</span> <span class="o">+</span> <span class="n">pgoff</span><span class="p">;</span>  <span class="c1">// MMIO page address </span>
+    <span class="k">return</span> <span class="n">remap_pfn_range</span><span class="p">(</span><span class="n">vma</span><span class="p">,</span> <span class="n">vma</span><span class="o">-&gt;</span><span class="n">vm_start</span><span class="p">,</span> <span class="n">vma</span><span class="o">-&gt;</span><span class="n">vm_pgoff</span><span class="p">,</span>
+            <span class="n">req_len</span><span class="p">,</span> <span class="n">vma</span><span class="o">-&gt;</span><span class="n">vm_page_prot</span><span class="p">);</span>
+
+<span class="p">}</span>
+</pre></div>
+
+
+<p>再来看下QEMU是如何注册这段虚拟地址(IOVA)到虚拟机的。</p>
+<p>vfio_region_mmap调用memory_region_init_ram_device_ptr把前面mmap过来的
+这段IOVA作为RAM类型设备注册给虚拟机。</p>
+<div class="highlight"><pre><span></span><span class="kt">int</span> <span class="nf">vfio_region_mmap</span><span class="p">(</span><span class="n">VFIORegion</span> <span class="o">*</span><span class="n">region</span><span class="p">)</span> 
+<span class="p">{</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="n">g_strdup_printf</span><span class="p">(</span><span class="s">&quot;%s mmaps[%d]&quot;</span><span class="p">,</span>
+                               <span class="n">memory_region_name</span><span class="p">(</span><span class="n">region</span><span class="o">-&gt;</span><span class="n">mem</span><span class="p">),</span> <span class="n">i</span><span class="p">);</span>
+    <span class="n">memory_region_init_ram_device_ptr</span><span class="p">(</span><span class="o">&amp;</span><span class="n">region</span><span class="o">-&gt;</span><span class="n">mmaps</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">mem</span><span class="p">,</span>
+                                        <span class="n">memory_region_owner</span><span class="p">(</span><span class="n">region</span><span class="o">-&gt;</span><span class="n">mem</span><span class="p">),</span>
+                                        <span class="n">name</span><span class="p">,</span> <span class="n">region</span><span class="o">-&gt;</span><span class="n">mmaps</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">size</span><span class="p">,</span>
+                                        <span class="n">region</span><span class="o">-&gt;</span><span class="n">mmaps</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">mmap</span><span class="p">);</span>
+    <span class="n">memory_region_add_subregion</span><span class="p">(</span><span class="n">region</span><span class="o">-&gt;</span><span class="n">mem</span><span class="p">,</span> <span class="n">region</span><span class="o">-&gt;</span><span class="n">mmaps</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">offset</span><span class="p">,</span>
+                                <span class="o">&amp;</span><span class="n">region</span><span class="o">-&gt;</span><span class="n">mmaps</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">mem</span><span class="p">);</span>                                    
+<span class="p">}</span>
+</pre></div>
+
+
+<p>memory_region_init_ram_device_ptr中会标志 mr-&gt;ram = true，
+那么QEMU就会通过kvm_set_phys_mem注册这段内存给虚拟机（是RAM类型才会建立EPT映射关系），
+这样KVM就会为这段地址空间建立EPT页表，
+虚拟机访问设备的MMIO空间时通过EPT页表翻直接访问不需要VM-Exit。
+例如，网卡的收发包场景，虚拟机可以直接操作真实网卡的相关寄存器（MMIO映射）而没有陷入先出开销，大幅度提升了虚拟化场景下的I/O性能。</p>
+<div class="highlight"><pre><span></span><span class="k">static</span> <span class="kt">void</span> <span class="nf">kvm_set_phys_mem</span><span class="p">(</span><span class="n">KVMMemoryListener</span> <span class="o">*</span><span class="n">kml</span><span class="p">,</span>
+                             <span class="n">MemoryRegionSection</span> <span class="o">*</span><span class="n">section</span><span class="p">,</span> <span class="kt">bool</span> <span class="n">add</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">memory_region_is_ram</span><span class="p">(</span><span class="n">mr</span><span class="p">))</span> <span class="p">{</span>  <span class="c1">// mr-&gt;ram = true 会注册到KVM</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">writeable</span> <span class="o">||</span> <span class="o">!</span><span class="n">kvm_readonly_mem_allowed</span><span class="p">)</span> <span class="p">{</span>
+            <span class="k">return</span><span class="p">;</span>
+        <span class="p">}</span> <span class="k">else</span> <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">mr</span><span class="o">-&gt;</span><span class="n">romd_mode</span><span class="p">)</span> <span class="p">{</span>
+            <span class="cm">/* If the memory device is not in romd_mode, then we actually want</span>
+<span class="cm">             * to remove the kvm memory slot so all accesses will trap. */</span>
+            <span class="n">add</span> <span class="o">=</span> <span class="nb">false</span><span class="p">;</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+
+    <span class="n">ram</span> <span class="o">=</span> <span class="n">memory_region_get_ram_ptr</span><span class="p">(</span><span class="n">mr</span><span class="p">)</span> <span class="o">+</span>   <span class="n">section</span><span class="o">-&gt;</span><span class="n">offset_within_region</span> <span class="o">+</span>  
+          <span class="p">(</span><span class="n">start_addr</span> <span class="o">-</span> <span class="n">section</span><span class="o">-&gt;</span><span class="n">offset_within_address_space</span><span class="p">);</span>
+    <span class="n">kvm_set_user_memory_region</span>  <span class="c1">// 作为RAM设备注册到KVM中</span>
+<span class="p">}</span>
+</pre></div>
+
+
+<h3>2.VFIO中如何实现MSI/MSI-X，Interrupt Remapping，以及Posted Interrupt的支持？</h3>
+<p>对于VFIO设备直通而言，设备中断的处理方式共有4种:</p>
+<ul>
+<li>INTx 最传统的PCI设备引脚Pin方式</li>
+<li>MSI/MSI-X方式</li>
+<li>Interrupt Remapping方式</li>
+<li>VT-d Posted Interrupt方式</li>
+</ul>
+<p>那么它们分别是如何设计实现的呢？
+这里我们来重点探索一下MSI/MSI-X的实现方式以及VT-d Posted Interrupt方式。
+如果忘了MSI和MSI-X的知识点可以看下《<a href="https://www.xilinx.com/Attachment/PCI_SPEV_V3_0.pdf">PCI Local Bus Specification 
+ Revision 3.0</a>》的Chapter 6有比较详细的介绍。</p>
+<p>先看下QEMU这边中断初始化和中断使能相关的函数调用关系图：</p>
+<div class="highlight"><pre><span></span><span class="n">vfio_realize</span>
+    <span class="o">|-&gt;</span> <span class="n">vfio_get_device</span>       <span class="c1">// get device info: num_irqs, num_regions, flags</span>
+    <span class="o">|-&gt;</span> <span class="n">vfio_msix_early_setup</span> <span class="c1">// get MSI-X info: table_bar,table_offset, pba_ -&gt; pci_device_route_intx_to_irqbar,pba_offset, entries</span>
+        <span class="o">|-&gt;</span> <span class="n">vfio_pci_fixup_msix_region</span>
+        <span class="o">|-&gt;</span> <span class="n">vfio_pci_relocate_msix</span>
+    <span class="o">|-&gt;</span> <span class="n">vfio_add_capabilities</span>
+            <span class="o">|-&gt;</span> <span class="n">vfio_add_std_cap</span>
+                <span class="o">|-&gt;</span> <span class="n">vfio_msi_setup</span>  <span class="o">-&gt;</span> <span class="n">msi_init</span>
+                <span class="o">|-&gt;</span> <span class="n">vfio_msix_setup</span> <span class="o">-&gt;</span> <span class="n">msix_init</span>
+    <span class="o">|-&gt;</span> <span class="n">vfio_intx_enable</span>    <span class="c1">// enable intx</span>
+        <span class="o">|-&gt;</span> <span class="n">pci_device_route_intx_to_irq</span>
+        <span class="o">|-&gt;</span> <span class="n">event_notifier_init</span> <span class="o">&amp;</span><span class="n">vdev</span><span class="o">-&gt;</span><span class="n">intx</span><span class="p">.</span><span class="n">interrupt</span>
+        <span class="o">|-&gt;</span> <span class="n">ioctl</span> <span class="n">VFIO_DEVICE_SET_IRQS</span>
+
+<span class="n">kvm_cpu_exec</span>
+   <span class="p">...</span>
+    <span class="o">|-&gt;</span> <span class="n">vfio_pci_write_config</span>
+            <span class="o">|-&gt;</span> <span class="n">vfio_msi_enable</span> 
+                    <span class="o">|-&gt;</span> <span class="n">event_notifier_init</span>        <span class="c1">// init eventfd as irqfd</span>
+                    <span class="o">|-&gt;</span> <span class="n">vfio_add_kvm_msi_virq</span>  <span class="p">...</span> <span class="o">-&gt;</span> <span class="n">kvm_irqchip_assign_irqfd</span>
+                    <span class="o">|-&gt;</span> <span class="n">vfio_enable_vectors</span> <span class="nb">false</span> 
+            <span class="o">|-&gt;</span> <span class="n">vfio_msix_enable</span>
+                <span class="o">|-&gt;</span> <span class="n">vfio_msix_vector_do_use</span> <span class="o">-&gt;</span> <span class="n">msix_vector_use</span>
+                <span class="o">|-&gt;</span> <span class="n">vfio_msix_vector_release</span>
+                <span class="o">|-&gt;</span> <span class="n">msix_set_vector_notifiers</span>
+</pre></div>
+
+
+<p>从图中可以看出，直通设备初始化时候会从物理设备的PCI配置空间读取INTx、MSI、MSI-X的相关信息并且进行一些必要的初始化（setup）再进行中断使能（enable）的。
+根据调试的结果来看，INTx的enable是最早的，
+而MSI/MSI-X初始化是在guest启动后进行enable。</p>
+<p>这里以MSI-X为例，
+首先调用vfio_msix_early_setup函数从硬件设备的PCI配置空间查询MSI-X相关信息包括:</p>
+<ul>
+<li>MSI-X Table Size ：MSI-X Table 大小</li>
+<li>MSI-X Table BAR Indicator ：MSI-X Table存放的BAR空间编号</li>
+<li>MSI-X Table Offset ：存放MSI-X Table在Table BAR空间中的偏移量</li>
+<li>MSI-X PBA BIR ：存放MSI-X 的Pending Bit Array的BAR空间编号</li>
+<li>MSI-X PBA Offset ：存放MSI-X Table在PBA BAR空间中的偏移量</li>
+</ul>
+<p>获取必要信息之后，通过vfio_msix_setup来完成直通设备的MSI-X的初始化工作，
+包括调用pci_add_capability为设备添加PCI_CAP_ID_MSIX Capability，
+并注册MSI-X的BAR空间到虚拟机的物理地址空间等。</p>
+<div class="highlight"><pre><span></span><span class="k">static</span> <span class="kt">void</span> <span class="nf">vfio_msix_early_setup</span><span class="p">(</span><span class="n">VFIOPCIDevice</span> <span class="o">*</span><span class="n">vdev</span><span class="p">,</span> <span class="n">Error</span> <span class="o">**</span><span class="n">errp</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">pread</span><span class="p">(</span><span class="n">fd</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">ctrl</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">ctrl</span><span class="p">),</span>
+              <span class="n">vdev</span><span class="o">-&gt;</span><span class="n">config_offset</span> <span class="o">+</span> <span class="n">pos</span> <span class="o">+</span> <span class="n">PCI_MSIX_FLAGS</span><span class="p">)</span> <span class="o">!=</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">ctrl</span><span class="p">))</span> <span class="p">{</span>
+        <span class="n">error_setg_errno</span><span class="p">(</span><span class="n">errp</span><span class="p">,</span> <span class="n">errno</span><span class="p">,</span> <span class="s">&quot;failed to read PCI MSIX FLAGS&quot;</span><span class="p">);</span>
+        <span class="k">return</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="n">pread</span><span class="p">(</span><span class="n">fd</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">table</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">table</span><span class="p">),</span>
+              <span class="n">vdev</span><span class="o">-&gt;</span><span class="n">config_offset</span> <span class="o">+</span> <span class="n">pos</span> <span class="o">+</span> <span class="n">PCI_MSIX_TABLE</span><span class="p">)</span> <span class="o">!=</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">table</span><span class="p">))</span> <span class="p">{</span>
+        <span class="n">error_setg_errno</span><span class="p">(</span><span class="n">errp</span><span class="p">,</span> <span class="n">errno</span><span class="p">,</span> <span class="s">&quot;failed to read PCI MSIX TABLE&quot;</span><span class="p">);</span>
+        <span class="k">return</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="n">pread</span><span class="p">(</span><span class="n">fd</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">pba</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">pba</span><span class="p">),</span>
+              <span class="n">vdev</span><span class="o">-&gt;</span><span class="n">config_offset</span> <span class="o">+</span> <span class="n">pos</span> <span class="o">+</span> <span class="n">PCI_MSIX_PBA</span><span class="p">)</span> <span class="o">!=</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">pba</span><span class="p">))</span> <span class="p">{</span>
+        <span class="n">error_setg_errno</span><span class="p">(</span><span class="n">errp</span><span class="p">,</span> <span class="n">errno</span><span class="p">,</span> <span class="s">&quot;failed to read PCI MSIX PBA&quot;</span><span class="p">);</span>
+        <span class="k">return</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="n">ctrl</span> <span class="o">=</span> <span class="n">le16_to_cpu</span><span class="p">(</span><span class="n">ctrl</span><span class="p">);</span>
+    <span class="n">table</span> <span class="o">=</span> <span class="n">le32_to_cpu</span><span class="p">(</span><span class="n">table</span><span class="p">);</span>
+    <span class="n">pba</span> <span class="o">=</span> <span class="n">le32_to_cpu</span><span class="p">(</span><span class="n">pba</span><span class="p">);</span>
+
+    <span class="n">msix</span> <span class="o">=</span> <span class="n">g_malloc0</span><span class="p">(</span><span class="k">sizeof</span><span class="p">(</span><span class="o">*</span><span class="n">msix</span><span class="p">));</span>
+    <span class="n">msix</span><span class="o">-&gt;</span><span class="n">table_bar</span> <span class="o">=</span> <span class="n">table</span> <span class="o">&amp;</span> <span class="n">PCI_MSIX_FLAGS_BIRMASK</span><span class="p">;</span>
+    <span class="n">msix</span><span class="o">-&gt;</span><span class="n">table_offset</span> <span class="o">=</span> <span class="n">table</span> <span class="o">&amp;</span> <span class="o">~</span><span class="n">PCI_MSIX_FLAGS_BIRMASK</span><span class="p">;</span>
+    <span class="n">msix</span><span class="o">-&gt;</span><span class="n">pba_bar</span> <span class="o">=</span> <span class="n">pba</span> <span class="o">&amp;</span> <span class="n">PCI_MSIX_FLAGS_BIRMASK</span><span class="p">;</span>
+    <span class="n">msix</span><span class="o">-&gt;</span><span class="n">pba_offset</span> <span class="o">=</span> <span class="n">pba</span> <span class="o">&amp;</span> <span class="o">~</span><span class="n">PCI_MSIX_FLAGS_BIRMASK</span><span class="p">;</span>
+    <span class="n">msix</span><span class="o">-&gt;</span><span class="n">entries</span> <span class="o">=</span> <span class="p">(</span><span class="n">ctrl</span> <span class="o">&amp;</span> <span class="n">PCI_MSIX_FLAGS_QSIZE</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span>
+<span class="k">static</span> <span class="kt">int</span> <span class="nf">vfio_msix_setup</span><span class="p">(</span><span class="n">VFIOPCIDevice</span> <span class="o">*</span><span class="n">vdev</span><span class="p">,</span> <span class="kt">int</span> <span class="n">pos</span><span class="p">,</span> <span class="n">Error</span> <span class="o">**</span><span class="n">errp</span><span class="p">)</span>
+<span class="p">{</span>
+
+    <span class="n">vdev</span><span class="o">-&gt;</span><span class="n">msix</span><span class="o">-&gt;</span><span class="n">pending</span> <span class="o">=</span> <span class="n">g_malloc0</span><span class="p">(</span><span class="n">BITS_TO_LONGS</span><span class="p">(</span><span class="n">vdev</span><span class="o">-&gt;</span><span class="n">msix</span><span class="o">-&gt;</span><span class="n">entries</span><span class="p">)</span> <span class="o">*</span>
+                                    <span class="k">sizeof</span><span class="p">(</span><span class="kt">unsigned</span> <span class="kt">long</span><span class="p">));</span>
+    <span class="n">ret</span> <span class="o">=</span> <span class="n">msix_init</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vdev</span><span class="o">-&gt;</span><span class="n">pdev</span><span class="p">,</span> <span class="n">vdev</span><span class="o">-&gt;</span><span class="n">msix</span><span class="o">-&gt;</span><span class="n">entries</span><span class="p">,</span>
+                    <span class="n">vdev</span><span class="o">-&gt;</span><span class="n">bars</span><span class="p">[</span><span class="n">vdev</span><span class="o">-&gt;</span><span class="n">msix</span><span class="o">-&gt;</span><span class="n">table_bar</span><span class="p">].</span><span class="n">mr</span><span class="p">,</span>
+                    <span class="n">vdev</span><span class="o">-&gt;</span><span class="n">msix</span><span class="o">-&gt;</span><span class="n">table_bar</span><span class="p">,</span> <span class="n">vdev</span><span class="o">-&gt;</span><span class="n">msix</span><span class="o">-&gt;</span><span class="n">table_offset</span><span class="p">,</span>
+                    <span class="n">vdev</span><span class="o">-&gt;</span><span class="n">bars</span><span class="p">[</span><span class="n">vdev</span><span class="o">-&gt;</span><span class="n">msix</span><span class="o">-&gt;</span><span class="n">pba_bar</span><span class="p">].</span><span class="n">mr</span><span class="p">,</span>
+                    <span class="n">vdev</span><span class="o">-&gt;</span><span class="n">msix</span><span class="o">-&gt;</span><span class="n">pba_bar</span><span class="p">,</span> <span class="n">vdev</span><span class="o">-&gt;</span><span class="n">msix</span><span class="o">-&gt;</span><span class="n">pba_offset</span><span class="p">,</span> <span class="n">pos</span><span class="p">,</span>
+                    <span class="o">&amp;</span><span class="n">err</span><span class="p">);</span>
+    <span class="n">memory_region_set_enabled</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vdev</span><span class="o">-&gt;</span><span class="n">pdev</span><span class="p">.</span><span class="n">msix_pba_mmio</span><span class="p">,</span> <span class="nb">false</span><span class="p">);</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">object_property_get_bool</span><span class="p">(</span><span class="n">OBJECT</span><span class="p">(</span><span class="n">qdev_get_machine</span><span class="p">()),</span>
+                                 <span class="s">&quot;vfio-no-msix-emulation&quot;</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">))</span> <span class="p">{</span>
+        <span class="n">memory_region_set_enabled</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vdev</span><span class="o">-&gt;</span><span class="n">pdev</span><span class="p">.</span><span class="n">msix_table_mmio</span><span class="p">,</span> <span class="nb">false</span><span class="p">);</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+
+
+<p>最后guest启动后调用vfio_msix_enable使能MSI-X中断。</p>
+<h3>irqfd 和 ioeventfd</h3>
+<p>我们知道QEMU本身有一套完整的模拟PCI设备INTx、MSI、MSI-X中断机制，
+其实现方式是irqfd（QEMU中断注入到guest）和ioeventfd（guest中断通知到QEMU），
+内部实现都是基于内核提供的eventfd机制。</p>
+<p>看代码的时候一直没明白设备中断绑定的irqfd是在什么时候注册的，从代码上看不是中断enable时候。
+后来结合代码调试才明白，
+原来中断enable时候将设备的MSI/MSI-X BAR空间映射用MMIO方式注册给了虚拟机（参考msix_init, msi_init函数实现），
+当虚拟机内部第一次访问MSI-X Table BAR空间的MMIO时会退出到用户态完成irqfd的注册，
+调用堆栈为：</p>
+<div class="highlight"><pre><span></span><span class="cp">#0  kvm_irqchip_assign_irqfd</span>
+<span class="cp">#1   in kvm_irqchip_add_irqfd_notifier_gsi </span>
+<span class="cp">#2   in vfio_add_kvm_msi_virq </span>
+<span class="cp">#3   in vfio_msix_vector_do_use </span>
+<span class="cp">#4   in vfio_msix_vector_use </span>
+<span class="cp">#5   in msix_fire_vector_notifier</span>
+<span class="cp">#6   in msix_handle_mask_update </span>
+<span class="cp">#7   in msix_table_mmio_write </span>
+<span class="cp">#8   in memory_region_write_accessor</span>
+<span class="cp">#9   in access_with_adjusted_size </span>
+<span class="cp">#10  in memory_region_dispatch_write </span>
+<span class="cp">#11  in address_space_write_continue </span>
+<span class="cp">#12  in address_space_write </span>
+<span class="cp">#13  in address_space_rw </span>
+<span class="cp">#14  in kvm_cpu_exec </span>
+</pre></div>
+
+
+<p>关于irqfd的社区patch可以从这里获取<a href="https://lwn.net/Articles/332924/">https://lwn.net/Articles/332924</a>。</p>
+<p>备注：Alex Williamson在最新的VFIO模块中加入新特性，支持直接使用物理设备的MSIX BAR空间，
+这样一来可以直接将物理设备的MSI-X BAR空间直接mmap过来然后呈现给虚拟机，
+guest直接使用而不用再进行模拟了。</p>
+<div class="highlight"><pre><span></span><span class="nv">commit</span> <span class="nv">ae0215b2bb56a9d5321a185dde133bfdd306a4c0</span>
+<span class="nv">Author</span>: <span class="nv">Alexey</span> <span class="nv">Kardashevskiy</span> <span class="o">&lt;</span><span class="nv">aik</span>@<span class="nv">ozlabs</span>.<span class="nv">ru</span><span class="o">&gt;</span>
+<span class="nv">Date</span>:   <span class="nv">Tue</span> <span class="nv">Mar</span> <span class="mi">13</span> <span class="mi">11</span>:<span class="mi">17</span>:<span class="mi">31</span> <span class="mi">2018</span> <span class="o">-</span><span class="mi">0600</span>
+
+    <span class="nv">vfio</span><span class="o">-</span><span class="nv">pci</span>: <span class="nv">Allow</span> <span class="nv">mmap</span> <span class="nv">of</span> <span class="nv">MSIX</span> <span class="nv">BAR</span>
+
+    <span class="nv">At</span> <span class="nv">the</span> <span class="nv">moment</span> <span class="nv">we</span> <span class="nv">unconditionally</span> <span class="nv">avoid</span> <span class="nv">mapping</span> <span class="nv">MSIX</span> <span class="nv">data</span> <span class="nv">of</span> <span class="nv">a</span> <span class="nv">BAR</span> <span class="nv">and</span>
+    <span class="nv">emulate</span> <span class="nv">MSIX</span> <span class="nv">table</span> <span class="nv">in</span> <span class="nv">QEMU</span>. <span class="nv">However</span> <span class="nv">it</span> <span class="nv">is</span> <span class="mi">1</span><span class="ss">)</span> <span class="nv">not</span> <span class="nv">always</span> <span class="nv">necessary</span> <span class="nv">as</span>
+    <span class="nv">a</span> <span class="nv">platform</span> <span class="nv">may</span> <span class="nv">provide</span> <span class="nv">a</span> <span class="nv">paravirt</span> <span class="nv">interface</span> <span class="k">for</span> <span class="nv">MSIX</span> <span class="nv">configuration</span><span class="c1">;</span>
+    <span class="mi">2</span><span class="ss">)</span> <span class="nv">can</span> <span class="nv">affect</span> <span class="nv">the</span> <span class="nv">speed</span> <span class="nv">of</span> <span class="nv">MMIO</span> <span class="nv">access</span> <span class="nv">by</span> <span class="nv">emulating</span> <span class="nv">them</span> <span class="nv">in</span> <span class="nv">QEMU</span> <span class="nv">when</span>
+    <span class="nv">frequently</span> <span class="nv">accessed</span> <span class="nv">registers</span> <span class="nv">share</span> <span class="nv">same</span> <span class="nv">system</span> <span class="nv">page</span> <span class="nv">with</span> <span class="nv">MSIX</span> <span class="nv">data</span>,
+    <span class="nv">this</span> <span class="nv">is</span> <span class="nv">particularly</span> <span class="nv">a</span> <span class="nv">problem</span> <span class="k">for</span> <span class="nv">systems</span> <span class="nv">with</span> <span class="nv">the</span> <span class="nv">page</span> <span class="nv">size</span> <span class="nv">bigger</span>
+    <span class="nv">than</span> <span class="mi">4</span><span class="nv">KB</span>.
+
+    <span class="nv">A</span> <span class="nv">new</span> <span class="nv">capability</span> <span class="o">-</span> <span class="nv">VFIO_REGION_INFO_CAP_MSIX_MAPPABLE</span> <span class="o">-</span> <span class="nv">has</span> <span class="nv">been</span> <span class="nv">added</span>
+    <span class="nv">to</span> <span class="nv">the</span> <span class="nv">kernel</span> [<span class="mi">1</span>] <span class="nv">which</span> <span class="nv">tells</span> <span class="nv">the</span> <span class="nv">userspace</span> <span class="nv">that</span> <span class="nv">mapping</span> <span class="nv">of</span> <span class="nv">the</span> <span class="nv">MSIX</span> <span class="nv">data</span>
+    <span class="nv">is</span> <span class="nv">possible</span> <span class="nv">now</span>. <span class="nv">This</span> <span class="nv">makes</span> <span class="nv">use</span> <span class="nv">of</span> <span class="nv">it</span> <span class="nv">so</span> <span class="nv">from</span> <span class="nv">now</span> <span class="nv">on</span> <span class="nv">QEMU</span> <span class="nv">tries</span> <span class="nv">mapping</span>
+    <span class="nv">the</span> <span class="nv">entire</span> <span class="nv">BAR</span> <span class="nv">as</span> <span class="nv">a</span> <span class="nv">whole</span> <span class="nv">and</span> <span class="nv">emulate</span> <span class="nv">MSIX</span> <span class="nv">on</span> <span class="nv">top</span> <span class="nv">of</span> <span class="nv">that</span>.
+
+    [<span class="mi">1</span>] <span class="nv">https</span>:<span class="o">//</span><span class="nv">git</span>.<span class="nv">kernel</span>.<span class="nv">org</span><span class="o">/</span><span class="nv">pub</span><span class="o">/</span><span class="nv">scm</span><span class="o">/</span><span class="nv">linux</span><span class="o">/</span><span class="nv">kernel</span><span class="o">/</span><span class="nv">git</span><span class="o">/</span><span class="nv">torvalds</span><span class="o">/</span><span class="nv">linux</span>.<span class="nv">git</span><span class="o">/</span><span class="nv">commit</span><span class="o">/</span>?<span class="nv">id</span><span class="o">=</span><span class="nv">a32295c612c57990d17fb0f41e7134394b2f35f6</span>
+
+    <span class="nv">Signed</span><span class="o">-</span><span class="nv">off</span><span class="o">-</span><span class="nv">by</span>: <span class="nv">Alexey</span> <span class="nv">Kardashevskiy</span> <span class="o">&lt;</span><span class="nv">aik</span>@<span class="nv">ozlabs</span>.<span class="nv">ru</span><span class="o">&gt;</span>
+    <span class="nv">Reviewed</span><span class="o">-</span><span class="nv">by</span>: <span class="nv">David</span> <span class="nv">Gibson</span> <span class="o">&lt;</span><span class="nv">david</span>@<span class="nv">gibson</span>.<span class="nv">dropbear</span>.<span class="nv">id</span>.<span class="nv">au</span><span class="o">&gt;</span>
+    <span class="nv">Signed</span><span class="o">-</span><span class="nv">off</span><span class="o">-</span><span class="nv">by</span>: <span class="nv">Alex</span> <span class="nv">Williamson</span> <span class="o">&lt;</span><span class="nv">alex</span>.<span class="nv">williamson</span>@<span class="nv">redhat</span>.<span class="nv">com</span><span class="o">&gt;</span>
+</pre></div>
+
+
+<h3>3. VFIO中是如何建立DMA Remapping映射关系？</h3>
+<p>前面的文章中我们反复提到VT-d DMA Remapping的原理和意义，那么在vfio中这又是如何实现的呢？</p>
+<p>实现的原理其实不难，我们知道QEMU会维护虚拟机的物理地址空间映射关系，
+而VT-d DMA Remapping需要建立GPA-&gt;HVA地址空间的映射关系，
+那么当虚拟机的地址空间布局发生变化时我们都会尝试更新对应的DMA Remapping关系，
+这是通过vfio_memory_listener来实现的。</p>
+<div class="highlight"><pre><span></span><span class="k">static</span> <span class="k">const</span> <span class="n">MemoryListener</span> <span class="n">vfio_memory_listener</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="p">.</span><span class="n">region_add</span> <span class="o">=</span> <span class="n">vfio_listener_region_add</span><span class="p">,</span>
+    <span class="p">.</span><span class="n">region_del</span> <span class="o">=</span> <span class="n">vfio_listener_region_del</span><span class="p">,</span>
+<span class="p">};</span>
+</pre></div>
+
+
+<p>vfio_connect_container函数中会将vfio_memory_listener注册给QEMU的物理地址空间address_space_memory，
+这样vfio_memory_listener会监听虚拟机的物理地址空间变化，
+调用对应的回调函数更新DMA Remapping关系。</p>
+<div class="highlight"><pre><span></span><span class="n">memory_listener_register</span><span class="p">(</span><span class="o">&amp;</span><span class="n">container</span><span class="o">-&gt;</span><span class="n">listener</span><span class="p">,</span> <span class="n">container</span><span class="o">-&gt;</span><span class="n">space</span><span class="o">-&gt;</span><span class="n">as</span><span class="p">);</span>
+</pre></div>
+
+
+<p>那么说了很久的IOMMU页表是如何创建和更新的呢？
+看下vfio_listener_region_add/vfio_listener_region_del函数的实现就知道。
+在该函数中先check对应的section是否是RAM（只对RAM类型的区域进行DMA Remapping），
+再进行一些Sanity Check后调用vfio_dma_map将映射关系建立起来，
+所以重点还是在于vfio_dma_map的函数实现。</p>
+<div class="highlight"><pre><span></span><span class="k">static</span> <span class="kt">void</span> <span class="nf">vfio_listener_region_add</span><span class="p">(</span><span class="n">MemoryListener</span> <span class="o">*</span><span class="n">listener</span><span class="p">,</span>
+                                     <span class="n">MemoryRegionSection</span> <span class="o">*</span><span class="n">section</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">VFIOContainer</span> <span class="o">*</span><span class="n">container</span> <span class="o">=</span> <span class="n">container_of</span><span class="p">(</span><span class="n">listener</span><span class="p">,</span> <span class="n">VFIOContainer</span><span class="p">,</span> <span class="n">listener</span><span class="p">);</span>
+    <span class="n">hwaddr</span> <span class="n">iova</span><span class="p">,</span> <span class="n">end</span><span class="p">;</span>
+    <span class="n">Int128</span> <span class="n">llend</span><span class="p">,</span> <span class="n">llsize</span><span class="p">;</span>
+    <span class="kt">void</span> <span class="o">*</span><span class="n">vaddr</span><span class="p">;</span>
+    <span class="kt">int</span> <span class="n">ret</span><span class="p">;</span>
+    <span class="n">VFIOHostDMAWindow</span> <span class="o">*</span><span class="n">hostwin</span><span class="p">;</span>
+    <span class="kt">bool</span> <span class="n">hostwin_found</span><span class="p">;</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="n">vfio_listener_skipped_section</span><span class="p">(</span><span class="n">section</span><span class="p">))</span> <span class="p">{</span>   <span class="c1">// do dma_map only if MRS is RAM type</span>
+        <span class="n">trace_vfio_listener_region_add_skip</span><span class="p">(</span>
+                <span class="n">section</span><span class="o">-&gt;</span><span class="n">offset_within_address_space</span><span class="p">,</span>
+                <span class="n">section</span><span class="o">-&gt;</span><span class="n">offset_within_address_space</span> <span class="o">+</span>
+                <span class="n">int128_get64</span><span class="p">(</span><span class="n">int128_sub</span><span class="p">(</span><span class="n">section</span><span class="o">-&gt;</span><span class="n">size</span><span class="p">,</span> <span class="n">int128_one</span><span class="p">())));</span>
+        <span class="k">return</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="n">unlikely</span><span class="p">((</span><span class="n">section</span><span class="o">-&gt;</span><span class="n">offset_within_address_space</span> <span class="o">&amp;</span> <span class="o">~</span><span class="n">TARGET_PAGE_MASK</span><span class="p">)</span> <span class="o">!=</span>
+                 <span class="p">(</span><span class="n">section</span><span class="o">-&gt;</span><span class="n">offset_within_region</span> <span class="o">&amp;</span> <span class="o">~</span><span class="n">TARGET_PAGE_MASK</span><span class="p">)))</span> <span class="p">{</span>
+        <span class="n">error_report</span><span class="p">(</span><span class="s">&quot;%s received unaligned region&quot;</span><span class="p">,</span> <span class="n">__func__</span><span class="p">);</span>
+        <span class="k">return</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="n">iova</span> <span class="o">=</span> <span class="n">TARGET_PAGE_ALIGN</span><span class="p">(</span><span class="n">section</span><span class="o">-&gt;</span><span class="n">offset_within_address_space</span><span class="p">);</span>
+    <span class="n">llend</span> <span class="o">=</span> <span class="n">int128_make64</span><span class="p">(</span><span class="n">section</span><span class="o">-&gt;</span><span class="n">offset_within_address_space</span><span class="p">);</span>
+    <span class="n">llend</span> <span class="o">=</span> <span class="n">int128_add</span><span class="p">(</span><span class="n">llend</span><span class="p">,</span> <span class="n">section</span><span class="o">-&gt;</span><span class="n">size</span><span class="p">);</span>
+    <span class="n">llend</span> <span class="o">=</span> <span class="n">int128_and</span><span class="p">(</span><span class="n">llend</span><span class="p">,</span> <span class="n">int128_exts64</span><span class="p">(</span><span class="n">TARGET_PAGE_MASK</span><span class="p">));</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="n">int128_ge</span><span class="p">(</span><span class="n">int128_make64</span><span class="p">(</span><span class="n">iova</span><span class="p">),</span> <span class="n">llend</span><span class="p">))</span> <span class="p">{</span>
+        <span class="k">return</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="n">end</span> <span class="o">=</span> <span class="n">int128_get64</span><span class="p">(</span><span class="n">int128_sub</span><span class="p">(</span><span class="n">llend</span><span class="p">,</span> <span class="n">int128_one</span><span class="p">()));</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="n">container</span><span class="o">-&gt;</span><span class="n">iommu_type</span> <span class="o">==</span> <span class="n">VFIO_SPAPR_TCE_v2_IOMMU</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">hwaddr</span> <span class="n">pgsize</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+
+        <span class="cm">/* For now intersections are not allowed, we may relax this later */</span>
+        <span class="n">QLIST_FOREACH</span><span class="p">(</span><span class="n">hostwin</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">container</span><span class="o">-&gt;</span><span class="n">hostwin_list</span><span class="p">,</span> <span class="n">hostwin_next</span><span class="p">)</span> <span class="p">{</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">ranges_overlap</span><span class="p">(</span><span class="n">hostwin</span><span class="o">-&gt;</span><span class="n">min_iova</span><span class="p">,</span>
+                               <span class="n">hostwin</span><span class="o">-&gt;</span><span class="n">max_iova</span> <span class="o">-</span> <span class="n">hostwin</span><span class="o">-&gt;</span><span class="n">min_iova</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span>
+                               <span class="n">section</span><span class="o">-&gt;</span><span class="n">offset_within_address_space</span><span class="p">,</span>
+                               <span class="n">int128_get64</span><span class="p">(</span><span class="n">section</span><span class="o">-&gt;</span><span class="n">size</span><span class="p">)))</span> <span class="p">{</span>
+                <span class="n">ret</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span><span class="p">;</span>
+                <span class="k">goto</span> <span class="n">fail</span><span class="p">;</span>
+            <span class="p">}</span>
+        <span class="p">}</span>
+
+        <span class="n">ret</span> <span class="o">=</span> <span class="n">vfio_spapr_create_window</span><span class="p">(</span><span class="n">container</span><span class="p">,</span> <span class="n">section</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">pgsize</span><span class="p">);</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">ret</span><span class="p">)</span> <span class="p">{</span>
+            <span class="k">goto</span> <span class="n">fail</span><span class="p">;</span>
+        <span class="p">}</span>
+
+        <span class="n">vfio_host_win_add</span><span class="p">(</span><span class="n">container</span><span class="p">,</span> <span class="n">section</span><span class="o">-&gt;</span><span class="n">offset_within_address_space</span><span class="p">,</span>
+                          <span class="n">section</span><span class="o">-&gt;</span><span class="n">offset_within_address_space</span> <span class="o">+</span>
+                          <span class="n">int128_get64</span><span class="p">(</span><span class="n">section</span><span class="o">-&gt;</span><span class="n">size</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">pgsize</span><span class="p">);</span>
+<span class="cp">#ifdef CONFIG_KVM</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">kvm_enabled</span><span class="p">())</span> <span class="p">{</span>
+            <span class="n">VFIOGroup</span> <span class="o">*</span><span class="n">group</span><span class="p">;</span>
+            <span class="n">IOMMUMemoryRegion</span> <span class="o">*</span><span class="n">iommu_mr</span> <span class="o">=</span> <span class="n">IOMMU_MEMORY_REGION</span><span class="p">(</span><span class="n">section</span><span class="o">-&gt;</span><span class="n">mr</span><span class="p">);</span>
+            <span class="k">struct</span> <span class="n">kvm_vfio_spapr_tce</span> <span class="n">param</span><span class="p">;</span>
+            <span class="k">struct</span> <span class="n">kvm_device_attr</span> <span class="n">attr</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="p">.</span><span class="n">group</span> <span class="o">=</span> <span class="n">KVM_DEV_VFIO_GROUP</span><span class="p">,</span>
+                <span class="p">.</span><span class="n">attr</span> <span class="o">=</span> <span class="n">KVM_DEV_VFIO_GROUP_SET_SPAPR_TCE</span><span class="p">,</span>
+                <span class="p">.</span><span class="n">addr</span> <span class="o">=</span> <span class="p">(</span><span class="kt">uint64_t</span><span class="p">)(</span><span class="kt">unsigned</span> <span class="kt">long</span><span class="p">)</span><span class="o">&amp;</span><span class="n">param</span><span class="p">,</span>
+            <span class="p">};</span>
+
+            <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">memory_region_iommu_get_attr</span><span class="p">(</span><span class="n">iommu_mr</span><span class="p">,</span> <span class="n">IOMMU_ATTR_SPAPR_TCE_FD</span><span class="p">,</span>
+                                              <span class="o">&amp;</span><span class="n">param</span><span class="p">.</span><span class="n">tablefd</span><span class="p">))</span> <span class="p">{</span>
+                <span class="n">QLIST_FOREACH</span><span class="p">(</span><span class="n">group</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">container</span><span class="o">-&gt;</span><span class="n">group_list</span><span class="p">,</span> <span class="n">container_next</span><span class="p">)</span> <span class="p">{</span>
+                    <span class="n">param</span><span class="p">.</span><span class="n">groupfd</span> <span class="o">=</span> <span class="n">group</span><span class="o">-&gt;</span><span class="n">fd</span><span class="p">;</span>
+                    <span class="k">if</span> <span class="p">(</span><span class="n">ioctl</span><span class="p">(</span><span class="n">vfio_kvm_device_fd</span><span class="p">,</span> <span class="n">KVM_SET_DEVICE_ATTR</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">attr</span><span class="p">))</span> <span class="p">{</span>
+                        <span class="n">error_report</span><span class="p">(</span><span class="s">&quot;vfio: failed to setup fd %d &quot;</span>
+                                     <span class="s">&quot;for a group with fd %d: %s&quot;</span><span class="p">,</span>
+                                     <span class="n">param</span><span class="p">.</span><span class="n">tablefd</span><span class="p">,</span> <span class="n">param</span><span class="p">.</span><span class="n">groupfd</span><span class="p">,</span>
+                                     <span class="n">strerror</span><span class="p">(</span><span class="n">errno</span><span class="p">));</span>
+                        <span class="k">return</span><span class="p">;</span>
+                    <span class="p">}</span>
+                    <span class="n">trace_vfio_spapr_group_attach</span><span class="p">(</span><span class="n">param</span><span class="p">.</span><span class="n">groupfd</span><span class="p">,</span> <span class="n">param</span><span class="p">.</span><span class="n">tablefd</span><span class="p">);</span>
+                <span class="p">}</span>
+            <span class="p">}</span>
+        <span class="p">}</span>
+<span class="cp">#endif</span>
+    <span class="p">}</span>
+
+    <span class="n">hostwin_found</span> <span class="o">=</span> <span class="nb">false</span><span class="p">;</span>
+    <span class="n">QLIST_FOREACH</span><span class="p">(</span><span class="n">hostwin</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">container</span><span class="o">-&gt;</span><span class="n">hostwin_list</span><span class="p">,</span> <span class="n">hostwin_next</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">hostwin</span><span class="o">-&gt;</span><span class="n">min_iova</span> <span class="o">&lt;=</span> <span class="n">iova</span> <span class="o">&amp;&amp;</span> <span class="n">end</span> <span class="o">&lt;=</span> <span class="n">hostwin</span><span class="o">-&gt;</span><span class="n">max_iova</span><span class="p">)</span> <span class="p">{</span>
+            <span class="n">hostwin_found</span> <span class="o">=</span> <span class="nb">true</span><span class="p">;</span>
+            <span class="k">break</span><span class="p">;</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">hostwin_found</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">error_report</span><span class="p">(</span><span class="s">&quot;vfio: IOMMU container %p can&#39;t map guest IOVA region&quot;</span>
+                     <span class="s">&quot; 0x%&quot;</span><span class="n">HWADDR_PRIx</span><span class="s">&quot;..0x%&quot;</span><span class="n">HWADDR_PRIx</span><span class="p">,</span>
+                     <span class="n">container</span><span class="p">,</span> <span class="n">iova</span><span class="p">,</span> <span class="n">end</span><span class="p">);</span>
+        <span class="n">ret</span> <span class="o">=</span> <span class="o">-</span><span class="n">EFAULT</span><span class="p">;</span>
+        <span class="k">goto</span> <span class="n">fail</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="n">memory_region_ref</span><span class="p">(</span><span class="n">section</span><span class="o">-&gt;</span><span class="n">mr</span><span class="p">);</span>     <span class="c1">// increase ref of MR by one</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="n">memory_region_is_iommu</span><span class="p">(</span><span class="n">section</span><span class="o">-&gt;</span><span class="n">mr</span><span class="p">))</span> <span class="p">{</span>      <span class="c1">// guest IOMMU emulation</span>
+        <span class="n">VFIOGuestIOMMU</span> <span class="o">*</span><span class="n">giommu</span><span class="p">;</span>
+        <span class="n">IOMMUMemoryRegion</span> <span class="o">*</span><span class="n">iommu_mr</span> <span class="o">=</span> <span class="n">IOMMU_MEMORY_REGION</span><span class="p">(</span><span class="n">section</span><span class="o">-&gt;</span><span class="n">mr</span><span class="p">);</span>
+
+        <span class="n">trace_vfio_listener_region_add_iommu</span><span class="p">(</span><span class="n">iova</span><span class="p">,</span> <span class="n">end</span><span class="p">);</span>
+        <span class="cm">/*</span>
+<span class="cm">         * FIXME: For VFIO iommu types which have KVM acceleration to</span>
+<span class="cm">         * avoid bouncing all map/unmaps through qemu this way, this</span>
+<span class="cm">         * would be the right place to wire that up (tell the KVM</span>
+<span class="cm">         * device emulation the VFIO iommu handles to use).</span>
+<span class="cm">         */</span>
+        <span class="n">giommu</span> <span class="o">=</span> <span class="n">g_malloc0</span><span class="p">(</span><span class="k">sizeof</span><span class="p">(</span><span class="o">*</span><span class="n">giommu</span><span class="p">));</span>
+        <span class="n">giommu</span><span class="o">-&gt;</span><span class="n">iommu</span> <span class="o">=</span> <span class="n">iommu_mr</span><span class="p">;</span>
+        <span class="n">giommu</span><span class="o">-&gt;</span><span class="n">iommu_offset</span> <span class="o">=</span> <span class="n">section</span><span class="o">-&gt;</span><span class="n">offset_within_address_space</span> <span class="o">-</span>
+                               <span class="n">section</span><span class="o">-&gt;</span><span class="n">offset_within_region</span><span class="p">;</span>
+        <span class="n">giommu</span><span class="o">-&gt;</span><span class="n">container</span> <span class="o">=</span> <span class="n">container</span><span class="p">;</span>
+        <span class="n">llend</span> <span class="o">=</span> <span class="n">int128_add</span><span class="p">(</span><span class="n">int128_make64</span><span class="p">(</span><span class="n">section</span><span class="o">-&gt;</span><span class="n">offset_within_region</span><span class="p">),</span>
+                           <span class="n">section</span><span class="o">-&gt;</span><span class="n">size</span><span class="p">);</span>
+        <span class="n">llend</span> <span class="o">=</span> <span class="n">int128_sub</span><span class="p">(</span><span class="n">llend</span><span class="p">,</span> <span class="n">int128_one</span><span class="p">());</span>
+        <span class="n">iommu_notifier_init</span><span class="p">(</span><span class="o">&amp;</span><span class="n">giommu</span><span class="o">-&gt;</span><span class="n">n</span><span class="p">,</span> <span class="n">vfio_iommu_map_notify</span><span class="p">,</span>
+                            <span class="n">IOMMU_NOTIFIER_ALL</span><span class="p">,</span>
+                            <span class="n">section</span><span class="o">-&gt;</span><span class="n">offset_within_region</span><span class="p">,</span>
+                            <span class="n">int128_get64</span><span class="p">(</span><span class="n">llend</span><span class="p">));</span>
+        <span class="n">QLIST_INSERT_HEAD</span><span class="p">(</span><span class="o">&amp;</span><span class="n">container</span><span class="o">-&gt;</span><span class="n">giommu_list</span><span class="p">,</span> <span class="n">giommu</span><span class="p">,</span> <span class="n">giommu_next</span><span class="p">);</span>
+
+        <span class="n">memory_region_register_iommu_notifier</span><span class="p">(</span><span class="n">section</span><span class="o">-&gt;</span><span class="n">mr</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">giommu</span><span class="o">-&gt;</span><span class="n">n</span><span class="p">);</span>
+        <span class="n">memory_region_iommu_replay</span><span class="p">(</span><span class="n">giommu</span><span class="o">-&gt;</span><span class="n">iommu</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">giommu</span><span class="o">-&gt;</span><span class="n">n</span><span class="p">);</span>
+
+        <span class="k">return</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="cm">/* Here we assume that memory_region_is_ram(section-&gt;mr)==true */</span>
+
+    <span class="n">vaddr</span> <span class="o">=</span> <span class="n">memory_region_get_ram_ptr</span><span class="p">(</span><span class="n">section</span><span class="o">-&gt;</span><span class="n">mr</span><span class="p">)</span> <span class="o">+</span>        <span class="c1">// get hva</span>
+            <span class="n">section</span><span class="o">-&gt;</span><span class="n">offset_within_region</span> <span class="o">+</span>
+            <span class="p">(</span><span class="n">iova</span> <span class="o">-</span> <span class="n">section</span><span class="o">-&gt;</span><span class="n">offset_within_address_space</span><span class="p">);</span>
+
+    <span class="n">trace_vfio_listener_region_add_ram</span><span class="p">(</span><span class="n">iova</span><span class="p">,</span> <span class="n">end</span><span class="p">,</span> <span class="n">vaddr</span><span class="p">);</span>
+
+    <span class="n">llsize</span> <span class="o">=</span> <span class="n">int128_sub</span><span class="p">(</span><span class="n">llend</span><span class="p">,</span> <span class="n">int128_make64</span><span class="p">(</span><span class="n">iova</span><span class="p">));</span>        <span class="c1">// calc map size</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="n">memory_region_is_ram_device</span><span class="p">(</span><span class="n">section</span><span class="o">-&gt;</span><span class="n">mr</span><span class="p">))</span> <span class="p">{</span>
+        <span class="n">hwaddr</span> <span class="n">pgmask</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1ULL</span> <span class="o">&lt;&lt;</span> <span class="n">ctz64</span><span class="p">(</span><span class="n">hostwin</span><span class="o">-&gt;</span><span class="n">iova_pgsizes</span><span class="p">))</span> <span class="o">-</span> <span class="mi">1</span><span class="p">;</span>
+
+        <span class="k">if</span> <span class="p">((</span><span class="n">iova</span> <span class="o">&amp;</span> <span class="n">pgmask</span><span class="p">)</span> <span class="o">||</span> <span class="p">(</span><span class="n">int128_get64</span><span class="p">(</span><span class="n">llsize</span><span class="p">)</span> <span class="o">&amp;</span> <span class="n">pgmask</span><span class="p">))</span> <span class="p">{</span>
+            <span class="n">trace_vfio_listener_region_add_no_dma_map</span><span class="p">(</span>
+                <span class="n">memory_region_name</span><span class="p">(</span><span class="n">section</span><span class="o">-&gt;</span><span class="n">mr</span><span class="p">),</span>
+                <span class="n">section</span><span class="o">-&gt;</span><span class="n">offset_within_address_space</span><span class="p">,</span>
+                <span class="n">int128_getlo</span><span class="p">(</span><span class="n">section</span><span class="o">-&gt;</span><span class="n">size</span><span class="p">),</span>
+                <span class="n">pgmask</span> <span class="o">+</span> <span class="mi">1</span><span class="p">);</span>
+            <span class="k">return</span><span class="p">;</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+
+    <span class="n">ret</span> <span class="o">=</span> <span class="n">vfio_dma_map</span><span class="p">(</span><span class="n">container</span><span class="p">,</span> <span class="n">iova</span><span class="p">,</span> <span class="n">int128_get64</span><span class="p">(</span><span class="n">llsize</span><span class="p">),</span>   <span class="c1">// do VFIO_IOMMU_MAP_DMA</span>
+                       <span class="n">vaddr</span><span class="p">,</span> <span class="n">section</span><span class="o">-&gt;</span><span class="n">readonly</span><span class="p">);</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">ret</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">error_report</span><span class="p">(</span><span class="s">&quot;vfio_dma_map(%p, 0x%&quot;</span><span class="n">HWADDR_PRIx</span><span class="s">&quot;, &quot;</span>
+                     <span class="s">&quot;0x%&quot;</span><span class="n">HWADDR_PRIx</span><span class="s">&quot;, %p) = %d (%m)&quot;</span><span class="p">,</span>
+                     <span class="n">container</span><span class="p">,</span> <span class="n">iova</span><span class="p">,</span> <span class="n">int128_get64</span><span class="p">(</span><span class="n">llsize</span><span class="p">),</span> <span class="n">vaddr</span><span class="p">,</span> <span class="n">ret</span><span class="p">);</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">memory_region_is_ram_device</span><span class="p">(</span><span class="n">section</span><span class="o">-&gt;</span><span class="n">mr</span><span class="p">))</span> <span class="p">{</span>
+            <span class="cm">/* Allow unexpected mappings not to be fatal for RAM devices */</span>
+            <span class="k">return</span><span class="p">;</span>
+        <span class="p">}</span>
+        <span class="k">goto</span> <span class="n">fail</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="k">return</span><span class="p">;</span>
+
+<span class="nl">fail</span><span class="p">:</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">memory_region_is_ram_device</span><span class="p">(</span><span class="n">section</span><span class="o">-&gt;</span><span class="n">mr</span><span class="p">))</span> <span class="p">{</span>
+        <span class="n">error_report</span><span class="p">(</span><span class="s">&quot;failed to vfio_dma_map. pci p2p may not work&quot;</span><span class="p">);</span>
+        <span class="k">return</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="cm">/*</span>
+<span class="cm">     * On the initfn path, store the first error in the container so we</span>
+<span class="cm">     * can gracefully fail.  Runtime, there&#39;s not much we can do other</span>
+<span class="cm">     * than throw a hardware error.</span>
+<span class="cm">     */</span>
+    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">container</span><span class="o">-&gt;</span><span class="n">initialized</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">container</span><span class="o">-&gt;</span><span class="n">error</span><span class="p">)</span> <span class="p">{</span>
+            <span class="n">container</span><span class="o">-&gt;</span><span class="n">error</span> <span class="o">=</span> <span class="n">ret</span><span class="p">;</span>
+        <span class="p">}</span>
+    <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+        <span class="n">hw_error</span><span class="p">(</span><span class="s">&quot;vfio: DMA mapping failed, unable to continue&quot;</span><span class="p">);</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+
+
+<p>vfio_dma_map函数中会传入建立DMA Remapping的基本信息，
+这里是用数据结构vfio_iommu_type1_dma_map来描述，
+然后交给内核去做DMA Remapping。</p>
+<div class="highlight"><pre><span></span>    <span class="k">struct</span> <span class="n">vfio_iommu_type1_dma_map</span> <span class="n">map</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="p">.</span><span class="n">argsz</span> <span class="o">=</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">map</span><span class="p">),</span>
+        <span class="p">.</span><span class="n">flags</span> <span class="o">=</span> <span class="n">VFIO_DMA_MAP_FLAG_READ</span><span class="p">,</span>    <span class="c1">// flags</span>
+        <span class="p">.</span><span class="n">vaddr</span> <span class="o">=</span> <span class="p">(</span><span class="n">__u64</span><span class="p">)(</span><span class="kt">uintptr_t</span><span class="p">)</span><span class="n">vaddr</span><span class="p">,</span>   <span class="c1">// HVA</span>
+        <span class="p">.</span><span class="n">iova</span> <span class="o">=</span> <span class="n">iova</span><span class="p">,</span>                       <span class="c1">// iova -&gt; gpa</span>
+        <span class="p">.</span><span class="n">size</span> <span class="o">=</span> <span class="n">size</span><span class="p">,</span>                       <span class="c1">// map size</span>
+    <span class="p">};</span>
+</pre></div>
+
+
+<p>该函数对应的内核调用栈见下面的图，其主要流程包含2个步骤，简称pin和map：</p>
+<ul>
+<li>vfio_pin_pages_remote 把虚拟机的物理内存都pin住，物理内存不能交换</li>
+<li>vfio_iommu_map 创建虚拟机domain的IOMMU页表，DMA Remapping地址翻译时候使用</li>
+</ul>
+<p>值得注意的是在pin步骤中，
+pin虚拟机物理内存是调用get_user_pages_fast来实现的，
+如果虚拟机的内存未申请那么会先将内存申请出来，
+这个过程可能会非常耗时并且会持有进程的mmap_sem大锁。</p>
+<div class="highlight"><pre><span></span><span class="n">vfio_dma_do_map</span>
+<span class="o">--------------------------------------------------------------</span>
+<span class="n">vfio_pin_map_dma</span>
+    <span class="o">|-&gt;</span> <span class="n">vfio_pin_pages_remote</span>   <span class="c1">// pin pages in memory</span>
+        <span class="o">|-&gt;</span> <span class="n">vaddr_get_pfn</span>
+            <span class="o">|</span><span class="n">get_user_pages_fast</span>
+                <span class="o">|</span><span class="n">gup_pud_range</span>
+                    <span class="n">gup_pud_range</span>
+                        <span class="n">gup_pte_range</span>
+                            <span class="n">get_page</span>   <span class="c1">// pin page, without mm-&gt;mmap_sem held</span>
+                <span class="o">|</span><span class="n">get_user_pages_unlocked</span>
+                    <span class="n">__get_user_pages_locked</span>
+                        <span class="n">__get_user_pages</span>
+                            <span class="o">|</span><span class="n">handle_mm_fault</span>
+                                <span class="n">__handle_mm_fault</span> <span class="c1">// do_page_fault process</span>
+                                    <span class="n">alloc</span> <span class="n">pud</span><span class="o">-&gt;</span><span class="n">pmd</span><span class="o">-&gt;</span><span class="n">pte</span>
+                                    <span class="n">handle_pte_fault</span>
+                                        <span class="n">do_anonymous_page</span>
+                                            <span class="n">alloc_zeroed_user_highpage_movable</span>
+                                            <span class="p">...</span> <span class="n">alloc</span> <span class="n">page</span> <span class="n">with</span> <span class="n">__GFP_ZERO</span>
+                            <span class="o">|</span><span class="n">_get_page</span>
+                                <span class="n">atomic_inc</span><span class="p">(</span><span class="o">&amp;</span><span class="n">page_count</span><span class="p">)</span> <span class="c1">// pin page</span>
+            <span class="o">|</span><span class="n">get_user_pages_remote</span>
+                <span class="n">__get_user_pages_locked</span>
+
+    <span class="o">|-&gt;</span> <span class="n">vfio_iommu_map</span>  <span class="c1">// create IOMMU domain page table</span>
+        <span class="o">|-&gt;</span> <span class="n">iommu_map</span>
+            <span class="o">|-&gt;</span> <span class="n">intel_iommu_map</span>     <span class="c1">// intel-iommu.c</span>
+                <span class="o">|-&gt;</span> <span class="n">domain_pfn_mapping</span>
+                    <span class="o">|-&gt;</span> <span class="n">pfn_to_dma_pte</span>
+</pre></div>
+
+
+<p>同理，vfio_listener_region_add回调函数实现了DMA Remapping关系的反注册。</p>
+<h3>4. VFIO中又是如何支持设备热插拔的？</h3>
+<p>vfio热插拔仍然是走的QEMU设备热插拔流程，大致流程如下：</p>
+<div class="highlight"><pre><span></span><span class="n">qdev_device_add</span>
+    <span class="o">|-&gt;</span> <span class="n">device_set_realized</span>
+        <span class="o">|-&gt;</span> <span class="n">hotplug_handler_plug</span>
+            <span class="o">|-&gt;</span> <span class="n">piix4_device_plug_cb</span>
+                <span class="o">|-&gt;</span> <span class="n">piix4_send_gpe</span> <span class="c1">// inject ACPI GPE to guest OS</span>
+        <span class="o">|-&gt;</span> <span class="n">pci_qdev_realize</span>
+                <span class="o">|-&gt;</span> <span class="n">vfio_realize</span>
+</pre></div>
+
+
+<p>device_set_realized函数负责将设备上线，
+piix4_send_gpe函数中会注入一个ACPI GPE事件通知GuestOS，
+vfio_realize函数负责整个vfio的设备初始化流程。
+那么vfio_realize中主要做了哪些事情呢？
+可以用下面这一张图概括~<a href="https://kernelgo.org/images/qemu-vfio.svg">点击链接查看原图</a></p>
+<p>vfio_realize的具体流程这里就不再展开免得啰嗦！
+感兴趣的请自己分析代码去，所有的vfio实现细节都在这里面。</p>
+<p><img alt="vfio-pci-bar" src="../images/qemu-vfio.svg"></p>
+            <div>
+</div>
+
+            <section>
+    <p id="post-share-links">
+    Share on:
+    <a href="https://twitter.com/intent/tweet?text=Insight%20Into%20VFIO&url=https%3A//kernelgo.org/vfio-insight.html&hashtags=virtualization" target="_blank" title="Share on Twitter">Twitter</a>
+    ❄
+    <a href="https://www.facebook.com/sharer/sharer.php?u=https%3A//kernelgo.org/vfio-insight.html" target="_blank" title="Share on Facebook">Facebook</a>
+    ❄
+    <a href="" target="_blank" title="Share on Google Plus">Google+</a>
+    ❄
+    <a href="mailto:?subject=Insight%20Into%20VFIO&amp;body=https%3A//kernelgo.org/vfio-insight.html" target="_blank" title="Share via Email">Email</a>
+    </p>
+</section>
+
+            <section>
+<div class="accordion" id="accordion2">
+    <div class="accordion-group">
+        <div class="accordion-heading">
+            <a class="accordion-toggle disqus-comment-count" data-toggle="collapse" data-parent="#accordion2"
+                href="https://kernelgo.org/vfio-insight.html#disqus_thread",
+                id="disqus-accordion-toggle">
+                Comments
+            </a>
+        </div>
+        <div id="disqus_thread" class="accordion-body collapse">
+            <div class="accordion-inner">
+                <div class="comments">
+                    <div id="disqus_thread"></div>
+<script type="text/javascript">
+    var disqus_shortname = 'kernelgo';
+        var disqus_identifier = 'https://kernelgo.org/vfio-insight.html';
+    var disqus_url = 'https://kernelgo.org/vfio-insight.html';
+
+    (function() {
+         var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+         dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+         (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+     })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</section>
+
+            <hr/>
+<section>
+    <h2>Related Posts</h2>
+<ul class="related-posts-list">
+<li><a href="https://kernelgo.org/posted-interrupt.html" title="VT-d Posted Interrupt">VT-d Posted Interrupt</a></li>
+<li><a href="https://kernelgo.org/vfio-introduction.html" title="VFIO Introduction">VFIO Introduction</a></li>
+<li><a href="https://kernelgo.org/vtd_interrupt_remapping_code_analysis.html" title="VT-d Interrupt Remapping Code Analysis">VT-d Interrupt Remapping Code Analysis</a></li>
+<li><a href="https://kernelgo.org/vtd-posted-interrupt-code-analysis.html" title="VT-d Interrupt Posting Code Analysis">VT-d Interrupt Posting Code Analysis</a></li>
+<li><a href="https://kernelgo.org/reading2019.html" title="Article Archive 2019 Reading Plan">Article Archive 2019 Reading Plan</a></li>
+</ul>
+<hr />
+</section>
+            <aside>
+            <nav>
+            <ul class="articles-timeline">
+                <li class="previous-article">« <a href="https://kernelgo.org/intel_iommu.html" title="Previous: Intel IOMMU Introduction">Intel IOMMU Introduction</a></li>
+                <li class="next-article"><a href="https://kernelgo.org/linux-tips.html" title="Next: Tips on Linux">Tips on Linux</a> »</li>
+            </ul>
+            </nav>
+            </aside>
+        </div>
+        <section>
+        <div class="span2" style="float:right;font-size:0.9em;">
+            <h4>Published</h4>
+            <time itemprop="dateCreated" datetime="2018-05-28T23:00:00+08:00">May 28, 2018</time>
+
+<h4>Last Updated</h4>
+<time datetime="2018-05-28T23:00:00+08:00">May 28, 2018</time>
+
+            <h4>Category</h4>
+            <a class="category-link" href="https://kernelgo.org/categories.html#virtualization-ref">virtualization</a>
+            <h4>Tags</h4>
+            <ul class="list-of-tags tags-in-article">
+                <li><a href="https://kernelgo.org/tags#virtualization-ref">virtualization
+                    <span>14</span>
+</a></li>
+            </ul>
+<h4>Contact</h4>
+    <a href="https://github.com/fangying" title="My github Profile" class="sidebar-social-links" target="_blank">
+    <i class="fa fa-github sidebar-social-links"></i></a>
+    <a href="#" title="My Another social link Profile" class="sidebar-social-links" target="_blank">
+    <i class="fa fa-another social link sidebar-social-links"></i></a>
+        </div>
+        </section>
+</div>
+</article>
+                </div>
+                <div class="span1"></div>
+            </div>
+        </div>
+        <div id="push"></div>
+    </div>
+<footer>
+<div id="footer">
+    <ul class="footer-content">
+        <li class="elegant-license"><span xmlns:dct="http://purl.org/dc/terms/" property="dct:title"> kernelgo"</span> by <a xmlns:cc="http://creativecommons.org/ns#" href="https://kernelgo.org" property="cc:attributionName" rel="cc:attributionURL">Yori Fang</a> is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/3.0/deed.en_US">Creative Commons Attribution-ShareAlike 3.0 Unported License</a>.</li>
+        <li class="elegant-power">Powered by <a href="http://getpelican.com/" title="Pelican Home Page">Pelican</a>. Theme: <a href="https://github.com/Pelican-Elegant/elegant/" title="Theme Elegant Home Page">Elegant</a></li>
+    </ul>
+</div>
+</footer>            <script src="//code.jquery.com/jquery.min.js"></script>
+        <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/js/bootstrap.min.js"></script>
+        <script>
+            function validateForm(query)
+            {
+                return (query.length > 0);
+            }
+        </script>
+
+            <script type="text/javascript">
+var disqus_shortname = 'kernelgo';
+(function () {
+    var s = document.createElement('script'); s.async = true;
+    s.type = 'text/javascript';
+    s.src = '//' + disqus_shortname + '.disqus.com/count.js';
+    (document.getElementsByTagName('HEAD')[0] || document.getElementsByTagName('BODY')[0]).appendChild(s);
+}());
+</script>
+<script  language="javascript" type="text/javascript">
+function uncollapse() {
+    if (window.location.hash.match(/^#comment-\d+$/)) {
+        $('#disqus_thread').collapse('show');
+    }
+}
+</script>
+<script type="text/javascript" language="JavaScript">
+uncollapse();
+window.onhashchange=function(){
+    if (window.location.hash.match(/^#comment-\d+$/))
+        window.location.reload(true);
+}
+</script>
+<script>
+$('#disqus_thread').on('shown', function () {
+    var link = document.getElementById('disqus-accordion-toggle');
+    var old_innerHTML = link.innerHTML;
+    $(link).fadeOut(500, function() {
+        $(this).text('Click here to hide comments').fadeIn(500);
+    });
+    $('#disqus_thread').on('hidden', function () {
+        $(link).fadeOut(500, function() {
+            $(this).text(old_innerHTML).fadeIn(500);
+        });
+    })
+})
+</script>
+
+
+    </body>
+    <!-- Theme: Elegant built for Pelican
+    License : MIT -->
+</html>

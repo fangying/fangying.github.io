@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="zh">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="author" content="Yori Fang" />
+
+        <meta property="og:type" content="article" />
+        <meta name="twitter:card" content="summary">
+
+<meta name="keywords" content="virtualization, virtualization, " />
+
+<meta property="og:title" content="Virt NMI Emulation "/>
+<meta property="og:url" content="https://kernelgo.org/x86-nmi.html" />
+<meta property="og:description" content="x86 NMI Emulation" />
+<meta property="og:site_name" content="kernelgo" />
+<meta property="og:article:author" content="Yori Fang" />
+<meta property="og:article:published_time" content="2019-03-16T23:00:00+08:00" />
+<meta property="og:article:modified_time" content="2019-03-16T23:00:00+08:00" />
+<meta name="twitter:title" content="Virt NMI Emulation ">
+<meta name="twitter:description" content="x86 NMI Emulation">
+
+        <title>Virt NMI Emulation  · kernelgo
+</title>
+        <link href="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/css/bootstrap-combined.min.css" rel="stylesheet">
+        <link href="//netdna.bootstrapcdn.com/font-awesome/4.0.1/css/font-awesome.css" rel="stylesheet">
+<link rel="stylesheet" href="https://kernelgo.org/theme/css/style.min.css?0d6ab362">
+<script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+     (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+     m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+     })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+    ga('create', 'UA-107392039-1', 'auto');
+    ga('send', 'pageview');
+</script>
+
+
+
+    </head>
+    <body>
+        <div id="content-sans-footer">
+        <div class="navbar navbar-static-top">
+            <div class="navbar-inner">
+                <div class="container-fluid">
+                    <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                    </a>
+                    <a class="brand" href="https://kernelgo.org/"><span class=site-name>kernelgo</span></a>
+                    <div class="nav-collapse collapse">
+                        <ul class="nav pull-right top-menu">
+                            <li ><a href="https://kernelgo.org">Home</a></li>
+                            <li ><a href="https://kernelgo.org/pages/about.html">About</a></li>
+                            <li ><a href="https://kernelgo.org/categories">Categories</a></li>
+                            <li ><a href="https://kernelgo.org/tags">Tags</a></li>
+                            <li ><a href="https://kernelgo.org/archives">Archives</a></li>
+                            <li><form class="navbar-search" action="https://kernelgo.org/search.html" onsubmit="return validateForm(this.elements['q'].value);"> <input type="text" class="search-query" placeholder="Search" name="q" id="tipue_search_input"></form></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="container-fluid">
+            <div class="row-fluid">
+                <div class="span1"></div>
+                <div class="span10">
+<article itemscope>
+<div class="row-fluid">
+    <header class="page-header span10 offset2">
+    <h1><a href="https://kernelgo.org/x86-nmi.html"> Virt NMI Emulation  </a></h1>
+    </header>
+</div>
+
+<div class="row-fluid">
+        <div class="span8 offset2 article-content">
+
+            
+            <h3>X86 NMI中断</h3>
+<p>NMI（Nonmaskable Interrupt）中断之所以称之为NMI的原因是：这种类型的中断不能被CPU的EFLAGS寄存器的IF标志位所屏蔽。
+而对于可屏蔽中断而言只要IF标志位被清理（例如：CPU执行了cli指令），那么处理器就会禁止INTR Pin和Local APIC上接收到的内部中断请求。
+NMI中断有两种触发方式：</p>
+<ul>
+<li>外部硬件通过CPU的 NMI Pin 去触发（硬件触发）</li>
+<li>软件向CPU系统总线上投递一个NMI类型中断（软件触发）</li>
+</ul>
+<p>当CPU从上述两种中断源接收到NMI中断后就立刻调用vector=2（中断向量为2）的中断处理函数来处理NMI中断。
+Intel SDM, Volume 3, Chapter 6.7 Nonmaskable Interrupt章节指出：
+当一个NMI中断处理函数正在执行的时候，处理器会block后续的NMI直到中断处理函数执行IRET返回。</p>
+<h3>1.NMI中断的用途</h3>
+<p>NMI中断的主要用途有两个：</p>
+<ul>
+<li>用来告知操作系统有硬件错误（Hardware Failure）</li>
+<li>用来做看门狗定时器，检测CPU死锁</li>
+</ul>
+<p>除了用来，看门狗定时器在Linux内核中被用来进行死锁检测（Hard Lockup），当CPU长时间不喂狗的时候会触发看门狗超时，
+这时候向操作系统注入NMI中断，告知系统异常。</p>
+<h3>2.NMI中断虚拟化</h3>
+<p>我们可以通过virsh inject-nmi VMname命令给虚拟机注入NMI中断。</p>
+<p>QEMU这边的调用栈为：</p>
+<div class="highlight"><pre><span></span><span class="n">qmp_inject_nmi</span>
+  <span class="o">=&gt;</span> <span class="n">nmi_monitor_handle</span>
+    <span class="o">=&gt;</span> <span class="n">nmi_children</span>  <span class="c1">//传入了struct do_nmi_s ns</span>
+      <span class="o">=&gt;</span> <span class="n">do_nmi</span>
+        <span class="o">=&gt;</span> <span class="n">nc</span><span class="o">-&gt;</span><span class="n">nmi_monitor_handler</span>
+          <span class="o">=&gt;</span> <span class="n">x86_nmi</span>
+            <span class="o">=&gt;</span> <span class="n">apic_deliver_nmi</span>
+              <span class="o">=&gt;</span> <span class="n">kvm_apic_external_nmi</span>
+                <span class="o">=&gt;</span> <span class="n">do_inject_external_nmi</span>
+                  <span class="o">=&gt;</span> <span class="n">kvm_vcpu_ioctl</span><span class="p">(</span><span class="n">cpu</span><span class="p">,</span> <span class="n">KVM_NMI</span><span class="p">)</span>
+</pre></div>
+
+
+<p>其中<code>nmi_children</code>的设计比较特别，它调用了一个object_child_foreach函数，
+会沿着QOM对象树往下遍历，遍历的时候调用<code>do_nmi</code>函数。
+值得注意的是这里<code>NMIClass</code>被设计为一个<code>interface</code>类型，而主板类<code>MachineClass</code>实现了这个接口。</p>
+<div class="highlight"><pre><span></span><span class="k">static</span> <span class="k">const</span> <span class="n">TypeInfo</span> <span class="n">pc_machine_info</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="p">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">TYPE_PC_MACHINE</span><span class="p">,</span>
+    <span class="p">.</span><span class="n">parent</span> <span class="o">=</span> <span class="n">TYPE_MACHINE</span><span class="p">,</span>
+    <span class="p">.</span><span class="n">abstract</span> <span class="o">=</span> <span class="nb">true</span><span class="p">,</span>
+    <span class="p">.</span><span class="n">instance_size</span> <span class="o">=</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">PCMachineState</span><span class="p">),</span>
+    <span class="p">.</span><span class="n">instance_init</span> <span class="o">=</span> <span class="n">pc_machine_initfn</span><span class="p">,</span>
+    <span class="p">.</span><span class="n">class_size</span> <span class="o">=</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">PCMachineClass</span><span class="p">),</span>
+    <span class="p">.</span><span class="n">class_init</span> <span class="o">=</span> <span class="n">pc_machine_class_init</span><span class="p">,</span>
+    <span class="p">.</span><span class="n">interfaces</span> <span class="o">=</span> <span class="p">(</span><span class="n">InterfaceInfo</span><span class="p">[])</span> <span class="p">{</span>
+         <span class="p">{</span> <span class="n">TYPE_HOTPLUG_HANDLER</span> <span class="p">},</span>
+         <span class="p">{</span> <span class="n">TYPE_NMI</span> <span class="p">},</span>
+         <span class="p">{</span> <span class="p">}</span>
+    <span class="p">},</span>
+<span class="p">};</span>
+</pre></div>
+
+
+<p>主板类是一个抽象类，实现了<code>TYPE_HOTPLUG_HANDLER</code>和<code>TYPE_NMI</code>接口，有点Java面向对象的意思。</p>
+<div class="highlight"><pre><span></span><span class="nv">static</span> <span class="nv">int</span> <span class="nv">do_nmi</span><span class="ss">(</span><span class="nv">Object</span> <span class="o">*</span><span class="nv">o</span>, <span class="nv">void</span> <span class="o">*</span><span class="nv">opaque</span><span class="ss">)</span>
+{
+    <span class="nv">struct</span> <span class="nv">do_nmi_s</span> <span class="o">*</span><span class="nv">ns</span> <span class="o">=</span> <span class="nv">opaque</span><span class="c1">;</span>
+    <span class="nv">NMIState</span> <span class="o">*</span><span class="nv">n</span> <span class="o">=</span> <span class="ss">(</span><span class="nv">NMIState</span> <span class="o">*</span><span class="ss">)</span> <span class="nv">object_dynamic_cast</span><span class="ss">(</span><span class="nv">o</span>, <span class="nv">TYPE_NMI</span><span class="ss">)</span><span class="c1">;  // 对象动态转换</span>
+
+    <span class="k">if</span> <span class="ss">(</span><span class="nv">n</span><span class="ss">)</span> {      <span class="o">//</span> 如果能够成功转换，说明这个对象实现了 <span class="nv">NMI</span> 接口，那么可以调用这个对象的处理函数
+        <span class="nv">NMIClass</span> <span class="o">*</span><span class="nv">nc</span> <span class="o">=</span> <span class="nv">NMI_GET_CLASS</span><span class="ss">(</span><span class="nv">n</span><span class="ss">)</span><span class="c1">;</span>
+
+        <span class="nv">ns</span><span class="o">-&gt;</span><span class="nv">handled</span> <span class="o">=</span> <span class="nv">true</span><span class="c1">;</span>
+        <span class="nv">nc</span><span class="o">-&gt;</span><span class="nv">nmi_monitor_handler</span><span class="ss">(</span><span class="nv">n</span>, <span class="nv">ns</span><span class="o">-&gt;</span><span class="nv">cpu_index</span>, <span class="o">&amp;</span><span class="nv">ns</span><span class="o">-&gt;</span><span class="nv">err</span><span class="ss">)</span><span class="c1">;   // nmi_monitor_handler 是NMI接口的方法</span>
+        <span class="k">if</span> <span class="ss">(</span><span class="nv">ns</span><span class="o">-&gt;</span><span class="nv">err</span><span class="ss">)</span> {
+            <span class="k">return</span> <span class="o">-</span><span class="mi">1</span><span class="c1">;</span>
+        }
+    }
+    <span class="nv">nmi_children</span><span class="ss">(</span><span class="nv">o</span>, <span class="nv">ns</span><span class="ss">)</span><span class="c1">;</span>
+
+    <span class="k">return</span> <span class="mi">0</span><span class="c1">;</span>
+}
+</pre></div>
+
+
+<p><code>nmi_monitor_handle</code>函数中调用了nmi_children(object_get_root(), &amp;ns)，从Root Object对象开始向下遍历，
+在对象上调用<code>do_nmi</code>方法，而<code>do_nmi</code>里面会检测这个对象是否实现了<code>TYPE_NMI</code>类型的接口，
+如果这个对象实现了这个接口，那么调用<code>mi_monitor_handler</code>方法来发送NMI中断。这里充分体现了QOM面向对象思想。
+在看代码的时候，我们可以找到<code>pc_machine_class_init</code>里面注册了<code>mi_monitor_handler</code>。
+这里还不太理解的是x86_nmi里面会遍历所有的CPU，对每个CPU都注了NMI，有这个必要吗？</p>
+<div class="highlight"><pre><span></span><span class="k">static</span> <span class="kt">void</span> <span class="nf">pc_machine_class_init</span><span class="p">(</span><span class="n">ObjectClass</span> <span class="o">*</span><span class="n">oc</span><span class="p">,</span> <span class="kt">void</span> <span class="o">*</span><span class="n">data</span><span class="p">)</span> 
+<span class="p">{</span>
+  <span class="n">NMIClass</span> <span class="o">*</span><span class="n">nc</span> <span class="o">=</span> <span class="n">NMI_CLASS</span><span class="p">(</span><span class="n">oc</span><span class="p">);</span>       <span class="c1">// 把对象转换为NMIClass类型对象</span>
+  <span class="n">nc</span><span class="o">-&gt;</span><span class="n">nmi_monitor_handler</span> <span class="o">=</span> <span class="n">x86_nmi</span><span class="p">;</span>  <span class="c1">// 实现接口方法</span>
+<span class="p">}</span>
+</pre></div>
+
+
+<p>QEMU调用完kvm_vcpu_ioctl(cpu, KVM_NMI)之后就开始进入KVM内核进行NMI中断注入，
+毕竟LAPIC和IOAPIC现在都放到KVM模拟来提升中断注入的实时性。</p>
+<div class="highlight"><pre><span></span><span class="n">KVM</span> <span class="n">x86</span><span class="p">.</span><span class="n">c</span>
+<span class="n">kvm_arch_vcpu_ioctl</span>
+  <span class="o">=&gt;</span> <span class="n">kvm_vcpu_ioctl_nmi</span>
+    <span class="o">=&gt;</span> <span class="n">kvm_inject_nmi</span>
+</pre></div>
+
+
+<p>kvm_inject_nmi 里面将nmi_queued加1，然后make KVM_REQ_NMI request。
+为了防止中断嵌套KVM做了一些额外的处理。</p>
+<div class="highlight"><pre><span></span> <span class="n">void</span> <span class="n">kvm_inject_nmi</span><span class="p">(</span><span class="n">struct</span> <span class="n">kvm_vcpu</span> <span class="o">*</span><span class="n">vcpu</span><span class="p">)</span>
+  <span class="err">{</span>
+          <span class="n">atomic_inc</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">nmi_queued</span><span class="p">);</span>
+          <span class="n">kvm_make_request</span><span class="p">(</span><span class="n">KVM_REQ_NMI</span><span class="p">,</span> <span class="n">vcpu</span><span class="p">);</span>
+  <span class="err">}</span>
+</pre></div>
+
+
+<p>这样VCPU在下次VM Exit的时候会check标志位，进行NMI注入。 </p>
+<div class="highlight"><pre><span></span><span class="k">static</span> <span class="kt">int</span> <span class="nf">vcpu_enter_guest</span><span class="p">(</span><span class="k">struct</span> <span class="n">kvm_vcpu</span> <span class="o">*</span><span class="n">vcpu</span><span class="p">)</span>
+<span class="p">{</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">kvm_check_request</span><span class="p">(</span><span class="n">KVM_REQ_NMI</span><span class="p">,</span> <span class="n">vcpu</span><span class="p">))</span>
+            <span class="n">process_nmi</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="c1">// 由于NMI中断不能嵌套，这里做了防呆，第一process_nmi的时候limit=2，</span>
+<span class="k">static</span> <span class="kt">void</span> <span class="nf">process_nmi</span><span class="p">(</span><span class="k">struct</span> <span class="n">kvm_vcpu</span> <span class="o">*</span><span class="n">vcpu</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="kt">unsigned</span> <span class="n">limit</span> <span class="o">=</span> <span class="mi">2</span><span class="p">;</span>
+
+    <span class="cm">/*</span>
+<span class="cm">     * x86 is limited to one NMI running, and one NMI pending after it.</span>
+<span class="cm">     * If an NMI is already in progress, limit further NMIs to just one.</span>
+<span class="cm">     * Otherwise, allow two (and we&#39;ll inject the first one immediately).</span>
+<span class="cm">     */</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">kvm_x86_ops</span><span class="o">-&gt;</span><span class="n">get_nmi_mask</span><span class="p">(</span><span class="n">vcpu</span><span class="p">)</span> <span class="o">||</span> <span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">nmi_injected</span><span class="p">)</span>
+        <span class="n">limit</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+
+    <span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">nmi_pending</span> <span class="o">+=</span> <span class="n">atomic_xchg</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">nmi_queued</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+    <span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">nmi_pending</span> <span class="o">=</span> <span class="n">min</span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">nmi_pending</span><span class="p">,</span> <span class="n">limit</span><span class="p">);</span>
+    <span class="n">kvm_make_request</span><span class="p">(</span><span class="n">KVM_REQ_EVENT</span><span class="p">,</span> <span class="n">vcpu</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="k">static</span> <span class="kt">int</span> <span class="nf">inject_pending_event</span><span class="p">(</span><span class="k">struct</span> <span class="n">kvm_vcpu</span> <span class="o">*</span><span class="n">vcpu</span><span class="p">,</span> <span class="kt">bool</span> <span class="n">req_int_win</span><span class="p">)</span>
+<span class="p">{</span>
+  <span class="n">kvm_x86_ops</span><span class="o">-&gt;</span><span class="n">set_nmi</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>  <span class="c1">// call vmx_inject_nmi</span>
+<span class="p">}</span>
+</pre></div>
+
+
+<p>最后调用<code>vmx_inject_nmi</code>函数注入NMI中断给虚拟机（也是通过写VMCS VM_ENTRY_INTR_INFO_FIELD域来实现）。</p>
+<h3>3.参考文献</h3>
+<p><a href="https://software.intel.com/sites/default/files/managed/39/c5/325462-sdm-vol-1-2abcd-3abcd.pdf">Intel SDM Volume 3, Chapter 6</a></p>
+            <div>
+</div>
+
+            <section>
+    <p id="post-share-links">
+    Share on:
+    <a href="https://twitter.com/intent/tweet?text=Virt%20NMI%20Emulation&url=https%3A//kernelgo.org/x86-nmi.html&hashtags=virtualization" target="_blank" title="Share on Twitter">Twitter</a>
+    ❄
+    <a href="https://www.facebook.com/sharer/sharer.php?u=https%3A//kernelgo.org/x86-nmi.html" target="_blank" title="Share on Facebook">Facebook</a>
+    ❄
+    <a href="" target="_blank" title="Share on Google Plus">Google+</a>
+    ❄
+    <a href="mailto:?subject=Virt%20NMI%20Emulation&amp;body=https%3A//kernelgo.org/x86-nmi.html" target="_blank" title="Share via Email">Email</a>
+    </p>
+</section>
+
+            <section>
+<div class="accordion" id="accordion2">
+    <div class="accordion-group">
+        <div class="accordion-heading">
+            <a class="accordion-toggle disqus-comment-count" data-toggle="collapse" data-parent="#accordion2"
+                href="https://kernelgo.org/x86-nmi.html#disqus_thread",
+                id="disqus-accordion-toggle">
+                Comments
+            </a>
+        </div>
+        <div id="disqus_thread" class="accordion-body collapse">
+            <div class="accordion-inner">
+                <div class="comments">
+                    <div id="disqus_thread"></div>
+<script type="text/javascript">
+    var disqus_shortname = 'kernelgo';
+        var disqus_identifier = 'https://kernelgo.org/x86-nmi.html';
+    var disqus_url = 'https://kernelgo.org/x86-nmi.html';
+
+    (function() {
+         var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+         dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+         (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+     })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</section>
+
+            <hr/>
+<section>
+    <h2>Related Posts</h2>
+<ul class="related-posts-list">
+<li><a href="https://kernelgo.org/posted-interrupt.html" title="VT-d Posted Interrupt">VT-d Posted Interrupt</a></li>
+<li><a href="https://kernelgo.org/vfio-introduction.html" title="VFIO Introduction">VFIO Introduction</a></li>
+<li><a href="https://kernelgo.org/vtd_interrupt_remapping_code_analysis.html" title="VT-d Interrupt Remapping Code Analysis">VT-d Interrupt Remapping Code Analysis</a></li>
+<li><a href="https://kernelgo.org/vtd-posted-interrupt-code-analysis.html" title="VT-d Interrupt Posting Code Analysis">VT-d Interrupt Posting Code Analysis</a></li>
+<li><a href="https://kernelgo.org/reading2019.html" title="Article Archive 2019 Reading Plan">Article Archive 2019 Reading Plan</a></li>
+</ul>
+<hr />
+</section>
+            <aside>
+            <nav>
+            <ul class="articles-timeline">
+                <li class="previous-article">« <a href="https://kernelgo.org/vim8.html" title="Previous: VIM8 Customized Configuration">VIM8 Customized Configuration</a></li>
+                <li class="next-article"><a href="https://kernelgo.org/reading2019.html" title="Next: Article Archive 2019 Reading Plan">Article Archive 2019 Reading Plan</a> »</li>
+            </ul>
+            </nav>
+            </aside>
+        </div>
+        <section>
+        <div class="span2" style="float:right;font-size:0.9em;">
+            <h4>Published</h4>
+            <time itemprop="dateCreated" datetime="2019-03-16T23:00:00+08:00">Mar 16, 2019</time>
+
+<h4>Last Updated</h4>
+<time datetime="2019-03-16T23:00:00+08:00">Mar 16, 2019</time>
+
+            <h4>Category</h4>
+            <a class="category-link" href="https://kernelgo.org/categories.html#virtualization-ref">virtualization</a>
+            <h4>Tags</h4>
+            <ul class="list-of-tags tags-in-article">
+                <li><a href="https://kernelgo.org/tags#virtualization-ref">virtualization
+                    <span>14</span>
+</a></li>
+            </ul>
+<h4>Contact</h4>
+    <a href="https://github.com/fangying" title="My github Profile" class="sidebar-social-links" target="_blank">
+    <i class="fa fa-github sidebar-social-links"></i></a>
+    <a href="#" title="My Another social link Profile" class="sidebar-social-links" target="_blank">
+    <i class="fa fa-another social link sidebar-social-links"></i></a>
+        </div>
+        </section>
+</div>
+</article>
+                </div>
+                <div class="span1"></div>
+            </div>
+        </div>
+        <div id="push"></div>
+    </div>
+<footer>
+<div id="footer">
+    <ul class="footer-content">
+        <li class="elegant-license"><span xmlns:dct="http://purl.org/dc/terms/" property="dct:title"> kernelgo"</span> by <a xmlns:cc="http://creativecommons.org/ns#" href="https://kernelgo.org" property="cc:attributionName" rel="cc:attributionURL">Yori Fang</a> is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/3.0/deed.en_US">Creative Commons Attribution-ShareAlike 3.0 Unported License</a>.</li>
+        <li class="elegant-power">Powered by <a href="http://getpelican.com/" title="Pelican Home Page">Pelican</a>. Theme: <a href="https://github.com/Pelican-Elegant/elegant/" title="Theme Elegant Home Page">Elegant</a></li>
+    </ul>
+</div>
+</footer>            <script src="//code.jquery.com/jquery.min.js"></script>
+        <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/js/bootstrap.min.js"></script>
+        <script>
+            function validateForm(query)
+            {
+                return (query.length > 0);
+            }
+        </script>
+
+            <script type="text/javascript">
+var disqus_shortname = 'kernelgo';
+(function () {
+    var s = document.createElement('script'); s.async = true;
+    s.type = 'text/javascript';
+    s.src = '//' + disqus_shortname + '.disqus.com/count.js';
+    (document.getElementsByTagName('HEAD')[0] || document.getElementsByTagName('BODY')[0]).appendChild(s);
+}());
+</script>
+<script  language="javascript" type="text/javascript">
+function uncollapse() {
+    if (window.location.hash.match(/^#comment-\d+$/)) {
+        $('#disqus_thread').collapse('show');
+    }
+}
+</script>
+<script type="text/javascript" language="JavaScript">
+uncollapse();
+window.onhashchange=function(){
+    if (window.location.hash.match(/^#comment-\d+$/))
+        window.location.reload(true);
+}
+</script>
+<script>
+$('#disqus_thread').on('shown', function () {
+    var link = document.getElementById('disqus-accordion-toggle');
+    var old_innerHTML = link.innerHTML;
+    $(link).fadeOut(500, function() {
+        $(this).text('Click here to hide comments').fadeIn(500);
+    });
+    $('#disqus_thread').on('hidden', function () {
+        $(link).fadeOut(500, function() {
+            $(this).text(old_innerHTML).fadeIn(500);
+        });
+    })
+})
+</script>
+
+
+    </body>
+    <!-- Theme: Elegant built for Pelican
+    License : MIT -->
+</html>

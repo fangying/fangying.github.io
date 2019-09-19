@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="zh">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="author" content="Yori Fang" />
+
+        <meta property="og:type" content="article" />
+        <meta name="twitter:card" content="summary">
+
+<meta name="keywords" content="virtualization, virtualization, " />
+
+<meta property="og:title" content="Virtio Overview "/>
+<meta property="og:url" content="https://kernelgo.org/virtio, virtio-net,virto-scsi.html" />
+<meta property="og:description" content="virtio overview" />
+<meta property="og:site_name" content="kernelgo" />
+<meta property="og:article:author" content="Yori Fang" />
+<meta property="og:article:published_time" content="2019-09-13T23:00:00+08:00" />
+<meta property="og:article:modified_time" content="2019-09-13T23:00:00+08:00" />
+<meta name="twitter:title" content="Virtio Overview ">
+<meta name="twitter:description" content="virtio overview">
+
+        <title>Virtio Overview  · kernelgo
+</title>
+        <link href="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/css/bootstrap-combined.min.css" rel="stylesheet">
+        <link href="//netdna.bootstrapcdn.com/font-awesome/4.0.1/css/font-awesome.css" rel="stylesheet">
+<link rel="stylesheet" href="https://kernelgo.org/theme/css/style.min.css?0d6ab362">
+<script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+     (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+     m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+     })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+    ga('create', 'UA-107392039-1', 'auto');
+    ga('send', 'pageview');
+</script>
+
+
+
+    </head>
+    <body>
+        <div id="content-sans-footer">
+        <div class="navbar navbar-static-top">
+            <div class="navbar-inner">
+                <div class="container-fluid">
+                    <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                    </a>
+                    <a class="brand" href="https://kernelgo.org/"><span class=site-name>kernelgo</span></a>
+                    <div class="nav-collapse collapse">
+                        <ul class="nav pull-right top-menu">
+                            <li ><a href="https://kernelgo.org">Home</a></li>
+                            <li ><a href="https://kernelgo.org/pages/about.html">About</a></li>
+                            <li ><a href="https://kernelgo.org/categories">Categories</a></li>
+                            <li ><a href="https://kernelgo.org/tags">Tags</a></li>
+                            <li ><a href="https://kernelgo.org/archives">Archives</a></li>
+                            <li><form class="navbar-search" action="https://kernelgo.org/search.html" onsubmit="return validateForm(this.elements['q'].value);"> <input type="text" class="search-query" placeholder="Search" name="q" id="tipue_search_input"></form></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="container-fluid">
+            <div class="row-fluid">
+                <div class="span1"></div>
+                <div class="span10">
+<article itemscope>
+<div class="row-fluid">
+    <header class="page-header span10 offset2">
+    <h1><a href="https://kernelgo.org/virtio, virtio-net,virto-scsi.html"> Virtio Overview  </a></h1>
+    </header>
+</div>
+
+<div class="row-fluid">
+        <div class="span8 offset2 article-content">
+
+            
+            <h2>摘要</h2>
+<p>半虚拟化设备(Virtio Device)在当前云计算虚拟化场景下已经得到了非常广泛的应用，
+并且现在也有越来越多的物理设备也开始支持Virtio协议，即所谓的Virtio Offload，
+通过将virtio协议卸载到硬件上（例如网卡）让物理机和虚拟机都能够获得加速体验。
+本文中我们来重点了解一下virtio技术中的一些关键点，方便我们加深对半虚拟化的理解。
+本文适合对IO虚拟化有一定了解的人群阅读，本文的目的是对想要了解virtio内部机制的读者提供一下帮助。</p>
+<p>在开始了解virtio之前，我们先思考一下几个相关问题：</p>
+<ul>
+<li>virtio设备是基于PCI设备标准，virtio设备的PCI配置空间都有哪些内容？</li>
+<li>virtio前端和后端基于共享内存机制进行通信，它是凭什么可以做到无锁的？</li>
+<li>virtio机制中有那几个关键的数据结构？virtio是如何工作的？</li>
+<li>virtio前后端是如何进行通信的？irqfd和ioeventfd是什么回事儿？在virtio前后端通信中是怎么用到的？</li>
+<li>virtio设备支持MSIx，在qemu/kvm中具体是怎么实现对MSIx的模拟呢？</li>
+<li>virtio modern相对于virtio legay多了哪些新特性？</li>
+</ul>
+<h2>0. 简单了解一下Virtio Spec协议</h2>
+<p>virtio协议标准最早又IBM提出，virtio作为一套标准协议现在有专门的技术委员会进行管理，
+具体的标准可以访问<a href="http://docs.oasis-open.org/virtio/virtio/v1.0/virtio-v1.0.html">virtio官网</a>，
+开发者可以向技术委员会提供新的virtio设备提案（RFC），经过委员会通过后可以增加新的virtio设备类型。</p>
+<p>组成一个virtio设备的四要素包括：
+设备状态域，feature bits，设备配置空间，一个或者多个virtqueue。
+其中设备状态域包含6种状态：</p>
+<ul>
+<li>ACKNOWLEDGE（1）：GuestOS发现了这个设备，并且认为这是一个有效的virtio设备；</li>
+<li>DRIVER (2) : GuestOS知道该如何驱动这个设备；</li>
+<li>FAILED (128) : GuestOS无法正常驱动这个设备，Something is wriong；</li>
+<li>FEATURES_OK (8) : GuestOS认识所有的feature，并且feature协商一完成；</li>
+<li>DRIVER_OK (4) : 驱动加载完成，设备可以投入使用了；</li>
+<li>DEVICE_NEEDS_RESET (64) ：设备触发了错误，需要重置才能继续工作。</li>
+</ul>
+<p>feature bits用来标志设备支持那个特性，其中bit0-bit23是特定设备可以使用的feature bits，
+bit24-bit37预给队列和feature协商机制，bit38以上保留给未来其他用途。
+例如：对于virtio-net设备而言，feature bit0表示网卡设备支持checksum校验。
+VIRTIO_F_VERSION_1这个feature bit用来表示设备是否支持virtio 1.0 spec标准。</p>
+<p>在virtio协议中，所有的设备都使用virtqueue来进行数据的传输。
+ <em>每个设备可以有0个或者多个virtqueue</em>，每个virtqueue占用2个或者更多个4K的物理页。
+ virtqueue有Split Virtqueues和Packed Virtqueues两种模式，在Split virtqueues模式下virtqueue被分成若干个部分，
+ 每个部分都是前端驱动或者后端单向可写的（不能两端同时写）。
+ 每个virtqueue都有一个16bit的queue size参数，表示队列的总长度。
+ 每个virtqueue由3个部分组成：</p>
+<p><code>+-------------------+--------------------------------+-----------------------+
+| Descriptor Table  |   Available Ring  (padding)    |       Used Ring       |
++-------------------+--------------------------------+-----------------------+</code></p>
+<ul>
+<li>Descriptor Table：存放IO传输请求信息；</li>
+<li>Available Ring：记录了Descriptor Table表中的哪些项被更新了，前端Driver可写但后端只读；</li>
+<li>Used Ring：记录Descriptor Table表中哪些请求已经被提交到硬件，前端Driver只读但后端可写。</li>
+</ul>
+<p>整个virtio协议中设备IO请求的工作机制可以简单地概括为：</p>
+<ol>
+<li>前端驱动将IO请求放到Descriptor Table中，然后将索引更新到Available Ring中，然后kick后端去取数据；</li>
+<li>后端取出IO请求进行处理，然后结果刷新到Descriptor Table中再更新Using Ring，然后发送中断notify前端。</li>
+</ol>
+<p>从virtio协议可以了解到virtio设备支持3种设备呈现模式：</p>
+<ul>
+<li>Virtio Over PCI BUS，依旧遵循PCI规范，挂在到PCI总线上；</li>
+<li>Virtio Over MMIO，部分不支持PCI协议的虚拟化平台可以使用这种工作模式；</li>
+<li>Virtio Over Channel I/O：主要用在s390平台上，virtio-ccw使用这种基于channel I/O的机制。</li>
+</ul>
+<p>其中，Virtio Over PCI BUS的使用比较广泛，作为PCI设备需按照规范要通过PCI配置空间来向操作系统报告设备支持的特性集合，
+这样操作系统才知道这是一个什么类型的virtio设备，并调用对应的前端驱动和这个设备进行握手，进而将设备驱动起来。
+QEMU会给virtio设备模拟PCI配置空间，对于virtio设备来说PCI Vendor ID固定为0x1AF4，
+PCI Device ID 为 0x1000到0x107F之间的是virtio设备。</p>
+<p>前面提到virtio设备有feature bits，virtqueue等四要素，那么在virtio-pci模式下是如何呈现的呢？
+从virtio spec来看，老的virtio协议和新的virtio协议在这一块有很大改动。
+virtio legacy（virtio 0.95）协议规定，对应的配置数据结构（virtio common configuration structure）
+应该存放在设备的BAR0里面，我们称之为virtio legay interface，其结构如下：</p>
+<div class="highlight"><pre><span></span><span class="n">virtio</span> <span class="n">legacy</span> <span class="o">==&gt;</span> <span class="n">PCI</span> <span class="n">BA0</span> 
+<span class="o">+</span><span class="c1">------------------------------------------------------------------+ </span>
+<span class="o">|</span>                    <span class="k">Host</span> <span class="n">Feature</span> <span class="n">Bits</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">31</span><span class="p">]</span>                       <span class="o">|</span> 
+<span class="o">+</span><span class="c1">------------------------------------------------------------------+</span>
+<span class="o">|</span>                    <span class="n">Guest</span> <span class="n">Feature</span> <span class="n">Bits</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">31</span><span class="p">]</span>                      <span class="o">|</span>
+<span class="o">+</span><span class="c1">------------------------------------------------------------------+</span>
+<span class="o">|</span>                    <span class="n">Virtqueue</span> <span class="n">Address</span> <span class="n">PFN</span>                         <span class="o">|</span>
+<span class="o">+</span><span class="c1">---------------------------------+--------------------------------+</span>
+<span class="o">|</span>           <span class="n">Queue</span> <span class="k">Select</span>          <span class="o">|</span>           <span class="n">Queue</span> <span class="k">Size</span>           <span class="o">|</span>
+<span class="o">+</span><span class="c1">----------------+----------------+--------------------------------+</span>
+<span class="o">|</span>   <span class="n">ISR</span> <span class="n">Status</span>   <span class="o">|</span> <span class="n">Device</span> <span class="n">Stat</span>    <span class="o">|</span>           <span class="n">Queue</span> <span class="k">Notify</span>         <span class="o">|</span>
+<span class="o">+</span><span class="c1">----------------+----------------+--------------------------------+</span>
+<span class="o">|</span>       <span class="n">MSI</span> <span class="n">Config</span> <span class="n">Vector</span>         <span class="o">|</span>         <span class="n">MSI</span> <span class="n">Queue</span> <span class="n">Vector</span>       <span class="o">|</span>
+<span class="o">+</span><span class="c1">---------------------------------+--------------------------------+</span>
+</pre></div>
+
+
+<p>对于新的virtio modern，协议将配置结构划分为5种类型：</p>
+<div class="highlight"><pre><span></span><span class="cm">/* Common configuration */</span><span class="w"> </span>
+<span class="err">#</span>define<span class="w"> </span>VIRTIO_PCI_CAP_COMMON_CFG<span class="w">        </span><span class="m">1</span><span class="w"> </span>
+<span class="cm">/* Notifications */</span><span class="w"> </span>
+<span class="err">#</span>define<span class="w"> </span>VIRTIO_PCI_CAP_NOTIFY_CFG<span class="w">        </span><span class="m">2</span><span class="w"></span>
+<span class="cm">/* ISR Status */</span><span class="w"> </span>
+<span class="err">#</span>define<span class="w"> </span>VIRTIO_PCI_CAP_ISR_CFG<span class="w">           </span><span class="m">3</span><span class="w"> </span>
+<span class="cm">/* Device specific configuration */</span><span class="w"> </span>
+<span class="err">#</span>define<span class="w"> </span>VIRTIO_PCI_CAP_DEVICE_CFG<span class="w">        </span><span class="m">4</span><span class="w"> </span>
+<span class="cm">/* PCI configuration access */</span><span class="w"> </span>
+<span class="err">#</span>define<span class="w"> </span>VIRTIO_PCI_CAP_PCI_CFG<span class="w">           </span><span class="m">5</span><span class="w"> </span>
+</pre></div>
+
+
+<p>以上的每种配置结构是直接映射到virtio设备的BAR空间内，那么如何指定每种配置结构的位置呢？
+答案是通过PCI Capability list方式去指定，这和物理PCI设备是一样的，体现了virtio-pci的协议兼容性。</p>
+<div class="highlight"><pre><span></span><span class="nv">struct</span> <span class="nv">virtio_pci_cap</span> { 
+        <span class="nv">u8</span> <span class="nv">cap_vndr</span><span class="c1">;    /* Generic PCI field: PCI_CAP_ID_VNDR */ </span>
+        <span class="nv">u8</span> <span class="nv">cap_next</span><span class="c1">;    /* Generic PCI field: next ptr. */ </span>
+        <span class="nv">u8</span> <span class="nv">cap_len</span><span class="c1">;     /* Generic PCI field: capability length */ </span>
+        <span class="nv">u8</span> <span class="nv">cfg_type</span><span class="c1">;    /* Identifies the structure. */ </span>
+        <span class="nv">u8</span> <span class="nv">bar</span><span class="c1">;         /* Where to find it. */ </span>
+        <span class="nv">u8</span> <span class="nv">padding</span>[<span class="mi">3</span>]<span class="c1">;  /* Pad to full dword. */ </span>
+        <span class="nv">le32</span> <span class="nv">offset</span><span class="c1">;    /* Offset within bar. */ </span>
+        <span class="nv">le32</span> <span class="nv">length</span><span class="c1">;    /* Length of the structure, in bytes. */ </span>
+}<span class="c1">;</span>
+</pre></div>
+
+
+<p>只是略微不同的是，virtio-pci的Capability有一个统一的结构，
+其中cfg_type表示Cap的类型，bar表示这个配置结构被映射到的BAR空间号。
+这样每个配置结构都可以通过BAR空间直接访问，或者通过PCI配置空间的VIRTIO_PCI_CAP_PCI_CFG域进行访问。
+每个Cap的具体结构定义可以参考virtio spec 4.1.4.3小节。</p>
+<h1>1. 前后端数据共享</h1>
+<p>传统的纯模拟设备在工作的时候，会触发频繁的陷入陷出，
+而且IO请求的内容要进行多次拷贝传递，严重影响了设备的IO性能。
+virtio为了提升设备的IO性能，采用了共享内存机制，
+前端驱动会提前申请好一段物理地址空间用来存放IO请求，然后将这段地址的GPA告诉QEMU。
+前端驱动在下发IO请求后，QEMU可以直接从共享内存中取出请求，然后将完成后的结果又直接写到虚拟机对应地址上去。
+整个过程中可以做到直拿直取，省去了很多开销。</p>
+<p>Virtqueue是整个virtio方案的灵魂所在。每个virtqueue都包含3张表，
+Descriptor Table存放了IO请求描述符，available ring记录了当前哪些描述符是可用的，used ring记录了哪些描述符已经被后端使用了。</p>
+<div class="highlight"><pre><span></span>                          <span class="o">+</span><span class="c1">------------------------------------+</span>
+                          <span class="o">|</span>   <span class="n">virtio</span>  <span class="n">guest</span> <span class="n">driver</span>         <span class="o">|</span>
+                          <span class="o">+</span><span class="c1">-----------------+------------------+</span>
+                            <span class="o">/</span>               <span class="o">|</span>              <span class="o">^</span>
+                           <span class="o">/</span>                <span class="o">|</span>               <span class="err">\</span>
+                          <span class="n">put</span>            <span class="k">update</span>             <span class="k">get</span>
+                         <span class="o">/</span>                  <span class="o">|</span>                 <span class="err">\</span>
+                        <span class="n">V</span>                   <span class="n">V</span>                  <span class="err">\</span>
+                   <span class="o">+</span><span class="c1">----------+      +------------+        +----------+</span>
+                   <span class="o">|</span>          <span class="o">|</span>      <span class="o">|</span>            <span class="o">|</span>        <span class="o">|</span>          <span class="o">|</span>
+                   <span class="o">+</span><span class="c1">----------+      +------------+        +----------+</span>
+                   <span class="o">|</span> <span class="n">available</span><span class="o">|</span>      <span class="o">|</span> <span class="k">descriptor</span> <span class="o">|</span>        <span class="o">|</span>   <span class="n">used</span>   <span class="o">|</span>
+                   <span class="o">|</span>   <span class="n">ring</span>   <span class="o">|</span>      <span class="o">|</span>   <span class="k">table</span>    <span class="o">|</span>        <span class="o">|</span>   <span class="n">ring</span>   <span class="o">|</span>
+                   <span class="o">+</span><span class="c1">----------+      +------------+        +----------+</span>
+                   <span class="o">|</span>          <span class="o">|</span>      <span class="o">|</span>            <span class="o">|</span>        <span class="o">|</span>          <span class="o">|</span>
+                   <span class="o">+</span><span class="c1">----------+      +------------+        +----------+</span>
+                   <span class="o">|</span>          <span class="o">|</span>      <span class="o">|</span>            <span class="o">|</span>        <span class="o">|</span>          <span class="o">|</span>
+                   <span class="o">+</span><span class="c1">----------+      +------------+        +----------+</span>
+                        <span class="err">\</span>                   <span class="o">^</span>                   <span class="o">^</span>
+                         <span class="err">\</span>                  <span class="o">|</span>                  <span class="o">/</span>
+                         <span class="k">get</span>             <span class="k">update</span>              <span class="n">put</span>
+                           <span class="err">\</span>                <span class="o">|</span>                <span class="o">/</span>
+                            <span class="n">V</span>               <span class="o">|</span>               <span class="o">/</span>
+                           <span class="o">+</span><span class="c1">----------------+-------------------+</span>
+                           <span class="o">|</span>       <span class="n">virtio</span> <span class="k">host</span> <span class="n">backend</span>          <span class="o">|</span>
+                           <span class="o">+</span><span class="c1">------------------------------------+</span>
+</pre></div>
+
+
+<p>Desriptor Table中存放的是一个一个的virtq_desc元素，每个virq_desc元素占用16个字节。</p>
+<div class="highlight"><pre><span></span><span class="o">+-----------------------------------------------------------+</span>
+<span class="o">|</span>                        <span class="nv">addr</span><span class="o">/</span><span class="nv">gpa</span> [<span class="mi">0</span>:<span class="mi">63</span>]                    <span class="o">|</span>
+<span class="o">+-------------------------+-----------------+---------------+</span>
+<span class="o">|</span>         <span class="nv">len</span> [<span class="mi">0</span>:<span class="mi">31</span>]      <span class="o">|</span>  <span class="nv">flags</span> [<span class="mi">0</span>:<span class="mi">15</span>]   <span class="o">|</span>  <span class="k">next</span> [<span class="mi">0</span>:<span class="mi">15</span>]  <span class="o">|</span>
+<span class="o">+-------------------------+-----------------+---------------+</span>
+</pre></div>
+
+
+<p>其中，addr占用64bit存放了单个IO请求的GPA地址信息，例如addr可能表示某个DMA buffer的起始地址。
+len占用32bit表示IO请求的长度，flags的取值有3种，
+VIRTQ_DESC_F_NEXT表示这个IO请求和下一个virtq_desc描述的是连续的，
+IRTQ_DESC_F_WRITE表示这段buffer是write only的，
+VIRTQ_DESC_F_INDIRECT表示这段buffer里面放的内容是另外一组buffer的virtq_desc（相当于重定向），
+next是指向下一个virtq_desc的索引号（前提是VIRTQ_DESC_F_NEXT &amp; flags）。</p>
+<p>Available Ring是前端驱动用来告知后端那些IO buffer是的请求需要处理，每个Ring中包含一个virtq_avail占用8个字节。
+其中，flags取值为VIRTQ_AVAIL_F_NO_INTERRUPT时表示前端驱动告诉后端：“当你消耗完一个IO buffer的时候，不要立刻给我发中断”。
+idx表示下次前端驱动要放置Descriptor Entry的地方。</p>
+<div class="highlight"><pre><span></span><span class="o">+</span><span class="c1">--------------+-------------+--------------+---------------------+</span>
+<span class="o">|</span> <span class="n">flags</span> <span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">15</span><span class="p">]</span> <span class="o">|</span>  <span class="n">idx</span> <span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">15</span><span class="p">]</span> <span class="o">|</span>  <span class="n">ring</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">15</span><span class="p">]</span>  <span class="o">|</span>  <span class="n">used_event</span> <span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">15</span><span class="p">]</span>  <span class="o">|</span>
+<span class="o">+</span><span class="c1">--------------+-------------+--------------+---------------------+</span>
+</pre></div>
+
+
+<p>Used Ring结构稍微不一样，flags的值如果为VIRTIO_F_EVENT_IDX并且前后端协商VIRTIO_F_EVENT_IDX feature成功,
+那么Guest会将used ring index放在available ring的末尾，告诉后端说：“Hi 小老弟，当你处理完这个请求的时候，给我发个中断通知我一下”，
+同时host也会将avail_event index放到used ring的末尾，告诉guest说：“Hi 老兄，记得把这个idx的请求kick给我哈”。
+VIRTIO_F_EVENT_IDX对virtio通知/中断有一定的优化，在某些场景下能够提升IO性能。</p>
+<div class="highlight"><pre><span></span><span class="cm">/* The Guest publishes the used index for which it expects an interrupt</span>
+<span class="cm"> * at the end of the avail ring. Host should ignore the avail-&gt;flags field. */</span>
+<span class="cm">/* The Host publishes the avail index for which it expects a kick</span>
+<span class="cm"> * at the end of the used ring. Guest should ignore the used-&gt;flags field. */</span>
+
+<span class="nv">struct</span> <span class="nv">virtq_used</span> { 
+#<span class="nv">define</span> <span class="nv">VIRTQ_USED_F_NO_NOTIFY</span>  <span class="mi">1</span> 
+        <span class="nv">le16</span> <span class="nv">flags</span><span class="c1">; </span>
+        <span class="nv">le16</span> <span class="nv">idx</span><span class="c1">; </span>
+        <span class="nv">struct</span> <span class="nv">virtq_used_elem</span> <span class="nv">ring</span>[ <span class="cm">/* Queue Size */</span>]<span class="c1">; </span>
+        <span class="nv">le16</span> <span class="nv">avail_event</span><span class="c1">; /* Only if VIRTIO_F_EVENT_IDX */ </span>
+}<span class="c1">; </span>
+
+<span class="cm">/* le32 is used here for ids for padding reasons. */</span> 
+<span class="nv">struct</span> <span class="nv">virtq_used_elem</span> { 
+        <span class="cm">/* Index of start of used descriptor chain. */</span> 
+        <span class="nv">le32</span> <span class="nv">id</span><span class="c1">; </span>
+        <span class="cm">/* Total length of the descriptor chain which was used (written to) */</span> 
+        <span class="nv">le32</span> <span class="nv">len</span><span class="c1">; </span>
+}<span class="c1">;</span>
+</pre></div>
+
+
+<p>原理就到这里，后面会以virtio网卡为例进行详细流程说明。</p>
+<h2>2. 前后端通信机制（irqfd 与 ioeventfd）</h2>
+<p>共享内存方式解决了传统设备IO过程中内存拷贝带来的性能损耗问题，除此之外前端驱动和后端驱动的通信问题也是有可以改进的地方。
+Virtio前后端通信概括起来只有两个方向，即GuestOS通知QEMU和QEMU通知GuestOS。
+当前端驱动准备好IO buffer之后，需要通知后端（QEMU），告诉后端：“小老弟，我有一波IO请求已经准备好了，你帮我处理一下”。
+前端通知出去后，就可以等待IO结果了（操作系统可以进行一次调度），这时候vCPU可以去干点其他的事情。
+后端收到消息后开始处理IO请求，当IO请求处理完成之后，后端就通过中断机制通知GuestOS：“老哥，你的IO给你处理好了，你来取一下”。
+前后端通信机制如下图所示：</p>
+<div class="highlight"><pre><span></span>             <span class="o">+</span><span class="c1">-------------+                +-------------+</span>
+             <span class="o">|</span>             <span class="o">|</span>                <span class="o">|</span>             <span class="o">|</span>
+             <span class="o">|</span>             <span class="o">|</span>                <span class="o">|</span>             <span class="o">|</span>
+             <span class="o">|</span>   <span class="n">GuestOS</span>   <span class="o">|</span>                <span class="o">|</span>     <span class="n">QEMU</span>    <span class="o">|</span>
+             <span class="o">|</span>             <span class="o">|</span>                <span class="o">|</span>             <span class="o">|</span>
+             <span class="o">|</span>             <span class="o">|</span>                <span class="o">|</span>             <span class="o">|</span>
+             <span class="o">+</span><span class="c1">---+---------+                +----+--------+</span>
+                 <span class="o">|</span>     <span class="o">^</span>                         <span class="o">|</span>    <span class="o">^</span>
+                 <span class="o">|</span>     <span class="o">|</span>                         <span class="o">|</span>    <span class="o">|</span>
+             <span class="o">+</span><span class="c1">---|-----|-------------------------|----|---+</span>
+             <span class="o">|</span>   <span class="o">|</span>     <span class="o">|</span>                <span class="n">irqfd</span>    <span class="o">|</span>    <span class="o">|</span>   <span class="o">|</span>
+             <span class="o">|</span>   <span class="o">|</span>     <span class="o">+</span><span class="c1">-------------------------+    |   |</span>
+             <span class="o">|</span>   <span class="o">|</span>  <span class="n">ioeventfd</span>                         <span class="o">|</span>   <span class="o">|</span>
+             <span class="o">|</span>   <span class="o">+</span><span class="c1">------------------------------------+   |</span>
+             <span class="o">|</span>                   <span class="n">KVM</span>                      <span class="o">|</span>
+             <span class="o">+</span><span class="c1">--------------------------------------------+</span>
+</pre></div>
+
+
+<p>前端驱动通知后端比较简单，QEMU设置一段特定的MMIO地址空间，前端驱动访问这段MMIO触发VMExit，
+退出到KVM后利用ioeventfd机制通知到用户态的QEMU，QEMU主循环（main_loop poll）检测到ioeventfd事件后调用callback进行处理。</p>
+<div class="highlight"><pre><span></span><span class="err">前端驱动通知后端：</span>
+<span class="err">内核流程</span><span class="n">mark一下</span><span class="err">，</span><span class="n">PCI设备驱动流程这个后面可以学习一下</span><span class="err">，先扫描</span><span class="n">PCI</span> <span class="n">bus发现是virtio设备再扫描virtio</span><span class="o">-</span><span class="n">bus</span><span class="err">。</span>
+<span class="n">worker_thread</span> <span class="o">--&gt;</span> <span class="n">process_one_work</span> <span class="o">--&gt;</span> <span class="n">pciehp_power_thread</span> <span class="o">--&gt;</span> <span class="n">pciehp_enable_slot</span> <span class="o">--&gt;</span> 
+<span class="n">pciehp_configure_device</span> <span class="o">--&gt;</span> <span class="n">pci_bus_add_devices</span> <span class="o">--&gt;</span> <span class="n">pci_bus_add_device</span> <span class="o">--&gt;</span> <span class="n">device_attach</span> <span class="o">--&gt;</span> 
+<span class="n">__device_attach</span> <span class="o">--&gt;</span> <span class="n">bus_for_each_drv</span> <span class="o">--&gt;</span> <span class="n">__device_attach_driver</span> <span class="o">--&gt;</span> <span class="n">driver_probe_device</span> <span class="o">--&gt;</span> 
+<span class="n">pci_device_probe</span> <span class="o">--&gt;</span> <span class="n">local_pci_probe</span> <span class="o">--&gt;</span> <span class="n">virtio_pci_probe</span> <span class="o">--&gt;</span> <span class="n">register_virtio_device</span> <span class="o">--&gt;</span> 
+<span class="n">device_register</span> <span class="o">--&gt;</span> <span class="n">device_add</span> <span class="o">--&gt;</span> <span class="n">bus_probe_device</span> <span class="o">--&gt;</span> <span class="n">device_initial_probe</span> <span class="o">--&gt;</span> <span class="n">__device_attach</span> <span class="o">--&gt;</span> <span class="n">bus_for_each_drv</span>
+<span class="o">--&gt;</span> <span class="n">__device_attach_driver</span> <span class="o">--&gt;</span> <span class="n">driver_probe_device</span> <span class="o">--&gt;</span> <span class="n">virtio_dev_probe</span> <span class="o">--&gt;</span> <span class="n">virtnet_probe</span> <span class="p">(</span><span class="err">网卡设备驱动加载的入口</span><span class="p">)</span>
+
+<span class="k">static</span> <span class="kt">int</span> <span class="n">virtnet_probe</span><span class="p">(</span><span class="k">struct</span> <span class="n">virtio_device</span> <span class="o">*</span><span class="n">vdev</span><span class="p">)</span> 
+<span class="p">{</span>
+    <span class="n">virtio_device_ready</span><span class="p">(</span><span class="n">vdev</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="cm">/**</span>
+<span class="cm"> * virtio_device_ready - enable vq use in probe function</span>
+<span class="cm"> * @vdev: the device</span>
+<span class="cm"> *</span>
+<span class="cm"> * Driver must call this to use vqs in the probe function.</span>
+<span class="cm"> *</span>
+<span class="cm"> * Note: vqs are enabled automatically after probe returns.</span>
+<span class="cm"> */</span>
+<span class="k">static</span> <span class="kr">inline</span>
+<span class="kt">void</span> <span class="n">virtio_device_ready</span><span class="p">(</span><span class="k">struct</span> <span class="n">virtio_device</span> <span class="o">*</span><span class="n">dev</span><span class="p">)</span>
+<span class="p">{</span>
+        <span class="kt">unsigned</span> <span class="n">status</span> <span class="o">=</span> <span class="n">dev</span><span class="o">-&gt;</span><span class="n">config</span><span class="o">-&gt;</span><span class="n">get_status</span><span class="p">(</span><span class="n">dev</span><span class="p">);</span>
+
+        <span class="n">BUG_ON</span><span class="p">(</span><span class="n">status</span> <span class="o">&amp;</span> <span class="n">VIRTIO_CONFIG_S_DRIVER_OK</span><span class="p">);</span>
+        <span class="n">dev</span><span class="o">-&gt;</span><span class="n">config</span><span class="o">-&gt;</span><span class="n">set_status</span><span class="p">(</span><span class="n">dev</span><span class="p">,</span> <span class="n">status</span> <span class="o">|</span> <span class="n">VIRTIO_CONFIG_S_DRIVER_OK</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="n">QEMU</span><span class="o">/</span><span class="n">KVM后端的处理流程如下</span><span class="err">：</span>
+<span class="err">前端驱动写</span><span class="n">Status位</span><span class="err">，</span><span class="n">val</span> <span class="o">&amp;</span> <span class="n">VIRTIO_CONFIG_S_DRIVER_OK</span><span class="err">，这时候前端驱动已经</span><span class="n">ready</span>
+<span class="n">virtio_pci_config_write</span>  <span class="o">--&gt;</span> <span class="n">virtio_ioport_write</span> <span class="o">--&gt;</span> <span class="n">virtio_pci_start_ioeventfd</span>
+<span class="o">--&gt;</span> <span class="n">virtio_bus_set_host_notifier</span> <span class="o">--&gt;</span> <span class="n">virtio_bus_start_ioeventfd</span> <span class="o">--&gt;</span> <span class="n">virtio_device_start_ioeventfd_impl</span>
+<span class="o">--&gt;</span> <span class="n">virtio_bus_set_host_notifier</span>
+    <span class="o">--&gt;</span> <span class="n">virtio_pci_ioeventfd_assign</span>
+        <span class="o">--&gt;</span> <span class="n">memory_region_add_eventfd</span>
+            <span class="o">--&gt;</span> <span class="n">memory_region_transaction_commit</span>
+              <span class="o">--&gt;</span> <span class="n">address_space_update_ioeventfds</span>
+                <span class="o">--&gt;</span> <span class="n">address_space_add_del_ioeventfds</span>
+                  <span class="o">--&gt;</span> <span class="n">kvm_io_ioeventfd_add</span><span class="o">/</span><span class="n">vhost_eventfd_add</span>
+                    <span class="o">--&gt;</span> <span class="n">kvm_set_ioeventfd_pio</span>
+                      <span class="o">--&gt;</span> <span class="n">kvm_vm_ioctl</span><span class="p">(</span><span class="n">kvm_state</span><span class="p">,</span> <span class="n">KVM_IOEVENTFD</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">kick</span><span class="p">)</span>
+</pre></div>
+
+
+<p>其实，这就是QEMU的fast mmio实现机制。我们可以看到，QEMU会为每个设备MMIO对应的MemoryRegion注册一个ioeventfd。
+最后调用了一个KVM_IOEVENTFD ioctl到KVM内核里面，而在KVM内核中会将MMIO对应的（gpa,len,eventfd）信息会注册到KVM_FAST_MMIO_BUS上。
+这样当Guest访问MMIO地址范围退出后（触发EPT Misconfig），KVM会查询一下访问的GPA是否落在某段MMIO地址空间range内部，
+如果是的话就直接写eventfd告知QEMU，QEMU就会从coalesced mmio ring page中取MMIO请求（注：pio page和 mmio page是QEMU和KVM内核之间的共享内存页，已经提前mmap好了）。</p>
+<div class="highlight"><pre><span></span><span class="n">kvm内核代码virt</span><span class="o">/</span><span class="n">kvm</span><span class="o">/</span><span class="n">eventfd</span><span class="p">.</span><span class="n">c中</span>
+<span class="n">kvm_vm_ioctl</span><span class="p">(</span><span class="n">KVM_IOEVENTFD</span><span class="p">)</span>
+  <span class="o">--&gt;</span> <span class="n">kvm_ioeventfd</span>
+    <span class="o">--&gt;</span> <span class="n">kvm_assign_ioeventfd</span>
+      <span class="o">--&gt;</span> <span class="n">kvm_assign_ioeventfd_idx</span>
+
+<span class="n">MMIO处理流程中</span><span class="err">（</span><span class="n">handle_ept_misconfig</span><span class="err">）最后会调用到</span><span class="n">ioeventfd_write通知QEMU</span><span class="err">。</span>
+<span class="cm">/* MMIO/PIO writes trigger an event if the addr/val match */</span>
+<span class="k">static</span> <span class="kt">int</span>
+<span class="n">ioeventfd_write</span><span class="p">(</span><span class="k">struct</span> <span class="n">kvm_vcpu</span> <span class="o">*</span><span class="n">vcpu</span><span class="p">,</span> <span class="k">struct</span> <span class="n">kvm_io_device</span> <span class="o">*</span><span class="n">this</span><span class="p">,</span> <span class="n">gpa_t</span> <span class="n">addr</span><span class="p">,</span>
+                <span class="kt">int</span> <span class="n">len</span><span class="p">,</span> <span class="k">const</span> <span class="kt">void</span> <span class="o">*</span><span class="n">val</span><span class="p">)</span>
+<span class="p">{</span>
+        <span class="k">struct</span> <span class="n">_ioeventfd</span> <span class="o">*</span><span class="n">p</span> <span class="o">=</span> <span class="n">to_ioeventfd</span><span class="p">(</span><span class="n">this</span><span class="p">);</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">ioeventfd_in_range</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">addr</span><span class="p">,</span> <span class="n">len</span><span class="p">,</span> <span class="n">val</span><span class="p">))</span>
+                <span class="k">return</span> <span class="o">-</span><span class="n">EOPNOTSUPP</span><span class="p">;</span>
+
+        <span class="n">eventfd_signal</span><span class="p">(</span><span class="n">p</span><span class="o">-&gt;</span><span class="n">eventfd</span><span class="p">,</span> <span class="mi">1</span><span class="p">);</span>
+        <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+
+
+<p>不了解MMIO是如何模拟的童鞋，可以结合本站的文章<a href="https://kernelgo.org/mmio.html">MMIO模拟实现分析</a>去了解一下，不懂的可以在文章下面评论。</p>
+<p><strong>后端通知前端，是通过中断的方式</strong>，QEMU/KVM中有一套完整的中断模拟实现框架，
+如果对QEMU/KVM中断模拟不熟悉的童鞋，
+建议阅读一下这篇文章：<a href="https://www.binss.me/blog/qemu-note-of-interrupt/">QEMU学习笔记-中断</a>。
+对于virtio-pci设备，可以通过Cap呈现MSIx给虚拟机，这样在前端驱动加载的时候就会尝试去使能MSIx中断，
+后端在这个时候建立起MSIx通道。</p>
+<p>前端驱动加载(probe)的过程中，会去初始化virtqueue，这个时候会去申请MSIx中断：</p>
+<div class="highlight"><pre><span></span><span class="n">virtnet_probe</span>
+  <span class="o">--&gt;</span> <span class="n">init_vqs</span>
+    <span class="o">--&gt;</span> <span class="n">virtnet_find_vqs</span>
+      <span class="o">--&gt;</span> <span class="n">vi</span><span class="o">-&gt;</span><span class="n">vdev</span><span class="o">-&gt;</span><span class="n">config</span><span class="o">-&gt;</span><span class="n">find_vqs</span> <span class="p">[</span><span class="n">vp_modern_find_vqs</span><span class="p">]</span>
+        <span class="o">--&gt;</span> <span class="n">vp_find_vqs</span>
+          <span class="o">--&gt;</span> <span class="n">vp_find_vqs_msix</span> <span class="c1">// 为每virtqueue申请一个MSIx中断，通常收发各一个队列</span>
+            <span class="o">--&gt;</span> <span class="n">vp_request_msix_vectors</span> <span class="c1">// 主要的MSIx中断申请逻辑都在这个函数里面</span>
+              <span class="o">--&gt;</span> <span class="n">pci_alloc_irq_vectors_affinity</span> <span class="c1">//这里申请MSIx中断描述符</span>
+                <span class="o">--&gt;</span> <span class="n">request_irq</span> 
+                <span class="c1">// virtio-net网卡至少申请了3个MSIx中断：</span>
+                <span class="c1">// 一个是configuration change中断（配置空间发生变化后，QEMU通知前端）</span>
+                <span class="c1">// 发送队列1个MSIx中断，接收队列1MSIx中断</span>
+</pre></div>
+
+
+<p>在QEMU/KVM这一侧，开始模拟MSIx中断，具体流程大致如下：</p>
+<div class="highlight"><pre><span></span><span class="nv">virtio_pci_config_write</span>
+  <span class="o">--&gt;</span> <span class="nv">virtio_ioport_write</span>
+    <span class="o">--&gt;</span> <span class="nv">virtio_set_status</span>
+      <span class="o">--&gt;</span> <span class="nv">virtio_net_vhost_status</span>
+        <span class="o">--&gt;</span> <span class="nv">vhost_net_start</span>
+          <span class="o">--&gt;</span> <span class="nv">virtio_pci_set_guest_notifiers</span>
+            <span class="o">--&gt;</span> <span class="nv">kvm_virtio_pci_vector_use</span> 
+              <span class="o">|--&gt;</span> <span class="nv">kvm_irqchip_add_msi_route</span> <span class="o">//</span>更新中断路由表
+              <span class="o">|--&gt;</span> <span class="nv">kvm_virtio_pci_irqfd_use</span>  <span class="o">//</span>使能<span class="nv">MSI</span>中断
+                 <span class="o">--&gt;</span> <span class="nv">kvm_irqchip_add_irqfd_notifier_gsi</span>
+                   <span class="o">--&gt;</span> <span class="nv">kvm_irqchip_assign_irqfd</span>
+
+申请<span class="nv">MSIx</span>中断的时候，会为<span class="nv">MSIx</span>分配一个<span class="nv">gsi</span>，并为这个<span class="nv">gsi</span>绑定一个<span class="nv">irqfd</span>，然后调用<span class="nv">ioctl</span> <span class="nv">KVM_IRQFD</span>注册到内核中。               
+<span class="nv">static</span> <span class="nv">int</span> <span class="nv">kvm_irqchip_assign_irqfd</span><span class="ss">(</span><span class="nv">KVMState</span> <span class="o">*</span><span class="nv">s</span>, <span class="nv">int</span> <span class="nv">fd</span>, <span class="nv">int</span> <span class="nv">rfd</span>, <span class="nv">int</span> <span class="nv">virq</span>,
+                                    <span class="nv">bool</span> <span class="nv">assign</span><span class="ss">)</span>
+{
+    <span class="nv">struct</span> <span class="nv">kvm_irqfd</span> <span class="nv">irqfd</span> <span class="o">=</span> {
+        .<span class="nv">fd</span> <span class="o">=</span> <span class="nv">fd</span>,
+        .<span class="nv">gsi</span> <span class="o">=</span> <span class="nv">virq</span>,
+        .<span class="nv">flags</span> <span class="o">=</span> <span class="nv">assign</span> ? <span class="mi">0</span> : <span class="nv">KVM_IRQFD_FLAG_DEASSIGN</span>,
+    }<span class="c1">;</span>
+
+    <span class="k">if</span> <span class="ss">(</span><span class="nv">rfd</span> <span class="o">!=</span> <span class="o">-</span><span class="mi">1</span><span class="ss">)</span> {
+        <span class="nv">irqfd</span>.<span class="nv">flags</span> <span class="o">|=</span> <span class="nv">KVM_IRQFD_FLAG_RESAMPLE</span><span class="c1">;</span>
+        <span class="nv">irqfd</span>.<span class="nv">resamplefd</span> <span class="o">=</span> <span class="nv">rfd</span><span class="c1">;</span>
+    }
+
+    <span class="k">if</span> <span class="ss">(</span><span class="o">!</span><span class="nv">kvm_irqfds_enabled</span><span class="ss">())</span> {
+        <span class="k">return</span> <span class="o">-</span><span class="nv">ENOSYS</span><span class="c1">;</span>
+    }
+
+    <span class="k">return</span> <span class="nv">kvm_vm_ioctl</span><span class="ss">(</span><span class="nv">s</span>, <span class="nv">KVM_IRQFD</span>, <span class="o">&amp;</span><span class="nv">irqfd</span><span class="ss">)</span><span class="c1">;</span>
+}
+
+<span class="nv">KVM</span>内核代码<span class="nv">virt</span><span class="o">/</span><span class="nv">kvm</span><span class="o">/</span><span class="nv">eventfd</span>.<span class="nv">c</span>
+<span class="nv">kvm_vm_ioctl</span><span class="ss">(</span><span class="nv">s</span>, <span class="nv">KVM_IRQFD</span>, <span class="o">&amp;</span><span class="nv">irqfd</span><span class="ss">)</span>
+  <span class="o">--&gt;</span> <span class="nv">kvm_irqfd_assign</span>
+    <span class="o">--&gt;</span> <span class="nv">vfs_poll</span><span class="ss">(</span><span class="nv">f</span>.<span class="nv">file</span>, <span class="o">&amp;</span><span class="nv">irqfd</span><span class="o">-&gt;</span><span class="nv">pt</span><span class="ss">)</span> <span class="o">//</span> 在内核中<span class="nv">poll</span>这个<span class="nv">irqfd</span>
+</pre></div>
+
+
+<p>从上面的流程可以看出，QEMU/KVM使用irqfd机制来模拟MSIx中断，
+即设备申请MSIx中断的时候会为MSIx分配一个gsi（这个时候会刷新irq routing table），
+并为这个gsi绑定一个irqfd，最后在内核中去poll这个irqfd。
+当QEMU处理完IO之后，就写MSIx对应的irqfd，给前端注入一个MSIx中断，告知前端我已经处理好IO了你可以来取结果了。</p>
+<p>例如，virtio-scsi从前端取出IO请求后会取做DMA操作（DMA是异步的，QEMU协程中负责处理）。
+当DMA完成后QEMU需要告知前端IO请求已完成（Complete），那么怎么去投递这个MSIx中断呢？
+答案是调用<code>virtio_notify_irqfd</code>注入一个MSIx中断。</p>
+<div class="highlight"><pre><span></span><span class="cp">#0  0x00005604798d569b in virtio_notify_irqfd (vdev=0x56047d12d670, vq=0x7fab10006110) at  hw/virtio/virtio.c:1684</span>
+<span class="cp">#1  0x00005604798adea4 in virtio_scsi_complete_req (req=0x56047d09fa70) at  hw/scsi/virtio-scsi.c:76</span>
+<span class="cp">#2  0x00005604798aecfb in virtio_scsi_complete_cmd_req (req=0x56047d09fa70) at  hw/scsi/virtio-scsi.c:468</span>
+<span class="cp">#3  0x00005604798aee9d in virtio_scsi_command_complete (r=0x56047ccb0be0, status=0, resid=0) at  hw/scsi/virtio-scsi.c:495</span>
+<span class="cp">#4  0x0000560479b397cf in scsi_req_complete (req=0x56047ccb0be0, status=0) at hw/scsi/scsi-bus.c:1404</span>
+<span class="cp">#5  0x0000560479b2b503 in scsi_dma_complete_noio (r=0x56047ccb0be0, ret=0) at hw/scsi/scsi-disk.c:279</span>
+<span class="cp">#6  0x0000560479b2b610 in scsi_dma_complete (opaque=0x56047ccb0be0, ret=0) at hw/scsi/scsi-disk.c:300</span>
+<span class="cp">#7  0x00005604799b89e3 in dma_complete (dbs=0x56047c6e9ab0, ret=0) at dma-helpers.c:118</span>
+<span class="cp">#8  0x00005604799b8a90 in dma_blk_cb (opaque=0x56047c6e9ab0, ret=0) at dma-helpers.c:136</span>
+<span class="cp">#9  0x0000560479cf5220 in blk_aio_complete (acb=0x56047cd77d40) at block/block-backend.c:1327</span>
+<span class="cp">#10 0x0000560479cf5470 in blk_aio_read_entry (opaque=0x56047cd77d40) at block/block-backend.c:1387</span>
+<span class="cp">#11 0x0000560479df49c4 in coroutine_trampoline (i0=2095821104, i1=22020) at util/coroutine-ucontext.c:115</span>
+<span class="cp">#12 0x00007fab214d82c0 in __start_context () at /usr/lib64/libc.so.6</span>
+</pre></div>
+
+
+<p>在<code>virtio_notify_irqfd</code>函数中，会去写irqfd，给内核发送一个信号。</p>
+<div class="highlight"><pre><span></span><span class="kt">void</span> <span class="nf">virtio_notify_irqfd</span><span class="p">(</span><span class="n">VirtIODevice</span> <span class="o">*</span><span class="n">vdev</span><span class="p">,</span> <span class="n">VirtQueue</span> <span class="o">*</span><span class="n">vq</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="p">...</span>
+     <span class="cm">/*</span>
+<span class="cm">     * virtio spec 1.0 says ISR bit 0 should be ignored with MSI, but</span>
+<span class="cm">     * windows drivers included in virtio-win 1.8.0 (circa 2015) are</span>
+<span class="cm">     * incorrectly polling this bit during crashdump and hibernation</span>
+<span class="cm">     * in MSI mode, causing a hang if this bit is never updated.</span>
+<span class="cm">     * Recent releases of Windows do not really shut down, but rather</span>
+<span class="cm">     * log out and hibernate to make the next startup faster.  Hence,</span>
+<span class="cm">     * this manifested as a more serious hang during shutdown with</span>
+<span class="cm">     *</span>
+<span class="cm">     * Next driver release from 2016 fixed this problem, so working around it</span>
+<span class="cm">     * is not a must, but it&#39;s easy to do so let&#39;s do it here.</span>
+<span class="cm">     *</span>
+<span class="cm">     * Note: it&#39;s safe to update ISR from any thread as it was switched</span>
+<span class="cm">     * to an atomic operation.</span>
+<span class="cm">     */</span>
+    <span class="n">virtio_set_isr</span><span class="p">(</span><span class="n">vq</span><span class="o">-&gt;</span><span class="n">vdev</span><span class="p">,</span> <span class="mh">0x1</span><span class="p">);</span>
+    <span class="n">event_notifier_set</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vq</span><span class="o">-&gt;</span><span class="n">guest_notifier</span><span class="p">);</span>   <span class="c1">//写vq-&gt;guest_notifier，即irqfd</span>
+<span class="p">}</span>
+</pre></div>
+
+
+<p>QEMU写了这个irqfd后，KVM内核模块中的irqfd poll就收到一个POLL_IN事件，然后将MSIx中断自动投递给对应的LAPIC。
+大致流程是：POLL_IN -&gt; kvm_arch_set_irq_inatomic -&gt; kvm_set_msi_irq, kvm_irq_delivery_to_apic_fast</p>
+<div class="highlight"><pre><span></span><span class="k">static</span> <span class="kt">int</span>
+<span class="nf">irqfd_wakeup</span><span class="p">(</span><span class="n">wait_queue_entry_t</span> <span class="o">*</span><span class="n">wait</span><span class="p">,</span> <span class="kt">unsigned</span> <span class="n">mode</span><span class="p">,</span> <span class="kt">int</span> <span class="n">sync</span><span class="p">,</span> <span class="kt">void</span> <span class="o">*</span><span class="n">key</span><span class="p">)</span>
+<span class="p">{</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">flags</span> <span class="o">&amp;</span> <span class="n">EPOLLIN</span><span class="p">)</span> <span class="p">{</span>
+                <span class="n">idx</span> <span class="o">=</span> <span class="n">srcu_read_lock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">kvm</span><span class="o">-&gt;</span><span class="n">irq_srcu</span><span class="p">);</span>
+                <span class="k">do</span> <span class="p">{</span>
+                        <span class="n">seq</span> <span class="o">=</span> <span class="n">read_seqcount_begin</span><span class="p">(</span><span class="o">&amp;</span><span class="n">irqfd</span><span class="o">-&gt;</span><span class="n">irq_entry_sc</span><span class="p">);</span>
+                        <span class="n">irq</span> <span class="o">=</span> <span class="n">irqfd</span><span class="o">-&gt;</span><span class="n">irq_entry</span><span class="p">;</span>
+                <span class="p">}</span> <span class="k">while</span> <span class="p">(</span><span class="n">read_seqcount_retry</span><span class="p">(</span><span class="o">&amp;</span><span class="n">irqfd</span><span class="o">-&gt;</span><span class="n">irq_entry_sc</span><span class="p">,</span> <span class="n">seq</span><span class="p">));</span>
+                <span class="cm">/* An event has been signaled, inject an interrupt */</span>
+                <span class="k">if</span> <span class="p">(</span><span class="n">kvm_arch_set_irq_inatomic</span><span class="p">(</span><span class="o">&amp;</span><span class="n">irq</span><span class="p">,</span> <span class="n">kvm</span><span class="p">,</span>
+                                             <span class="n">KVM_USERSPACE_IRQ_SOURCE_ID</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span>
+                                             <span class="nb">false</span><span class="p">)</span> <span class="o">==</span> <span class="o">-</span><span class="n">EWOULDBLOCK</span><span class="p">)</span>
+                        <span class="n">schedule_work</span><span class="p">(</span><span class="o">&amp;</span><span class="n">irqfd</span><span class="o">-&gt;</span><span class="n">inject</span><span class="p">);</span>
+                <span class="n">srcu_read_unlock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">kvm</span><span class="o">-&gt;</span><span class="n">irq_srcu</span><span class="p">,</span> <span class="n">idx</span><span class="p">);</span>
+        <span class="p">}</span>
+</pre></div>
+
+
+<p>这里还有一点没有想明白，结合代码和调试来看，virtio-blk/virtio-scsi的msi中断走irqfd机制，
+但是virtio-net（不开启vhost的情况下）不走irqfd，而是直接调用virtio_notify/virtio_pci_notify，最后通过KVM的ioctl投递中断？
+从代码路径上来看，后者明显路径更长，谁知道原因告诉我一下。</p>
+<div class="highlight"><pre><span></span><span class="nv">Once</span> <span class="nv">in</span> <span class="nv">virtio_notify_irqfd</span>, <span class="nv">once</span> <span class="nv">in</span> <span class="nv">virtio_queue_guest_notifier_read</span>.
+
+<span class="nv">Unfortunately</span>, <span class="k">for</span> <span class="nv">virtio</span><span class="o">-</span><span class="nv">blk</span> <span class="o">+</span> <span class="nv">MSI</span> <span class="o">+</span> <span class="nv">KVM</span> <span class="o">+</span> <span class="nv">old</span> <span class="nv">Windows</span> <span class="nv">drivers</span> <span class="nv">we</span> <span class="nv">need</span> <span class="nv">the</span> <span class="nv">one</span> <span class="nv">in</span> <span class="nv">virtio_notify_irqfd</span>. <span class="k">For</span> <span class="nv">virtio</span><span class="o">-</span><span class="nv">net</span> <span class="o">+</span> <span class="nv">vhost</span> <span class="o">+</span> <span class="nv">INTx</span> <span class="nv">we</span> <span class="nv">need</span> <span class="nv">the</span> <span class="nv">one</span> <span class="nv">in</span> <span class="nv">virtio_queue_guest_notifier_read</span>. ，这显然更长啊。 <span class="nv">https</span>:<span class="o">//</span><span class="nv">patchwork</span>.<span class="nv">kernel</span>.<span class="nv">org</span><span class="o">/</span><span class="nv">patch</span><span class="o">/</span><span class="mi">9531577</span><span class="o">/</span>
+</pre></div>
+
+
+<p>Ok，到这里virtio前后端通信机制已经明了，最后一个小节我们以virtio-net为例，梳理一下virtio中的部分核心代码流程。</p>
+<h2>3. virtio核心代码分析，以virtio-net为例</h2>
+<p>这里我们已virtio-net网卡为例，在不适用vhost的情况下（<driver name='qemu'/>），网卡后端收发包都走QEMU处理。</p>
+<h3>3.1 前后端握手流程</h3>
+<p>QEM模拟PCI设备对GuestOS进行呈现，设备驱动加载的时候尝试去初始化设备。</p>
+<div class="highlight"><pre><span></span><span class="cp"># 先在PCI总线上调用probe设备，调用了virtio_pci_probe，然后再virtio-bus上调用virtio_dev_probe</span>
+<span class="cp"># virtio_dev_probe最后调用到virtnet_probe</span>
+<span class="n">pci_device_probe</span> <span class="o">--&gt;</span> <span class="n">local_pci_probe</span> <span class="o">--&gt;</span> <span class="n">virtio_pci_probe</span> <span class="o">--&gt;</span> <span class="n">register_virtio_device</span> <span class="o">--&gt;</span> 
+<span class="n">device_register</span> <span class="o">--&gt;</span> <span class="n">device_add</span> <span class="o">--&gt;</span> <span class="n">bus_probe_device</span> <span class="o">--&gt;</span> <span class="n">device_initial_probe</span> 
+<span class="o">--&gt;</span> <span class="n">__device_attach</span> <span class="o">--&gt;</span> <span class="n">bus_for_each_drv</span> <span class="o">--&gt;</span> <span class="n">__device_attach_driver</span> <span class="o">--&gt;</span> <span class="n">driver_probe_device</span> <span class="o">--&gt;</span> 
+<span class="n">virtio_dev_probe</span> <span class="o">--&gt;</span> <span class="n">virtnet_probe</span>
+
+<span class="err">在</span><span class="n">virtio_pci_probe里先尝试以virtio</span> <span class="n">modern方式读取设备配置数据结构</span><span class="err">，如果失败则尝试</span><span class="n">virio</span> <span class="n">legacy方式</span><span class="err">。</span>
+<span class="err">对于</span><span class="n">virtio</span> <span class="n">legacy</span><span class="err">，我们前面提到了</span><span class="n">virtio</span> <span class="n">legacy协议规定设备的配置数据结构放在PCI</span> <span class="n">BAR0里面</span><span class="err">。</span>
+<span class="cm">/* the PCI probing function */</span>
+<span class="kt">int</span> <span class="n">virtio_pci_legacy_probe</span><span class="p">(</span><span class="k">struct</span> <span class="n">virtio_pci_device</span> <span class="o">*</span><span class="n">vp_dev</span><span class="p">)</span>
+<span class="p">{</span>
+        <span class="n">rc</span> <span class="o">=</span> <span class="n">pci_request_region</span><span class="p">(</span><span class="n">pci_dev</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="s">&quot;virtio-pci-legacy&quot;</span><span class="p">);</span>  <span class="c1">//将设备的BAR0映射到物理地址空间</span>
+        <span class="n">vp_dev</span><span class="o">-&gt;</span><span class="n">ioaddr</span> <span class="o">=</span> <span class="n">pci_iomap</span><span class="p">(</span><span class="n">pci_dev</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>   <span class="c1">//获得BAR0的内核地址</span>
+<span class="p">}</span>
+<span class="err">对于</span><span class="n">virtio</span> <span class="n">modern</span><span class="err">，通过</span><span class="n">capability方式报告配置数据结构的位置</span><span class="err">，配置数据结构有</span><span class="mi">5</span><span class="err">种类型。</span>
+<span class="kt">int</span> <span class="n">virtio_pci_modern_probe</span><span class="p">(</span><span class="k">struct</span> <span class="n">virtio_pci_device</span> <span class="o">*</span><span class="n">vp_dev</span><span class="p">)</span>
+<span class="p">{</span>
+        <span class="cm">/* check for a common config: if not, use legacy mode (bar 0). */</span>
+        <span class="n">common</span> <span class="o">=</span> <span class="n">virtio_pci_find_capability</span><span class="p">(</span><span class="n">pci_dev</span><span class="p">,</span> <span class="n">VIRTIO_PCI_CAP_COMMON_CFG</span><span class="p">,</span>
+                                            <span class="n">IORESOURCE_IO</span> <span class="o">|</span> <span class="n">IORESOURCE_MEM</span><span class="p">,</span>
+                                            <span class="o">&amp;</span><span class="n">vp_dev</span><span class="o">-&gt;</span><span class="n">modern_bars</span><span class="p">);</span>
+
+        <span class="cm">/* If common is there, these should be too... */</span>
+        <span class="n">isr</span> <span class="o">=</span> <span class="n">virtio_pci_find_capability</span><span class="p">(</span><span class="n">pci_dev</span><span class="p">,</span> <span class="n">VIRTIO_PCI_CAP_ISR_CFG</span><span class="p">,</span>
+                                         <span class="n">IORESOURCE_IO</span> <span class="o">|</span> <span class="n">IORESOURCE_MEM</span><span class="p">,</span>
+                                         <span class="o">&amp;</span><span class="n">vp_dev</span><span class="o">-&gt;</span><span class="n">modern_bars</span><span class="p">);</span>
+        <span class="n">notify</span> <span class="o">=</span> <span class="n">virtio_pci_find_capability</span><span class="p">(</span><span class="n">pci_dev</span><span class="p">,</span> <span class="n">VIRTIO_PCI_CAP_NOTIFY_CFG</span><span class="p">,</span>
+                                            <span class="n">IORESOURCE_IO</span> <span class="o">|</span> <span class="n">IORESOURCE_MEM</span><span class="p">,</span>
+                                            <span class="o">&amp;</span><span class="n">vp_dev</span><span class="o">-&gt;</span><span class="n">modern_bars</span><span class="p">);</span>
+
+        <span class="cm">/* Device capability is only mandatory for devices that have</span>
+<span class="cm">        * device-specific configuration.</span>
+<span class="cm">        */</span>
+        <span class="n">device</span> <span class="o">=</span> <span class="n">virtio_pci_find_capability</span><span class="p">(</span><span class="n">pci_dev</span><span class="p">,</span> <span class="n">VIRTIO_PCI_CAP_DEVICE_CFG</span><span class="p">,</span>
+                                            <span class="n">IORESOURCE_IO</span> <span class="o">|</span> <span class="n">IORESOURCE_MEM</span><span class="p">,</span>
+                                            <span class="o">&amp;</span><span class="n">vp_dev</span><span class="o">-&gt;</span><span class="n">modern_bars</span><span class="p">);</span>
+
+        <span class="n">err</span> <span class="o">=</span> <span class="n">pci_request_selected_regions</span><span class="p">(</span><span class="n">pci_dev</span><span class="p">,</span> <span class="n">vp_dev</span><span class="o">-&gt;</span><span class="n">modern_bars</span><span class="p">,</span>
+                                            <span class="s">&quot;virtio-pci-modern&quot;</span><span class="p">);</span>
+                                        <span class="k">sizeof</span><span class="p">(</span><span class="k">struct</span> <span class="n">virtio_pci_common_cfg</span><span class="p">),</span> <span class="mi">4</span><span class="p">,</span>
+                                        <span class="mi">0</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="k">struct</span> <span class="n">virtio_pci_common_cfg</span><span class="p">),</span>
+                                        <span class="nb">NULL</span><span class="p">);</span>
+        <span class="c1">// 将配virtio置结构所在的BAR空间MAP到内核地址空间里                                </span>
+        <span class="n">vp_dev</span><span class="o">-&gt;</span><span class="n">common</span> <span class="o">=</span> <span class="n">map_capability</span><span class="p">(</span><span class="n">pci_dev</span><span class="p">,</span> <span class="n">common</span><span class="p">,</span>
+                                        <span class="k">sizeof</span><span class="p">(</span><span class="k">struct</span> <span class="n">virtio_pci_common_cfg</span><span class="p">),</span> <span class="mi">4</span><span class="p">,</span>
+                                        <span class="mi">0</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="k">struct</span> <span class="n">virtio_pci_common_cfg</span><span class="p">),</span>
+                                        <span class="nb">NULL</span><span class="p">);</span>
+        <span class="p">......</span>                              
+<span class="p">}</span>
+
+<span class="err">接着来到</span><span class="n">virtio_dev_probe里面看下</span><span class="err">：</span>
+<span class="k">static</span> <span class="kt">int</span> <span class="n">virtio_dev_probe</span><span class="p">(</span><span class="k">struct</span> <span class="n">device</span> <span class="o">*</span><span class="n">_d</span><span class="p">)</span>
+<span class="p">{</span>
+        <span class="cm">/* We have a driver! */</span>
+        <span class="n">virtio_add_status</span><span class="p">(</span><span class="n">dev</span><span class="p">,</span> <span class="n">VIRTIO_CONFIG_S_DRIVER</span><span class="p">);</span>     <span class="c1">// 更新status bit，这里要写配置数据结构</span>
+
+        <span class="cm">/* Figure out what features the device supports. */</span>
+        <span class="n">device_features</span> <span class="o">=</span> <span class="n">dev</span><span class="o">-&gt;</span><span class="n">config</span><span class="o">-&gt;</span><span class="n">get_features</span><span class="p">(</span><span class="n">dev</span><span class="p">);</span>   <span class="c1">// 查询后端支持哪些feature bits</span>
+
+        <span class="c1">// feature set协商，取交集</span>
+        <span class="n">err</span> <span class="o">=</span> <span class="n">virtio_finalize_features</span><span class="p">(</span><span class="n">dev</span><span class="p">);</span> 
+
+        <span class="c1">// 调用特定virtio设备的驱动程序probe，例如: virtnet_probe, virtblk_probe</span>
+        <span class="n">err</span> <span class="o">=</span> <span class="n">drv</span><span class="o">-&gt;</span><span class="n">probe</span><span class="p">(</span><span class="n">dev</span><span class="p">);</span> 
+<span class="p">}</span>
+</pre></div>
+
+
+<p>再看下virtnet_probe里面的一些关键的流程，这里包含了virtio-net网卡前端初始化的主要逻辑。</p>
+<div class="highlight"><pre><span></span><span class="k">static</span> <span class="kt">int</span> <span class="nf">virtnet_probe</span><span class="p">(</span><span class="k">struct</span> <span class="n">virtio_device</span> <span class="o">*</span><span class="n">vdev</span><span class="p">)</span>
+<span class="p">{</span>
+       <span class="c1">// check后端是否支持多队列，并按情况创建队列</span>
+       <span class="cm">/* Allocate ourselves a network device with room for our info */</span>
+        <span class="n">dev</span> <span class="o">=</span> <span class="n">alloc_etherdev_mq</span><span class="p">(</span><span class="k">sizeof</span><span class="p">(</span><span class="k">struct</span> <span class="n">virtnet_info</span><span class="p">),</span> <span class="n">max_queue_pairs</span><span class="p">);</span>
+
+        <span class="c1">// 定义一个网络设备并配置一些属性，例如MAC地址</span>
+        <span class="n">dev</span><span class="o">-&gt;</span><span class="n">ethtool_ops</span> <span class="o">=</span> <span class="o">&amp;</span><span class="n">virtnet_ethtool_ops</span><span class="p">;</span>
+           <span class="n">SET_NETDEV_DEV</span><span class="p">(</span><span class="n">dev</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">vdev</span><span class="o">-&gt;</span><span class="n">dev</span><span class="p">);</span>
+
+        <span class="c1">// 初始化virtqueue</span>
+        <span class="n">err</span> <span class="o">=</span> <span class="n">init_vqs</span><span class="p">(</span><span class="n">vi</span><span class="p">);</span>
+
+        <span class="c1">// 注册一个网络设备</span>
+        <span class="n">err</span> <span class="o">=</span> <span class="n">register_netdev</span><span class="p">(</span><span class="n">dev</span><span class="p">);</span>
+
+        <span class="c1">// 写状态位DRIVER_OK，告诉后端，前端已经ready</span>
+        <span class="n">virtio_device_ready</span><span class="p">(</span><span class="n">vdev</span><span class="p">);</span>
+
+        <span class="c1">// 将网卡up起来</span>
+        <span class="n">netif_carrier_on</span><span class="p">(</span><span class="n">dev</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+
+
+<p>其中关键的流程是init_vqs，在vp_find_vqs_msix流程中会尝试去申请MSIx中断，这里前面已经有分析过了。
+其中，"configuration changed" 中断服务程序<code>vp_config_changed</code>， 
+virtqueue队列的中断服务程序是 <code>vp_vring_interrupt</code>。</p>
+<div class="highlight"><pre><span></span><span class="n">init_vqs</span> <span class="o">--&gt;</span> <span class="n">virtnet_find_vqs</span> <span class="o">--&gt;</span> <span class="n">vi</span><span class="o">-&gt;</span><span class="n">vdev</span><span class="o">-&gt;</span><span class="n">config</span><span class="o">-&gt;</span><span class="n">find_vqs</span> <span class="o">--&gt;</span> <span class="n">vp_modern_find_vqs</span>
+<span class="o">--&gt;</span> <span class="n">vp_find_vqs</span> <span class="o">--&gt;</span> <span class="n">vp_find_vqs_msix</span>
+
+<span class="k">static</span> <span class="kt">int</span> <span class="n">vp_find_vqs_msix</span><span class="p">(</span><span class="k">struct</span> <span class="n">virtio_device</span> <span class="o">*</span><span class="n">vdev</span><span class="p">,</span> <span class="kt">unsigned</span> <span class="n">nvqs</span><span class="p">,</span>
+        <span class="k">struct</span> <span class="n">virtqueue</span> <span class="o">*</span><span class="n">vqs</span><span class="p">[],</span> <span class="n">vq_callback_t</span> <span class="o">*</span><span class="n">callbacks</span><span class="p">[],</span>
+        <span class="k">const</span> <span class="kt">char</span> <span class="o">*</span> <span class="k">const</span> <span class="n">names</span><span class="p">[],</span> <span class="kt">bool</span> <span class="n">per_vq_vectors</span><span class="p">,</span>
+        <span class="k">const</span> <span class="kt">bool</span> <span class="o">*</span><span class="n">ctx</span><span class="p">,</span>
+        <span class="k">struct</span> <span class="n">irq_affinity</span> <span class="o">*</span><span class="n">desc</span><span class="p">)</span>
+<span class="p">{</span>
+        <span class="cm">/* 为configuration change申请MSIx中断 */</span>
+    <span class="n">err</span> <span class="o">=</span> <span class="n">vp_request_msix_vectors</span><span class="p">(</span><span class="n">vdev</span><span class="p">,</span> <span class="n">nvectors</span><span class="p">,</span> <span class="n">per_vq_vectors</span><span class="p">,</span>
+                  <span class="n">per_vq_vectors</span> <span class="o">?</span> <span class="nl">desc</span> <span class="p">:</span> <span class="nb">NULL</span><span class="p">);</span>
+        <span class="k">for</span> <span class="p">(</span><span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">nvqs</span><span class="p">;</span> <span class="o">++</span><span class="n">i</span><span class="p">)</span> <span class="p">{</span>
+         <span class="c1">// 创建队列 --&gt; vring_create_virtqueue --&gt; vring_create_virtqueue_split --&gt; vring_alloc_queue</span>
+             <span class="n">vqs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">vp_setup_vq</span><span class="p">(</span><span class="n">vdev</span><span class="p">,</span> <span class="n">queue_idx</span><span class="o">++</span><span class="p">,</span> <span class="n">callbacks</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">names</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
+                                <span class="n">ctx</span> <span class="o">?</span> <span class="n">ctx</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">:</span> <span class="nb">false</span><span class="p">,</span>
+                                <span class="n">msix_vec</span><span class="p">);</span>
+        <span class="c1">// 每个队列申请一个MSIx中断</span>
+                <span class="n">err</span> <span class="o">=</span> <span class="n">request_irq</span><span class="p">(</span><span class="n">pci_irq_vector</span><span class="p">(</span><span class="n">vp_dev</span><span class="o">-&gt;</span><span class="n">pci_dev</span><span class="p">,</span> <span class="n">msix_vec</span><span class="p">),</span>
+                                  <span class="n">vring_interrupt</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span>
+                                  <span class="n">vp_dev</span><span class="o">-&gt;</span><span class="n">msix_names</span><span class="p">[</span><span class="n">msix_vec</span><span class="p">],</span>
+                                  <span class="n">vqs</span><span class="p">[</span><span class="n">i</span><span class="p">]);</span>
+
+    <span class="p">}</span>
+</pre></div>
+
+
+<p><code>vp_setup_vq</code>流程再往下走就开始分配共享内存页，至此建立起共享内存通信通道。
+值得注意的是一路传下来的callbacks参数其实传入了发送队列和接收队列的回调处理函数，
+好家伙，从<code>virtnet_find_vqs</code>一路传递到了<code>__vring_new_virtqueue</code>中最终赋值给了<code>vq-&gt;vq.callback</code>。</p>
+<div class="highlight"><pre><span></span><span class="nv">static</span> <span class="nv">struct</span> <span class="nv">virtqueue</span> <span class="o">*</span><span class="nv">vring_create_virtqueue_split</span><span class="ss">(</span>
+        <span class="nv">unsigned</span> <span class="nv">int</span> <span class="nv">index</span>,
+        <span class="nv">unsigned</span> <span class="nv">int</span> <span class="nv">num</span>,
+        <span class="nv">unsigned</span> <span class="nv">int</span> <span class="nv">vring_align</span>,
+        <span class="nv">struct</span> <span class="nv">virtio_device</span> <span class="o">*</span><span class="nv">vdev</span>,
+        <span class="nv">bool</span> <span class="nv">weak_barriers</span>,
+        <span class="nv">bool</span> <span class="nv">may_reduce_num</span>,
+        <span class="nv">bool</span> <span class="nv">context</span>,
+        <span class="nv">bool</span> <span class="ss">(</span><span class="o">*</span><span class="nv">notify</span><span class="ss">)(</span><span class="nv">struct</span> <span class="nv">virtqueue</span> <span class="o">*</span><span class="ss">)</span>,
+        <span class="nv">void</span> <span class="ss">(</span><span class="o">*</span><span class="nv">callback</span><span class="ss">)(</span><span class="nv">struct</span> <span class="nv">virtqueue</span> <span class="o">*</span><span class="ss">)</span>,
+        <span class="nv">const</span> <span class="nv">char</span> <span class="o">*</span><span class="nv">name</span><span class="ss">)</span>
+{
+       <span class="cm">/* TODO: allocate each queue chunk individually */</span>
+        <span class="k">for</span> <span class="ss">(</span><span class="c1">; num &amp;&amp; vring_size(num, vring_align) &gt; PAGE_SIZE; num /= 2) {</span>
+        <span class="o">//</span> 申请物理页，地址赋值给<span class="nv">queue</span>
+                <span class="nv">queue</span> <span class="o">=</span> <span class="nv">vring_alloc_queue</span><span class="ss">(</span><span class="nv">vdev</span>, <span class="nv">vring_size</span><span class="ss">(</span><span class="nv">num</span>, <span class="nv">vring_align</span><span class="ss">)</span>,
+                                          <span class="o">&amp;</span><span class="nv">dma_addr</span>,
+                                          <span class="nv">GFP_KERNEL</span><span class="o">|</span><span class="nv">__GFP_NOWARN</span><span class="o">|</span><span class="nv">__GFP_ZERO</span><span class="ss">)</span><span class="c1">;</span>
+        }
+
+
+        <span class="nv">queue_size_in_bytes</span> <span class="o">=</span> <span class="nv">vring_size</span><span class="ss">(</span><span class="nv">num</span>, <span class="nv">vring_align</span><span class="ss">)</span><span class="c1">;</span>
+        <span class="nv">vring_init</span><span class="ss">(</span><span class="o">&amp;</span><span class="nv">vring</span>, <span class="nv">num</span>, <span class="nv">queue</span>, <span class="nv">vring_align</span><span class="ss">)</span><span class="c1">; // 确定 descriptor table, available ring, used ring的位置。</span>
+}
+</pre></div>
+
+
+<p>我们看下如果virtqueue队列如果收到MSIx中断消息后，会调用哪个hook来处理？</p>
+<div class="highlight"><pre><span></span><span class="n">irqreturn_t</span> <span class="nf">vring_interrupt</span><span class="p">(</span><span class="kt">int</span> <span class="n">irq</span><span class="p">,</span> <span class="kt">void</span> <span class="o">*</span><span class="n">_vq</span><span class="p">)</span>
+<span class="p">{</span>
+        <span class="k">struct</span> <span class="n">vring_virtqueue</span> <span class="o">*</span><span class="n">vq</span> <span class="o">=</span> <span class="n">to_vvq</span><span class="p">(</span><span class="n">_vq</span><span class="p">);</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">more_used</span><span class="p">(</span><span class="n">vq</span><span class="p">))</span> <span class="p">{</span>
+                <span class="n">pr_debug</span><span class="p">(</span><span class="s">&quot;virtqueue interrupt with no work for %p</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span> <span class="n">vq</span><span class="p">);</span>
+                <span class="k">return</span> <span class="n">IRQ_NONE</span><span class="p">;</span>
+        <span class="p">}</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="n">unlikely</span><span class="p">(</span><span class="n">vq</span><span class="o">-&gt;</span><span class="n">broken</span><span class="p">))</span>
+                <span class="k">return</span> <span class="n">IRQ_HANDLED</span><span class="p">;</span>
+
+        <span class="n">pr_debug</span><span class="p">(</span><span class="s">&quot;virtqueue callback for %p (%p)</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span> <span class="n">vq</span><span class="p">,</span> <span class="n">vq</span><span class="o">-&gt;</span><span class="n">vq</span><span class="p">.</span><span class="n">callback</span><span class="p">);</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">vq</span><span class="o">-&gt;</span><span class="n">vq</span><span class="p">.</span><span class="n">callback</span><span class="p">)</span>
+                <span class="n">vq</span><span class="o">-&gt;</span><span class="n">vq</span><span class="p">.</span><span class="n">callback</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vq</span><span class="o">-&gt;</span><span class="n">vq</span><span class="p">);</span>
+
+        <span class="k">return</span> <span class="n">IRQ_HANDLED</span><span class="p">;</span>
+<span class="p">}</span>
+<span class="n">EXPORT_SYMBOL_GPL</span><span class="p">(</span><span class="n">vring_interrupt</span><span class="p">);</span>
+</pre></div>
+
+
+<p>不难想到中断服务程序里面会调用队列上的callback。
+我们再回过头来看下<code>virtnet_find_vqs</code>，原来接受队列的回调函数是<code>skb_recv_done</code>，发送队列的回调函数是<code>skb_xmit_done</code>。</p>
+<div class="highlight"><pre><span></span><span class="nv">static</span> <span class="nv">int</span> <span class="nv">virtnet_find_vqs</span><span class="ss">(</span><span class="nv">struct</span> <span class="nv">virtnet_info</span> <span class="o">*</span><span class="nv">vi</span><span class="ss">)</span>
+{
+       <span class="cm">/* Allocate/initialize parameters for send/receive virtqueues */</span>
+        <span class="k">for</span> <span class="ss">(</span><span class="nv">i</span> <span class="o">=</span> <span class="mi">0</span><span class="c1">; i &lt; vi-&gt;max_queue_pairs; i++) {</span>
+        <span class="nv">callbacks</span>[<span class="nv">rxq2vq</span><span class="ss">(</span><span class="nv">i</span><span class="ss">)</span>] <span class="o">=</span> <span class="nv">skb_recv_done</span><span class="c1">;</span>
+        <span class="nv">callbacks</span>[<span class="nv">txq2vq</span><span class="ss">(</span><span class="nv">i</span><span class="ss">)</span>] <span class="o">=</span> <span class="nv">skb_xmit_done</span><span class="c1">;</span>
+    }
+}
+</pre></div>
+
+
+<p>OK，这个小节就到这里。Are you clear ?</p>
+            <div>
+</div>
+
+            <section>
+    <p id="post-share-links">
+    Share on:
+    <a href="https://twitter.com/intent/tweet?text=Virtio%20Overview&url=https%3A//kernelgo.org/virtio%2C%20virtio-net%2Cvirto-scsi.html&hashtags=virtualization" target="_blank" title="Share on Twitter">Twitter</a>
+    ❄
+    <a href="https://www.facebook.com/sharer/sharer.php?u=https%3A//kernelgo.org/virtio%2C%20virtio-net%2Cvirto-scsi.html" target="_blank" title="Share on Facebook">Facebook</a>
+    ❄
+    <a href="" target="_blank" title="Share on Google Plus">Google+</a>
+    ❄
+    <a href="mailto:?subject=Virtio%20Overview&amp;body=https%3A//kernelgo.org/virtio%2C%20virtio-net%2Cvirto-scsi.html" target="_blank" title="Share via Email">Email</a>
+    </p>
+</section>
+
+            <section>
+<div class="accordion" id="accordion2">
+    <div class="accordion-group">
+        <div class="accordion-heading">
+            <a class="accordion-toggle disqus-comment-count" data-toggle="collapse" data-parent="#accordion2"
+                href="https://kernelgo.org/virtio, virtio-net,virto-scsi.html#disqus_thread",
+                id="disqus-accordion-toggle">
+                Comments
+            </a>
+        </div>
+        <div id="disqus_thread" class="accordion-body collapse">
+            <div class="accordion-inner">
+                <div class="comments">
+                    <div id="disqus_thread"></div>
+<script type="text/javascript">
+    var disqus_shortname = 'kernelgo';
+        var disqus_identifier = 'https://kernelgo.org/virtio, virtio-net,virto-scsi.html';
+    var disqus_url = 'https://kernelgo.org/virtio, virtio-net,virto-scsi.html';
+
+    (function() {
+         var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+         dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+         (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+     })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</section>
+
+            <hr/>
+<section>
+    <h2>Related Posts</h2>
+<ul class="related-posts-list">
+<li><a href="https://kernelgo.org/posted-interrupt.html" title="VT-d Posted Interrupt">VT-d Posted Interrupt</a></li>
+<li><a href="https://kernelgo.org/vfio-introduction.html" title="VFIO Introduction">VFIO Introduction</a></li>
+<li><a href="https://kernelgo.org/vtd_interrupt_remapping_code_analysis.html" title="VT-d Interrupt Remapping Code Analysis">VT-d Interrupt Remapping Code Analysis</a></li>
+<li><a href="https://kernelgo.org/vtd-posted-interrupt-code-analysis.html" title="VT-d Interrupt Posting Code Analysis">VT-d Interrupt Posting Code Analysis</a></li>
+<li><a href="https://kernelgo.org/reading2019.html" title="Article Archive 2019 Reading Plan">Article Archive 2019 Reading Plan</a></li>
+</ul>
+<hr />
+</section>
+            <aside>
+            <nav>
+            <ul class="articles-timeline">
+                <li class="previous-article">« <a href="https://kernelgo.org/armv8-virt-guide.html" title="Previous: ARMv8 Virtualization Overview">ARMv8 Virtualization Overview</a></li>
+            </ul>
+            </nav>
+            </aside>
+        </div>
+        <section>
+        <div class="span2" style="float:right;font-size:0.9em;">
+            <h4>Published</h4>
+            <time itemprop="dateCreated" datetime="2019-09-13T23:00:00+08:00">Sep 13, 2019</time>
+
+<h4>Last Updated</h4>
+<time datetime="2019-09-13T23:00:00+08:00">Sep 13, 2019</time>
+
+            <h4>Category</h4>
+            <a class="category-link" href="https://kernelgo.org/categories.html#virtualization-ref">virtualization</a>
+            <h4>Tags</h4>
+            <ul class="list-of-tags tags-in-article">
+                <li><a href="https://kernelgo.org/tags#virtualization-ref">virtualization
+                    <span>14</span>
+</a></li>
+            </ul>
+<h4>Contact</h4>
+    <a href="https://github.com/fangying" title="My github Profile" class="sidebar-social-links" target="_blank">
+    <i class="fa fa-github sidebar-social-links"></i></a>
+    <a href="#" title="My Another social link Profile" class="sidebar-social-links" target="_blank">
+    <i class="fa fa-another social link sidebar-social-links"></i></a>
+        </div>
+        </section>
+</div>
+</article>
+                </div>
+                <div class="span1"></div>
+            </div>
+        </div>
+        <div id="push"></div>
+    </div>
+<footer>
+<div id="footer">
+    <ul class="footer-content">
+        <li class="elegant-license"><span xmlns:dct="http://purl.org/dc/terms/" property="dct:title"> kernelgo"</span> by <a xmlns:cc="http://creativecommons.org/ns#" href="https://kernelgo.org" property="cc:attributionName" rel="cc:attributionURL">Yori Fang</a> is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/3.0/deed.en_US">Creative Commons Attribution-ShareAlike 3.0 Unported License</a>.</li>
+        <li class="elegant-power">Powered by <a href="http://getpelican.com/" title="Pelican Home Page">Pelican</a>. Theme: <a href="https://github.com/Pelican-Elegant/elegant/" title="Theme Elegant Home Page">Elegant</a></li>
+    </ul>
+</div>
+</footer>            <script src="//code.jquery.com/jquery.min.js"></script>
+        <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/js/bootstrap.min.js"></script>
+        <script>
+            function validateForm(query)
+            {
+                return (query.length > 0);
+            }
+        </script>
+
+            <script type="text/javascript">
+var disqus_shortname = 'kernelgo';
+(function () {
+    var s = document.createElement('script'); s.async = true;
+    s.type = 'text/javascript';
+    s.src = '//' + disqus_shortname + '.disqus.com/count.js';
+    (document.getElementsByTagName('HEAD')[0] || document.getElementsByTagName('BODY')[0]).appendChild(s);
+}());
+</script>
+<script  language="javascript" type="text/javascript">
+function uncollapse() {
+    if (window.location.hash.match(/^#comment-\d+$/)) {
+        $('#disqus_thread').collapse('show');
+    }
+}
+</script>
+<script type="text/javascript" language="JavaScript">
+uncollapse();
+window.onhashchange=function(){
+    if (window.location.hash.match(/^#comment-\d+$/))
+        window.location.reload(true);
+}
+</script>
+<script>
+$('#disqus_thread').on('shown', function () {
+    var link = document.getElementById('disqus-accordion-toggle');
+    var old_innerHTML = link.innerHTML;
+    $(link).fadeOut(500, function() {
+        $(this).text('Click here to hide comments').fadeIn(500);
+    });
+    $('#disqus_thread').on('hidden', function () {
+        $(link).fadeOut(500, function() {
+            $(this).text(old_innerHTML).fadeIn(500);
+        });
+    })
+})
+</script>
+
+
+    </body>
+    <!-- Theme: Elegant built for Pelican
+    License : MIT -->
+</html>
