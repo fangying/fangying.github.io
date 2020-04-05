@@ -1,10 +1,10 @@
 Title: A Qemu Hang Problem revelant to AIO
-Date: 2020-2-3 23:00 
-Modified: 2020-2-3 23:00 
+Date: 2020-4-3 23:00
+Modified: 2020-4-3 23:00
 Tags: aio
 Slug: qemu-aio-internal
-Status: published 
-Authors: Yori Fang 
+Status: published
+Authors: Yori Fang
 Summary: Qemu AIO Internal
 
 最近openEuler在HDC 2020上宣布开源了，采用开源社区的运作模式开发和发布版本。
