@@ -74,7 +74,7 @@ SITEMAP = {
         }
 
 # do not generate draft docs
-IGNORE_FILES=['draft/*.md']
+IGNORE_FILES=['drafts/*']
 
 # SEO
 SITE_DESCRIPTION = (
