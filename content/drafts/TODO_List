@@ -1,0 +1,33 @@
+ORAYb0349c48900c
+
+topics to be done
+
+qemu  PCI 总线和 PCI设备模拟
+qemu  主板模拟
+qemu  VNC
+qemu  Chardev
+qemu  内存管理
+qemu  鼠标键盘
+qemu  USB直通
+qemu  Virtio
+qemu  vhost-net/vhost-user
+qemu  device hotplug/unplug
+qemu  QOM
+qemu  interrupt eventfd
+qemu  timer
+qemu  vcpu emulation/ hotplug unplug
+qemu  seabios
+qemu  e1000
+qemu  vga
+qemu  rcu
+qemu  tcg
+
+KVM   MMU
+KVM   VCPU
+KVM   生命周期
+KVM   Sched
+Userspace RCU
+intel cmt cat
+Kpatch
+
+qemu/kvm live migration
