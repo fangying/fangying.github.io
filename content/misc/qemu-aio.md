@@ -1,4 +1,4 @@
-Title: A Qemu Hang Problem revelant to AIO
+Title: A Qemu Hang Problem Revelant to AIO
 Date: 2020-4-3 23:00
 Modified: 2020-4-3 23:00
 Tags: aio
@@ -268,8 +268,8 @@ qemu-img 进行covert格式转换的时候创建了8个协程来并发处理转�
 根据Paolo Bonzini的回复和总结，这个问题可以简化为一个smp编程场景
 多线程之间共享变量的一个同步模型：
 
-* aio_ctx_prepare里面：主线程写`notify_me`，然后又读取bh->flags | BH_SCHEDULE的值来判是休眠还是处理bh
-* io worker线程写bh->flags的BH_SCHEDULE标志位，然后又读取`notify_me`来判断是否唤醒主线程
+* aio_ctx_prepare里面：主线程写`notify_me`，然后又读取bh->flags | BH_SCHEDULE的值来判是休眠还是处理bh；
+* io worker线程写bh->flags的BH_SCHEDULE标志位，然后又读取`notify_me`来判断是否唤醒主线程。
 
 ```
 Yes, that's what I expected too when I wrote that code. :(  But Torvald
@@ -296,7 +296,7 @@ Paolo
 
 在这个模型下面，主线程和io worker线程之间的执行逻辑去取决于共享变量`notify_me`
 和bh->flags | BH_SCHEDULE的值，两个线程之间又各自会写对方需要的分支判断条件，
-这样就存在一种竞争关系，作者在写代码的时候认为atomic_or或者atomic_and这类API函数
+这样就存在一种竞争关系，作者在写代码的时候认为`atomic_or`或者`atomic_and`这类API函数
 在执行的时候会加barrier，保证代码执行的顺序逻辑（注意是从另外一个线程的角度去看），
 但不幸的是实际上并没有。为了验证这一点，我们在aarch64环境上对`aio_ctx_prepare`进行反汇编：
 
