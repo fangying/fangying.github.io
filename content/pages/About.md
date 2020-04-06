@@ -9,8 +9,8 @@ Summary: Self Introduction
 
 Hi，我叫Fang Ying，Yori Fang是我的英文名字。 出生于1990年7月，毕业于：
 
-*   浙江大学信息与电子工程学院 (Master) 2013-2016
-*   东北大学信息科学与工程学院 (Bachelor) 2009-2013
+*   浙江大学 信息与电子工程学院 (Master) 2013-2016
+*   东北大学 信息科学与工程学院 (Bachelor) 2009-2013
 
 现在从事与linux内核和操作系统虚拟化方面的工作。主要工作在QEMU/KVM虚拟方向，致力于使能ICT云计算基础架构。
 
