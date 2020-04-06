@@ -30,7 +30,7 @@ while true
 done
 ```
 
-我们向qemu社区提交了bugzilla，但社区的Commiter也没有就这个问题达成一个结论，
+我们向qemu社区提交了bugzilla，但qemu社区也没有就这个问题达成一个结论，
 社区讨讨论连接是：
 
 [https://lists.gnu.org/archive/html/qemu-arm/2019-10/msg00051.html](https://lists.gnu.org/archive/html/qemu-arm/2019-10/msg00051.html)
@@ -310,7 +310,7 @@ Paolo
     
     /* We assume there is no timeout already supplied */
     *timeout = qemu_timeout_ns_to_ms(aio_compute_timeout(ctx));
-``
+```
 
 所以这问题的根源在于：
 
