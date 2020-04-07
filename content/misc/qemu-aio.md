@@ -353,7 +353,7 @@ https://patchwork.kernel.org/cover/11476375/
 https://patchwork.kernel.org/patch/11476383/
 
 参考文献：
-
+* http://www.cs.jhu.edu/~gyn/publications/memorymodels/writeup.html
 * https://developer.arm.com/docs/den0024/a/memory-ordering
 * https://www.csm.ornl.gov/workshops/openshmem2018/presentations/mm-openshmem2018.pdf
 * https://github.com/qemu/qemu/blob/master/docs/devel/atomics.rst
