@@ -348,9 +348,13 @@ lock prefix guarantee that result of instruction is immediately globaly visible.
 
 https://patchwork.kernel.org/cover/11476375/
 
+还有针对这个问题的补丁已经post，不得不说社区大牛速度真是快，日常膜拜：
+
+https://patchwork.kernel.org/patch/11476383/
+
 参考文献：
 
 * https://developer.arm.com/docs/den0024/a/memory-ordering
 * https://www.csm.ornl.gov/workshops/openshmem2018/presentations/mm-openshmem2018.pdf
-* https://github.com/qemu/qemu/blob/master/docs/devel/atomics.txt
+* https://github.com/qemu/qemu/blob/master/docs/devel/atomics.rst
 * https://www.jianshu.com/p/a26763dd9b0e
