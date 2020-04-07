@@ -321,14 +321,18 @@ aarch64环境上的smp多线程场景下，线程间使用了共享变量
 代码的执行顺序，只有在代码分支条件判断的关键点显式添加memory barrier才能
 保证代码的执顺序！！！
 
+为什么这个bug在x86上不出现而在aarch64上出现可以高概率复现？
+猜测是aarch64和x86上内存一致性模型不同导致的结果。
+
+从ARMv8的PG文档可以看到aarch46使用的是一种weakly-ordered model of memory
+所以，很明显aarch64和x86的内存模型是很大不同的。
+
 ```
 ARMv8A PG Chapter 13. Memory Ordering
 
 The ARMv8 architecture employs a weakly-ordered model of memory. In general terms, this means that the order of memory accesses is not required to be the same as the program order for load and store operations. The processor is able to re-order memory read operations with respect to each other. Writes may also be re-ordered (for example, write combining) .As a result, hardware optimizations, such as the use of cache and write buffer, function in a way that improves the performance of the processor, which means that the required bandwidth between the processor and external memory can be reduced and the long latencies associated with such external memory accesses are hidden.
 ```
 
-为什么这个bug在x86上不出现而在aarch64上出现可以高概率复现，
-猜测是aarch64和x86上内存一致性模型不同导致的结果。
 这里对x86环境上的`aio_ctx_prepare`进行反汇编得到的结果是：
 
 ![aio_ctx_prepare on x86](images/aio_ctx_prepare_asm_x86.png)
@@ -339,6 +343,10 @@ The ARMv8 architecture employs a weakly-ordered model of memory. In general term
 lock prefix guarantee that result of instruction is immediately globaly visible.
 ```
 发现lock前缀是锁总线，可以保证执行操作立刻全局可见，难道这里顺带这里可以起到内存屏障的作用？
+
+更新一下最新进展，Paolo Bonzini已经开始发patch了，针对weakly-ordered内存模型体系结构修改了一些内容：
+
+https://patchwork.kernel.org/cover/11476375/
 
 参考文献：
 
