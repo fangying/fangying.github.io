@@ -352,4 +352,5 @@ https://patchwork.kernel.org/cover/11476375/
 
 * https://developer.arm.com/docs/den0024/a/memory-ordering
 * https://www.csm.ornl.gov/workshops/openshmem2018/presentations/mm-openshmem2018.pdf
+* https://github.com/qemu/qemu/blob/master/docs/devel/atomics.txt
 * https://www.jianshu.com/p/a26763dd9b0e
