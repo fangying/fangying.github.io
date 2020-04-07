@@ -300,9 +300,9 @@ Paolo
 在执行的时候会加barrier，保证代码执行的顺序逻辑（注意是从另外一个线程的角度去看），
 但不幸的是实际上并没有。为了验证这一点，我们在aarch64环境上对`aio_ctx_prepare`进行反汇编：
 
-![aio_ctx_prepare](images/../../images/aio_ctx_prepare_asm.png)
+![aio_ctx_prepare](images/aio_ctx_prepare_asm.png)
 
-从反汇编可以看出，atom api后面并没有添加任何barrier指令，
+从反汇编可以看出，atomic_or这里对应一条orr指令，后面并没有添加任何barrier指令(dmb或者dsb指令)，
 也就是说`aio_ctx_prepare`中并不能保证smp环境下多线程之间的指令顺序执行。
 
 ```c
@@ -319,7 +319,7 @@ aarch64环境上的smp多线程场景下，线程间使用了共享变量
 并没有采用互斥锁、条件变量、信号量等重量级同步方式来保证）
 可能会导致一些意想不到的结果，单独的用户态原子操作并不能保证smp多线程之间
 代码的执行顺序，只有在代码分支条件判断的关键点显式添加memory barrier才能
-保证代码的执顺序，barrier能够防止！！！
+保证代码的执顺序！！！
 
 ```
 ARMv8A PG Chapter 13. Memory Ordering
@@ -333,7 +333,7 @@ The ARMv8 architecture employs a weakly-ordered model of memory. In general term
 
 ![aio_ctx_prepare on x86](images/aio_ctx_prepare_asm_x86.png)
 
-可以看到x86上是一条lock_add指令，查询资料x86使用Total Store Order内存模型：
+可以看到x86上是一条lock orl指令，查询资料x86使用Total Store Order内存模型：
 
 ```
 lock prefix guarantee that result of instruction is immediately globaly visible.
