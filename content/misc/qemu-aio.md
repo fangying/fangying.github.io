@@ -343,4 +343,5 @@ lock prefix guarantee that result of instruction is immediately globaly visible.
 参考文献：
 
 * https://developer.arm.com/docs/den0024/a/memory-ordering
+* https://www.csm.ornl.gov/workshops/openshmem2018/presentations/mm-openshmem2018.pdf
 * https://www.jianshu.com/p/a26763dd9b0e
