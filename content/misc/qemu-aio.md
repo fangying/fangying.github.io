@@ -359,4 +359,5 @@ https://patchwork.kernel.org/patch/11476383/
 * https://github.com/qemu/qemu/blob/master/docs/devel/atomics.rst
 * http://www.inf.ed.ac.uk/teaching/courses/pa/Notes/lecture07-sc.pdf
 * https://www.cs.cmu.edu/afs/cs/academic/class/15740-s17/www/lectures/07-multiprocessor-consistency-cache.pdf
+* https://people.mpi-sws.org/~viktor/wmc/c11.pdf
 * https://www.jianshu.com/p/a26763dd9b0e
