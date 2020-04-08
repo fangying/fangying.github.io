@@ -322,7 +322,7 @@ aarch64环境上的smp多线程场景下，线程间使用了共享变量
 保证代码的执顺序！！！
 
 为什么这个bug在x86上不出现而在aarch64上出现可以高概率复现？
-猜测是aarch64和x86上内存一致性模型不同导致的结果。
+猜测是aarch64和x86上内存模型不同导致的结果。
 
 从ARMv8的PG文档可以看到aarch46使用的是一种weakly-ordered model of memory
 所以，很明显aarch64和x86的内存模型是很大不同的。
@@ -351,6 +351,8 @@ https://patchwork.kernel.org/cover/11476375/
 还有针对这个问题的补丁已经post，不得不说社区大牛速度真是快，日常膜拜：
 
 https://patchwork.kernel.org/patch/11476383/
+
+SMP架构下的内存模型（Memory Model）与CPU Arch和编程语言息息相关，
 
 参考文献：
 * http://www.cs.jhu.edu/~gyn/publications/memorymodels/writeup.html
