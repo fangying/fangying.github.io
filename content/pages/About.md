@@ -37,11 +37,11 @@ I was born in July 1990.
 
 Graduated From:
 
-*   College of Electronic and Infomation Zhejiang University as Master 2013-2016
+*   College of Electronic and Information Zhejiang University as Master 2013-2016
 *   College of Computer Science Northeastern University as Bachelor 2009-2013
 
-I'm now working on things related to linux kernel and OS virtualization. I'm a virtualization developmenter,
-working on KVM and QEMU and delicated to enable ICT on Cloud Computing.
+I'm now working on things related to linux kernel and OS virtualization. I'm a virtualization developer,
+working on KVM and QEMU and dedicated to enable Cloud Computing for ICT infrastructure.
 
 * Mail:   fangying2725@gmail.com
 * Github: https://github.com/fangying
