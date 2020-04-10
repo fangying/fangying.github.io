@@ -13,13 +13,13 @@ Status: published
 echo 'handle SIGUSR1 SIGUSR2 noprint nostop' >> ~/.gdbinit
 ```
 
-### 生成内核符号表
+#### 生成内核符号表
 ```bash
 make tags ARCH=x86
 make cscope ARCH=x86
 ```
 
-### GDB设置条件断点
+#### GDB设置条件断点
 
 设置条件断点除了使用break if语句之外还有一种便捷的方法。
 例如，我们在qemu的函数vmstate_save_sate_v上设置断点，抓取virtio-blk设备的状态保存。
@@ -34,14 +34,14 @@ condition 1 strcmp(vmsd->name, "virtio-blk") == 0
 ```
 参考: https://www.fayewilliams.com/2011/07/13/gdb-conditional-breakpoints/
 
-### 密码输错超过最大次数，解锁骚操作
+#### 密码输错超过最大次数，解锁骚操作
 
 ```bash
 pam_tally2 --user root
 pam_tally2 -r -u root
 ```
 
-### 更新let's encrypt证书
+#### 更新let's encrypt证书
 
 ```bash
 yum -y install yum-utils
@@ -81,7 +81,7 @@ cat per_cpu/cpu2/trace > /home/trace.txt
           <idle>-0     [002] dNh. 158158.086265: sched_wakeup: comm=CPU 0/KVM pid=2046 prio=120 success=1 target_cpu=002
 ```
 
-### 测试NUMA NODE内存性能
+#### 测试NUMA NODE内存性能
 这里以加压100M为例
 
 ```
@@ -102,7 +102,7 @@ chmod +x ./pcm-memory.x
 ./pcm-memory.x 查看带宽
 ```
 
-### 如何查看任务的调度延时
+#### 如何查看任务的调度延时
 通过perf sched 查看某段时间内进程的调度延时
 ```c
 perf sched record -- sleep 1
@@ -114,26 +114,26 @@ perf sched latency --sort=max
 :set binary noeol
 ```
 
-### 如何查找一个系统调用的定义在哪个文件中
+#### 如何查找一个系统调用的定义在哪个文件中
 
 ```
 grep -E "SYSCALL_DEFINE[0-6]\(listen" -nr
 ```
 
-### perf查看虚拟机性能数据
+#### perf查看虚拟机性能数据
 ```
 pid=$(pgrep qemu-kvm)
 perf kvm stat record -p $pid
 perf kvm stat report
 ```
 
-### wget下载指定目录的指定文件到
+#### wget下载指定目录的指定文件到
 ```
  wget -c -r -nd -np -k -L -p -A "qemu*.rpm" http://mirrors.aliyun.com/centos/7.6.1810/updates/x86_64/Packages/
  -c 断点续传， -r 递归， -nd不在本地创建对应文件夹， -np不下载父目录， -A 接受哪些类型的文件（这里可以试一个glob表达式）
 ```
-
-### 查询设备/设备类属性
+ 
+#### 查询设备/设备类属性
 
 ```
  设备属性
@@ -143,14 +143,16 @@ perf kvm stat report
  设备实例的属性
  virsh qemu-monitor-command fangying --hmp "info qtree" | less
 ```
-### 配置yum proxy
+
+#### 配置yum proxy
 ```
 # append to /etc/yum.conf
 proxy=http://xxxx
 proxy_username=xxxx
 proxy_password=xxxx
 ```
-### 配置docker hub
+
+#### 配置docker hub
 
 众所周知,docker hub默认国外镜像在国内几乎无法访问,需要配置国内支持匿名pull的docker hub.
 edit `/etc/docker/daemon.json`
@@ -169,7 +171,7 @@ sudo systemctl daemon-reload
 sudo systemctl restart docker
 ```
 
-### 编译firecracker
+#### 编译firecracker
 
 ```
 docker run --user 0:0 --workdir /firecracker -it \
@@ -177,7 +179,8 @@ docker run --user 0:0 --workdir /firecracker -it \
 --env OPT_LOCAL_IMAGES_PATH=/firecracker/build \
 --env PYTHONDONTWRITEBYTECODE=1 fcuvm/dev:v12
 ```
-### 虚拟机文件系统扩容
+
+#### 虚拟机文件系统扩容
 
 情况1： 非lvm卷，rootfs是ext4文件系统
 
@@ -258,7 +261,7 @@ vda                 252:0     0    110G  0 part
 搞定了
 ```
 
-### Debug Qemu代码
+#### Debug Qemu代码
 
 ```
 QEMU_BINARY=/mnt/sdc/fangying/x86/qemu/x86_64-softmmu/qemu-system-x86_64
@@ -276,11 +279,12 @@ gdb --args $QEMU_BINARY \
     -vnc :9
 ```
 
-### 将进程proc cmdline格式化一下
+#### 将进程proc cmdline格式化一下
 ```
 sed -i "s/ -/ \\\ \n-/g" cmd.txt
 ```
-### 使用quilt补丁管理工具来管理补丁
+
+#### 使用quilt补丁管理工具来管理补丁
 
 ```
 quilt add filename
@@ -303,7 +307,7 @@ quilt ...
 
 https://dev.to/saltyshiomix/a-guide-for-upgrading-macos-to-catalina-and-migrating-the-default-shell-from-bash-to-zsh-4ep3
 
-### git 将本地自己拉出来的分支push到远程
+#### git 将本地自己拉出来的分支push到远程
 
 ```
 git checkout -b test
@@ -311,7 +315,7 @@ git checkout -b test
 git push --set-upstream origin test
 ```
 
-### DPDK源码编译和测试
+#### DPDK源码编译和测试
 
 参考：
 
@@ -444,4 +448,16 @@ MiB Swap:   8192.0 total,   8148.2 free,     43.8 used.  10993.1 avail Mem
    1578 root      20   0  236660  14648   2768 S   1.0   0.1   4:02.44 phdaemon
  169477 root      20   0  252768  29536   8136 S   0.3   0.2   0:30.76 sssd_kcm
       1 root      20   0  172240  12648   8996 S   0.0   0.1   0:08.36 systemd
+```
+
+
+#### Docker配置内部代理
+
+方法一：写Dockerfile，启动容器OS后传入proxy
+```bash
+From docker.io/fedora:latest
+
+RUN [-n $http_proxy ] && sed -i "$ a proxy=$http_proxy" /etc/dnf/dnf.conf; true
+
+RUN dnf install -y vim
 ```
