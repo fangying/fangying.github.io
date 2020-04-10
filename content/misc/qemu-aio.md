@@ -356,7 +356,7 @@ https://patchwork.kernel.org/patch/11476383/
 SMP架构下的内存模型（Memory Model）与CPU Arch和编程语言息息相关，
 为了深入理解这个Topic，这里列举了一些参考文档供学习。
 
-参考文献：
+*参考文献*：
 
 * http://www.cs.jhu.edu/~gyn/publications/memorymodels/writeup.html
 * https://developer.arm.com/docs/den0024/a/memory-ordering
