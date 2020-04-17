@@ -33,7 +33,6 @@ SOCIAL = (('github', 'https://github.com/fangying'),
 # SEO
 GOOGLE_ANALYTICS = 'UA-107392039-1'
 DISQUS_SITENAME = u'kernelgo'
-DISQUS_FILTER = True
 
 # defaults
 DEFAULT_PAGINATION = False
