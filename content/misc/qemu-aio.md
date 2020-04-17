@@ -17,7 +17,7 @@ qemu主线程会出现hung的情况。奇怪的是这个现在只在aarch64平�
 通过我们的分析，再加上和社区的讨论发现这个问题其实是
 隐藏在qemu AIO机制中的一个典型smp多线程共享变量直接的同步问题，
 究其根因是一个不同体系结构上内存模型不同从而导致代码行为不一致的问题。
-（注：一开始我们以为是编译器优化导致局部指令被重排导致，后来发现并不是）
+（注：一开始我们以为是编译器优化导致局部指令被重排了，后来发现并不是）
 通过对这个问题的分析和探讨，可以有助于进一步理解了smp架构上内存模型和其的重要性。
 这里分析和记录一下这个问题。
 
@@ -327,7 +327,9 @@ aarch64环境上的smp多线程场景下，线程间使用了共享变量
 猜测是aarch64和x86上内存模型不同导致的结果。
 （注意：编译器barriers只能够防止代码被编译器优化，并不能防止指令在执行的时候被CPU重新排列）
 
-从ARMv8的PG文档可以看到aarch46使用的是一种weakly-ordered model of memory
+从ARMv8的PG文档可以看到aarch46使用的是一种weakly-ordered model of memory内存模型。
+通俗的讲就是处理器实际对内存访问（load and store）的执行序列和program order不一定保持严格的一致，
+处理器可以对内存访问进行reorder（可以参考：[http://www.wowotech.net/armv8a_arch/__cpu_setup.html](http://www.wowotech.net/armv8a_arch/__cpu_setup.html)）。
 所以，很明显aarch64和x86的内存模型是很大不同的。
 
 ```
@@ -349,11 +351,11 @@ lock prefix guarantee that result of instruction is immediately globaly visible.
 
 更新一下最新进展，Paolo Bonzini已经开始发patch了，针对weakly-ordered内存模型体系结构修改了一些内容：
 
-https://patchwork.kernel.org/cover/11476375/
+[https://patchwork.kernel.org/cover/11476375/](https://patchwork.kernel.org/cover/11476375/)
 
 还有针对这个问题的补丁已经post，不得不说社区大牛速度真是快，日常膜拜：
 
-https://patchwork.kernel.org/patch/11476383/
+[https://patchwork.kernel.org/patch/11476383/](https://patchwork.kernel.org/patch/11476383/)
 
 SMP架构下的内存模型（Memory Model）与CPU Arch和编程语言息息相关，
 为了深入理解这个Topic，这里列举了一些参考文档供学习。
