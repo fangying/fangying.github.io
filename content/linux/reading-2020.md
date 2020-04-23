@@ -56,7 +56,6 @@ QEMU使用fw_cfg设备向OS呈现系统固件(firmware)信息，
 其中主要包括：device bootorder，ACPI和SMBIOS tables，VM UUID，SMP/NUMA，
 kenerl/initrd images for direct (Linux) kernel booting等（fw_cfg直接把硬件信息报告给OS）。
 
-
 fw_cfg设备对外提供了3个关键寄存器用来完成设备操作，x86上使用PIO方式，arm上使用MMIO方式访问寄存器。
 ```
 === x86, x86_64 Register Locations ===
@@ -128,6 +127,14 @@ glue load_elf elf_ops.h
 ### 5.内核大锁的讨论
 
 https://kernelnewbies.org/BigKernelLock
+
+### 6. PVH Boot引导方式
+
+[https://patchwork.kernel.org/cover/10722233/](https://patchwork.kernel.org/cover/10722233/)
+PVH特性的目的是为了让QEMU支持内核的快速启动，可以跳过固件直接引导一个未经压缩的内核，
+听上去是不是有点酷。在KVM之前，Xen上就已经有支持Linux和FreeBSD的PVH guests和ABI。
+
+
 
 1. [For a Microkernel, a BIG Lock is fine !](https://ts.data61.csiro.au/publications/nicta_slides/8768.pdf)
 
