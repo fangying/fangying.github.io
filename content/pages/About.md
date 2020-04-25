@@ -29,6 +29,7 @@ Hi，我叫Fang Ying，Yori Fang是我的英文名字。 出生于1990年7月，
 
 * 2019.10.16  Limin Chang 捐赠 50 RMB
 * 2020.4.12   Barry Song 捐赠10 RMB
+* 2020.4.25   Fan Yang 捐赠5 RMB
 
 ---------------------------------------
 
@@ -54,3 +55,4 @@ You can conntact with me via WeChat, and can also encourage me to keep writting 
 
 * 2019.10.16  Limin Chang donated 50 RMB
 * 2020.4.12   Barry Song donated 10 RMB
+* 2020.4.25   Fan Yang donated 5 RMB
