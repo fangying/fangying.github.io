@@ -1,10 +1,10 @@
 ---
 author: Yori Fang
-title: Memory Hotplug & CPU Hotplug
-date: 2020-04-26 23:00
+title:  Memory Hotplug & CPU Hotplug
+date:   2020-04-26 23:00
 status: published
-slug: qemu-device-hotplug
-tags: Memory Hotplug
+slug:   qemu-device-hotplug
+tags:   Memory Hotplug
 ---
 
 在虚拟化场景下Guest的设备由软件进行模拟，所以可以比较方便地实现设备热插、热拔，
@@ -124,7 +124,7 @@ Memory Hotplug实现的重点部分是ACPI表的那一部分。
 为了支持Memory Hotplug需要提前做的事情有2个：
 
 * ARM64上virt主板初始化的时候要创建GED设备
-* 主板创建完成之后开始构建ACPI表
+* 主板创建完成之后开始构建GED ACPI表
 
 ```c
 machvirt_init
@@ -135,17 +135,20 @@ virt_machine_done
         -> virt_acpi_build
             -> build_dsdt
                 -> build_ged_aml    // build GED ACPI table
+                -> build_memory_hotplug_aml // build DIMM hotplug ACPI table
 ```
 
 ### 1.1 创建ged设备
 
-GED设备创建的时候做了一些事情，`ged-event`是32bit的，可以支持很多事件。
-而且可以看到设备的ACPI和PCDIMM基地址是提前分配好的。
+GED设备创建的时候做哪些事情？
 
 * 创建ged设备
 * 设置了属性`ged-event`当前只支持了2个事件：powerdown事件和hotplug事件
 * 设置了ged设备和dimm设备的mmio基地址
 * 连接了ged设备的GPIO
+  
+设备属性`ged-event`是32bit的，理论上可以支持很多事件。
+而且可以看到，设备的ACPI和PCDIMM基地址是提前分配好的（静态的）。
 
 ```c
 static inline DeviceState *create_acpi_ged(VirtMachineState *vms)
@@ -171,9 +174,10 @@ static inline DeviceState *create_acpi_ged(VirtMachineState *vms)
     return dev;
 }
 ```
-这里隐含的是，ged设备在实例化的时候`acpi_ged_initfn`里调用了`acpi_memory_hotplug_init`
-此时会为DIMM设备创建好一个名为'acpi-mem-hotplug'的MemoryRegion，
-Guest可以读写这个MR来查询DIMM slot状态，并支持Memory Hot-unplug这个高级特性。
+这里隐含了的是，ged设备在实例化的时候`acpi_ged_initfn`里调用了`acpi_memory_hotplug_init`。
+此时，会为DIMM设备创建好一个名为`acpi-mem-hotplug`的MemoryRegion，
+作为一段MMIO呈现给Guest OS，Guest可以读写这个MR来查询DIMM slot状态，
+并支持Memory Hot-unplug这个高级特性。
 
 ### 1.2 构建ged的acpi表
 
@@ -286,6 +290,5 @@ void build_ged_aml(Aml *table, const char *name, HotplugHandler *hotplug_dev,
 插槽状态信息，和插槽扫描函数(`MEMORY_SLOT_SCAN_METHOD`)等关键信息。
 Guest在boot的时候会去解析这些表的信息，当事件到来时就调用对应的函数来处理
 Memory Hotplug/unplug事件。
-
 
 ## 2. CPU Hotplug 特性
