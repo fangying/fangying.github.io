@@ -2,7 +2,7 @@
 author: Yori Fang
 title: Memory Hotplug & CPU Hotplug
 date: 2020-04-26 23:00
-status: hidden
+status: published
 slug: qemu-device-hotplug
 tags: Memory Hotplug
 ---
@@ -166,11 +166,14 @@ static inline DeviceState *create_acpi_ged(VirtMachineState *vms)
     sysbus_mmio_map(SYS_BUS_DEVICE(dev), 1, vms->memmap[VIRT_PCDIMM_ACPI].base);
     sysbus_connect_irq(SYS_BUS_DEVICE(dev), 0, qdev_get_gpio_in(vms->gic, irq));
 
-    qdev_init_nofail(dev);
+    qdev_init_nofail(dev);  // 设备实例化，调用realize函数
 
     return dev;
 }
 ```
+这里隐含的是，ged设备在实例化的时候`acpi_ged_initfn`里调用了`acpi_memory_hotplug_init`
+此时会为DIMM设备创建好一个名为'acpi-mem-hotplug'的MemoryRegion，
+Guest可以读写这个MR来查询DIMM slot状态，并支持Memory Hot-unplug这个高级特性。
 
 ### 1.2 构建ged的acpi表
 
@@ -278,11 +281,11 @@ void build_ged_aml(Aml *table, const char *name, HotplugHandler *hotplug_dev,
 }
 ```
 
-除此之外，还要构建PCDIMM的ACPI表，实现函数在`build_memory_hotplug_aml`。
+除此之外，还要构建DIMM支持Hotplug的ACPI表，它的实现函数是`build_memory_hotplug_aml`。
 在这个表里面存放了当前主板上内存的插槽信息`max_slot_num`，
 插槽状态信息，和插槽扫描函数(`MEMORY_SLOT_SCAN_METHOD`)等关键信息。
 Guest在boot的时候会去解析这些表的信息，当事件到来时就调用对应的函数来处理
-Memory Hotplug事件。
+Memory Hotplug/unplug事件。
 
 
 ## 2. CPU Hotplug 特性
