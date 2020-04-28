@@ -124,7 +124,7 @@ Memory Hotplug实现的重点部分是ACPI表的那一部分。
 为了支持Memory Hotplug需要提前做的事情有2个：
 
 * ARM64上virt主板初始化的时候要创建GED设备
-* 主板创建完成之后开始构建GED ACPI表
+* 主板创建完成之后开始构建GED ACPI表，如果配置了numa还有构建srat表
 
 ```c
 machvirt_init
@@ -136,6 +136,7 @@ virt_machine_done
             -> build_dsdt
                 -> build_ged_aml    // build GED ACPI table
                 -> build_memory_hotplug_aml // build DIMM hotplug ACPI table
+            -> build_srat   // numa节点>0的时候要呈现SRAT
 ```
 
 ### 1.1 创建ged设备
@@ -290,5 +291,23 @@ void build_ged_aml(Aml *table, const char *name, HotplugHandler *hotplug_dev,
 插槽状态信息，和插槽扫描函数(`MEMORY_SLOT_SCAN_METHOD`)等关键信息。
 Guest在boot的时候会去解析这些表的信息，当事件到来时就调用对应的函数来处理
 Memory Hotplug/unplug事件。
+
+当配置了Guest Numa的时候，还要去呈现SRAT（System Resource Affinity Table）表。
+这个过程是在`build_srat`中实现，目的是为了呈现资源亲和性。
+
+### 1.3 内存热插流程
+
+### 1.4 Linux arm64 内核支持memory hotplug
+
+QEMU 4.1支持arm64 memory hotplug之后当然也需要Linux kernel进行支持，
+相关的内核patch可以在patchwork上获取到（看pw历史记录有助于了解patch review的过程）：
+
+[https://patchwork.kernel.org/patch/10724455/](https://patchwork.kernel.org/patch/10724455/)
+
+对应的内核git commit是:
+
+[https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=4ab215061554ae2a4b78744a5dd3b3c6639f16a7](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=4ab215061554ae2a4b78744a5dd3b3c6639f16a7)
+
+不得不说的是，气人，这个patch我看不懂！！！
 
 ## 2. CPU Hotplug 特性
