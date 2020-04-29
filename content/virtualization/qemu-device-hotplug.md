@@ -315,35 +315,35 @@ Launch qemu虚拟机进程，初始配置8G内存2个numa node，最大支持内
 
 ```
 /usr/bin/qemu-system-aarch64 \
-        -M virt,usb=off,accel=kvm,gic-version=3 \
-        -cpu host \
-        -smp sockets=1,cores=4 \
-        -m size=8G,slots=128,maxmem=512G \
-        -numa node,nodeid=0,cpus=0-1,mem=4G \
-        -numa node,nodeid=1,cpus=2-3,mem=4G \
-        -chardev socket,id=qmp,path=/var/run/qemu-qmp.qmp,server,nowait \
-        -mon chardev=qmp,mode=control \
-        -nodefaults \
-        -drive file=/usr/share/edk2/aarch64/QEMU_EFI-pflash.raw,if=pflash,format=raw,unit=0,readonly=on \
-        -drive file=/var/lib/libvirt/qemu/nvram/fangying_openeuler_VARS.fd,if=pflash,format=raw,unit=1 \
-        -device pcie-root-port,port=0x8,chassis=1,id=pci.1,bus=pcie.0,multifunction=on,addr=0x1 \
-        -device pcie-root-port,port=0x9,chassis=2,id=pci.2,bus=pcie.0,addr=0x1.0x1 \
-        -device pcie-pci-bridge,id=pci.3,bus=pci.1,addr=0x0 \
-        -device pcie-root-port,port=0xa,chassis=4,id=pci.4,bus=pcie.0,addr=0x1.0x2 \
-        -device pcie-root-port,port=0xb,chassis=5,id=pci.5,bus=pcie.0,addr=0x1.0x3 \
-        -device pcie-root-port,port=0xc,chassis=6,id=pci.6,bus=pcie.0,addr=0x1.0x4 \
-        -device pcie-root-port,port=0xd,chassis=7,id=pci.7,bus=pcie.0,addr=0x1.0x5 \
-        -device pcie-root-port,port=0xe,chassis=8,id=pci.8,bus=pcie.0,addr=0x1.0x6 \
-        -device pcie-root-port,port=0xf,chassis=9,id=pci.9,bus=pcie.0,addr=0x1.0x7 \
-        -device virtio-blk-pci,drive=drive-virtio0,id=virtio0,bus=pci.4,addr=0x0 \
-        -drive file=./openeuler-lts.qcow2,if=none,id=drive-virtio0,cache=none,aio=native \
-        -device usb-ehci,id=usb,bus=pci.3,addr=0x1 \
-        -device usb-tablet,id=input0,bus=usb.0,port=1 \
-        -device usb-kbd,id=input1,bus=usb.0,port=2 \
-        -device virtio-gpu-pci,id=video0,bus=pci.3,addr=0x4 \
-        -device virtio-balloon-pci,id=balloon0,bus=pci.3,addr=0x3 \
-        -vnc :99 \
-        -monitor stdio
+    -M virt,usb=off,accel=kvm,gic-version=3 \
+    -cpu host \
+    -smp sockets=1,cores=4 \
+    -m size=8G,slots=128,maxmem=512G \
+    -numa node,nodeid=0,cpus=0-1,mem=4G \
+    -numa node,nodeid=1,cpus=2-3,mem=4G \
+    -chardev socket,id=qmp,path=/var/run/qemu-qmp.qmp,server,nowait \
+    -mon chardev=qmp,mode=control \
+    -nodefaults \
+    -drive file=/usr/share/edk2/aarch64/QEMU_EFI-pflash.raw,if=pflash,format=raw,unit=0,readonly=on \
+    -drive file=/var/lib/libvirt/qemu/nvram/fangying_openeuler_VARS.fd,if=pflash,format=raw,unit=1 \
+    -device pcie-root-port,port=0x8,chassis=1,id=pci.1,bus=pcie.0,multifunction=on,addr=0x1 \
+    -device pcie-root-port,port=0x9,chassis=2,id=pci.2,bus=pcie.0,addr=0x1.0x1 \
+    -device pcie-pci-bridge,id=pci.3,bus=pci.1,addr=0x0 \
+    -device pcie-root-port,port=0xa,chassis=4,id=pci.4,bus=pcie.0,addr=0x1.0x2 \
+    -device pcie-root-port,port=0xb,chassis=5,id=pci.5,bus=pcie.0,addr=0x1.0x3 \
+    -device pcie-root-port,port=0xc,chassis=6,id=pci.6,bus=pcie.0,addr=0x1.0x4 \
+    -device pcie-root-port,port=0xd,chassis=7,id=pci.7,bus=pcie.0,addr=0x1.0x5 \
+    -device pcie-root-port,port=0xe,chassis=8,id=pci.8,bus=pcie.0,addr=0x1.0x6 \
+    -device pcie-root-port,port=0xf,chassis=9,id=pci.9,bus=pcie.0,addr=0x1.0x7 \
+    -device virtio-blk-pci,drive=drive-virtio0,id=virtio0,bus=pci.4,addr=0x0 \
+    -drive file=./openeuler-lts.qcow2,if=none,id=drive-virtio0,cache=none,aio=native \
+    -device usb-ehci,id=usb,bus=pci.3,addr=0x1 \
+    -device usb-tablet,id=input0,bus=usb.0,port=1 \
+    -device usb-kbd,id=input1,bus=usb.0,port=2 \
+    -device virtio-gpu-pci,id=video0,bus=pci.3,addr=0x4 \
+    -device virtio-balloon-pci,id=balloon0,bus=pci.3,addr=0x3 \
+    -vnc :99 \
+    -monitor stdio
 ```
 
 使用qemu monitor命令执行内存热插，这里为虚拟机添加1G内存：
