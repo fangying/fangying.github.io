@@ -23,7 +23,7 @@ QEMU 4.2版本给我们带来了期待已久的Memory Hotplug特性，相关实�
 有点好奇什么是GED设备？翻阅了ACPI Spec才知道，
 GED是ACPI 6.1规范在Hardware Reduced模式下定义的一个事件通知设备，
 ARM64上的内存热插使用这个设备通知Guest。
-备注：这有个疑问是，为啥不用ACPI GPE（General-Purpose Event）来做这个事情呢?
+备注：这有个疑问是，为啥不像x86上一样用ACPI GPE（General-Purpose Event）来做这个事情呢?
 
 `generic_event_device.c`中定义了GED设备类型，为了支持hotplug这个设备
 实现了两个qom interface，`TYPE_HOTPLUG_HANDLER`和`TYPE_ACPI_DEVICE_IF`。
@@ -85,7 +85,8 @@ typedef struct AcpiGedState {
 ```
 
 这个GED设备存在的唯一意义就是帮助完成Memory Hotplug。
-有必要了解一下这个GED设备，根据[ACPI Spec Chapter 5.6.9 Interrupt-signaled ACPI events](https://uefi.org/sites/default/files/resources/ACPI_6_3_final_Jan30.pdf)章节，
+有必要了解一下这个GED设备，根据
+[ACPI Spec Chapter 5.6.9 Interrupt-signaled ACPI events](https://uefi.org/sites/default/files/resources/ACPI_6_3_final_Jan30.pdf)章节，
 GED设备使用_CRS（Current Resource Setting）描述中断，使用_EVT对象来映射ACPI事件。
 例如：下面的ASL中定义了3个中断及其回调函数
 
@@ -295,10 +296,7 @@ Memory Hotplug/unplug事件。
 当配置了Guest Numa的时候，还要去呈现SRAT（System Resource Affinity Table）表。
 这个过程是在`build_srat`中实现，目的是为了呈现资源亲和性。
 
-### 1.3 内存热插流程
-
-
-### 1.4 Linux arm64 内核支持memory hotplug
+### 1.3 Linux arm64 内核支持memory hotplug
 
 QEMU 4.1支持arm64 memory hotplug之后当然也需要Linux kernel进行支持，
 相关的内核patch可以在patchwork上获取到（看pw历史记录有助于了解patch review的过程）：
@@ -311,4 +309,68 @@ QEMU 4.1支持arm64 memory hotplug之后当然也需要Linux kernel进行支持�
 
 不得不说的是，有点气人，尽管没几行代码但这个patch我看不懂！！！ 
 
+### 1.4 测试arm64虚拟机的Memory Hotplug功能
+
+Launch qemu虚拟机进程，初始配置8G内存2个numa node，最大支持内存512G内存。
+
+```
+/usr/bin/qemu-system-aarch64 \
+        -M virt,usb=off,accel=kvm,gic-version=3 \
+        -cpu host \
+        -smp sockets=1,cores=4 \
+        -m size=8G,slots=128,maxmem=512G \
+        -numa node,nodeid=0,cpus=0-1,mem=4G \
+        -numa node,nodeid=1,cpus=2-3,mem=4G \
+        -chardev socket,id=qmp,path=/var/run/qemu-qmp.qmp,server,nowait \
+        -mon chardev=qmp,mode=control \
+        -nodefaults \
+        -drive file=/usr/share/edk2/aarch64/QEMU_EFI-pflash.raw,if=pflash,format=raw,unit=0,readonly=on \
+        -drive file=/var/lib/libvirt/qemu/nvram/fangying_openeuler_VARS.fd,if=pflash,format=raw,unit=1 \
+        -device pcie-root-port,port=0x8,chassis=1,id=pci.1,bus=pcie.0,multifunction=on,addr=0x1 \
+        -device pcie-root-port,port=0x9,chassis=2,id=pci.2,bus=pcie.0,addr=0x1.0x1 \
+        -device pcie-pci-bridge,id=pci.3,bus=pci.1,addr=0x0 \
+        -device pcie-root-port,port=0xa,chassis=4,id=pci.4,bus=pcie.0,addr=0x1.0x2 \
+        -device pcie-root-port,port=0xb,chassis=5,id=pci.5,bus=pcie.0,addr=0x1.0x3 \
+        -device pcie-root-port,port=0xc,chassis=6,id=pci.6,bus=pcie.0,addr=0x1.0x4 \
+        -device pcie-root-port,port=0xd,chassis=7,id=pci.7,bus=pcie.0,addr=0x1.0x5 \
+        -device pcie-root-port,port=0xe,chassis=8,id=pci.8,bus=pcie.0,addr=0x1.0x6 \
+        -device pcie-root-port,port=0xf,chassis=9,id=pci.9,bus=pcie.0,addr=0x1.0x7 \
+        -device virtio-blk-pci,drive=drive-virtio0,id=virtio0,bus=pci.4,addr=0x0 \
+        -drive file=./openeuler-lts.qcow2,if=none,id=drive-virtio0,cache=none,aio=native \
+        -device usb-ehci,id=usb,bus=pci.3,addr=0x1 \
+        -device usb-tablet,id=input0,bus=usb.0,port=1 \
+        -device usb-kbd,id=input1,bus=usb.0,port=2 \
+        -device virtio-gpu-pci,id=video0,bus=pci.3,addr=0x4 \
+        -device virtio-balloon-pci,id=balloon0,bus=pci.3,addr=0x3 \
+        -vnc :99 \
+        -monitor stdio
+```
+
+使用qemu monitor命令执行内存热插，这里为虚拟机添加1G内存：
+
+```
+  (qemu) object_add memory-backend-ram,id=mem1,size=1G
+  (qemu) device_add pc-dimm,id=dimm1,memdev=mem1
+```
+
+然后到Guest OS内部去执行`free -g`或者`numactl -H`查询一下（注意Guest OS内核版本要支持memhp），
+应该已经生效了，但这个时候内存应该默认还没自动上线。
+
+手动上线：
+```bash
+  for i in `grep -l offline         /sys/devices/system/memory/memory*/state`
+  do 
+  echo online > $i 
+  done
+```
+
+udev设备自动上线
+```
+  ACTION=="add", SUBSYSTEM=="memory", ATTR{state}="online"
+```
+
 ## 2. CPU Hotplug 特性
+
+QEMU在x86上很早就支持了CPU hotplug，但在aarch64上目前upstream还没有支持。
+值得高兴地是，在openEuler上提前为我们带来了这个特性，
+感谢HUAWEI Hisilicon和openEuler virtualization team的努力！
