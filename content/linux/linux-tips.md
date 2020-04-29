@@ -129,7 +129,9 @@ perf kvm stat report
 
 #### wget下载指定目录的指定文件到
 ```
- wget -c -r -nd -np -k -L -p -A "qemu*.rpm" http://mirrors.aliyun.com/centos/7.6.1810/updates/x86_64/Packages/
+ wget -c -r -nd -np -k -L -p -A "qemu*.rpm" \
+  http://mirrors.aliyun.com/centos/7.6.1810/updates/x86_64/Packages/
+ 
  -c 断点续传， -r 递归， -nd不在本地创建对应文件夹， -np不下载父目录， -A 接受哪些类型的文件（这里可以试一个glob表达式）
 ```
  
