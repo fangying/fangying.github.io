@@ -124,7 +124,7 @@ Memory Hotplug实现的重点部分是ACPI表的那一部分。
 为了支持Memory Hotplug需要提前做的事情有2个：
 
 * ARM64上virt主板初始化的时候要创建GED设备
-* 主板创建完成之后开始构建GED ACPI表，如果配置了numa还有构建srat表
+* 主板创建完成之后开始构建GED ACPI表，如果配置了numa要构建srat表
 
 ```c
 machvirt_init
@@ -297,6 +297,7 @@ Memory Hotplug/unplug事件。
 
 ### 1.3 内存热插流程
 
+
 ### 1.4 Linux arm64 内核支持memory hotplug
 
 QEMU 4.1支持arm64 memory hotplug之后当然也需要Linux kernel进行支持，
@@ -308,6 +309,6 @@ QEMU 4.1支持arm64 memory hotplug之后当然也需要Linux kernel进行支持�
 
 [https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=4ab215061554ae2a4b78744a5dd3b3c6639f16a7](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=4ab215061554ae2a4b78744a5dd3b3c6639f16a7)
 
-不得不说的是，气人，这个patch我看不懂！！！
+不得不说的是，有点气人，尽管没几行代码但这个patch我看不懂！！！ 
 
 ## 2. CPU Hotplug 特性
