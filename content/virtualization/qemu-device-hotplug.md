@@ -382,6 +382,6 @@ CPU Hotplug主要涉及的点有：
 * 1. 扩展GED，支持CPU Hotplug Event
 
 
-## Reference
+## 3. Reference
 
 * 1. [Linux Kernel Memory Hotplug](https://www.kernel.org/doc/html/latest/admin-guide/mm/memory-hotplug.html)
