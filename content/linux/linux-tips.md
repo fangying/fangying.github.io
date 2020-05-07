@@ -463,3 +463,11 @@ RUN [-n $http_proxy ] && sed -i "$ a proxy=$http_proxy" /etc/dnf/dnf.conf; true
 
 RUN dnf install -y vim
 ```
+
+### multifd live migration
+
+Since qemu 4.1.0
+```
+virsh migrate --live --unsafe --parallel --parallel-connections 4 \
+    --migrateuri tcp://192.168.3.33 testvm qemu+tcp://192.168.3.34/system --verbose
+```
