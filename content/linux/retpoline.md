@@ -11,7 +11,7 @@ https://stackoverflow.com/questions/48089426/what-is-a-retpoline-and-how-does-it
 
 https://support.google.com/faqs/answer/7625886
 
-```
+```asm
 B+>x0x550dfc <aio_ctx_prepare+16>   ldr    x0, [x29, #24]
    x0x550e00 <aio_ctx_prepare+20>   str    x0, [x29, #40] 
    x0x550e04 <aio_ctx_prepare+24>   ldr    x0, [x29, #40]
@@ -30,7 +30,7 @@ B+>x0x550dfc <aio_ctx_prepare+16>   ldr    x0, [x29, #24]
    x0x550e38 <aio_ctx_prepare+76>   bl     0x555f90 <aio_prepare>
 ```
 
-```
+```asm
 B+>x0x55555564bea0 <aio_ctx_prepare>        push   %rbp
    x0x55555564bea1 <aio_ctx_prepare+1>      mov    %rsi,%rbp
    x0x55555564bea4 <aio_ctx_prepare+4>      push   %rbx
