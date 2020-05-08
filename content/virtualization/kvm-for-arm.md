@@ -12,7 +12,7 @@ tags: KVM, aarch64
 学习的时候重点对照一下x86来比较一下aarch64和x86两个平台上的异同点，
 相得益彰进一步加深对系统虚拟机的理解。
 
-## 0. ARM64硬件辅助虚拟化基本原理简要回顾
+## 0. ARM64硬件辅助虚拟化原理回顾
 
 引入硬件辅助虚拟化之后ARM64的运行级别共有4个级别：
 
@@ -42,11 +42,7 @@ Guest执行敏感指令触发模式切换。
 
 ### 1.1 KVM初始化关键
 ```c
-static int arm_init(void)                                                       
-{                                                                               
-    int rc = kvm_init(NULL, sizeof(struct kvm_vcpu), 0, THIS_MODULE);           
-    return rc;                                                                                                                                          
-}
+arm_init
 call kvm_init
     -> kvm_arch_init    // virt/kvm/arm/arm.c
         -> !is_hyp_mode_available    /* 判断是否支持SVC模式 */
@@ -61,6 +57,13 @@ call kvm_init
         -> init_hyp_mode
         -> init_subsystems
         -> 
+```
+
+### 1.2 Two Stage地址翻译
+
+```
+kvm_handle_guest_abort
+  -> user_mem_abort
 ```
 
 ## 1. KVM for ARM
