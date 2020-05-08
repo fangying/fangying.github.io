@@ -29,3 +29,21 @@ B+>x0x550dfc <aio_ctx_prepare+16>   ldr    x0, [x29, #24]
    x0x550e34 <aio_ctx_prepare+72>   ldr    x0, [x29, #40]
    x0x550e38 <aio_ctx_prepare+76>   bl     0x555f90 <aio_prepare>
 ```
+
+```
+B+>x0x55555564bea0 <aio_ctx_prepare>        push   %rbp
+   x0x55555564bea1 <aio_ctx_prepare+1>      mov    %rsi,%rbp
+   x0x55555564bea4 <aio_ctx_prepare+4>      push   %rbx
+   x0x55555564bea5 <aio_ctx_prepare+5>      mov    %rdi,%rbx
+   x0x55555564bea8 <aio_ctx_prepare+8>      sub    $0x8,%rsp
+   x0x55555564beac <aio_ctx_prepare+12>     lock orl $0x1,0x98(%rdi)
+   x0x55555564beb4 <aio_ctx_prepare+20>     callq  0x55555564be40 <aio_compute_timeout>
+   x0x55555564beb9 <aio_ctx_prepare+25>     mov    %rax,%rdi
+   x0x55555564bebc <aio_ctx_prepare+28>     callq  0x55555564d260 <qemu_timeout_ns_to_ms>
+   x0x55555564bec1 <aio_ctx_prepare+33>     mov    %rbx,%rdi
+   x0x55555564bec4 <aio_ctx_prepare+36>     mov    %eax,0x0(%rbp)
+   x0x55555564bec7 <aio_ctx_prepare+39>     callq  0x55555564f060 <aio_prepare>
+   x0x55555564becc <aio_ctx_prepare+44>     test   %al,%al
+   x0x55555564bece <aio_ctx_prepare+46>     je     0x55555564bee8 <aio_ctx_prepare+72>
+   x0x55555564bed0 <aio_ctx_prepare+48>     movl   $0x0,0x0(%rbp)
+```
