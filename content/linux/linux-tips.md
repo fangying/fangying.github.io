@@ -469,5 +469,5 @@ RUN dnf install -y vim
 Since qemu 4.1.0
 ```
 virsh migrate --live --unsafe --parallel --parallel-connections 4 \
-    --migrateuri tcp://192.168.3.33 testvm qemu+tcp://192.168.3.34/system --verbose
+    --migrateuri tcp://192.168.3.33 testvm qemu+tcp://192.168.3.33/system --verbose
 ```
