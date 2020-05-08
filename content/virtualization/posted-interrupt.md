@@ -31,8 +31,8 @@ VT-d Interrupt Posting是基于Interrupt Remapping的一种扩展的中断处理
 在Interrupt Posting模式下IRTE格式相当于Remapping模式有很大不同（参考附录），IRTE的格式相对于Remapping模式新增了以下几个域：
 
 *   中断请求对应的Posted Interrupt Descriptor数据结构地址，包含高地址和低地址2个域；
-*   Urgent (URG)标志来指定中断请求是否需要实时处理；
-*   一个用来指定要post的vector号的Vector域，与Remapping格式不同的是posted-format 的IRTEs的Vector域是用来决定Posted Interrupt Descriptor里的PIR域的哪个bit要置位。
+*   Urgent (**URG**)标志来指定中断请求是否需要**实时处理**；
+*   一个用来指定要post的vector号的Vector域，与Remapping格式不同的是posted-format的IRTEs的Vector域是用来决定Posted Interrupt Descriptor里的PIR域的哪个bit要置位。
 
 
 ### 2 Interrupt Posting 的硬件处理步骤

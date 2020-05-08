@@ -48,7 +48,7 @@ struct pi_desc {
 	u32 rsvd[6];
 } __aligned(64);
 ```
-首先要明确pi_desc是percpu的，所以在struct vcpu_vmx里面会包含一个pi_desc数据结构。
+首先要明确`pi_desc`是percpu的，所以在struct `vcpu_vmx`里面会包含一个`pi_desc`数据结构。
 ```c
 struct vcpu_vmx {
 	/* Posted interrupt descriptor */
@@ -56,7 +56,7 @@ struct vcpu_vmx {
 }
 ```
 vCPU创建的时候会将NV置成POSTED_INTR_VECTOR也就是notification event的中断号，同时把SN置1（因为这时候vCPU还没有运行）。
-kvm_vm_ioctl_create_vcpu => kvm_arch_vcpu_create => vmx_vcpu_create，这里会注册vCPU的preempt notifier，
+`kvm_vm_ioctl_create_vcpu` => `kvm_arch_vcpu_create` => `vmx_vcpu_create`，这里会注册vCPU的preempt notifier，
 当调度器选中vCPU线程的时候VMM会收到通知，VMM调用回调函数进行处理。
 
 ```c
@@ -71,7 +71,8 @@ static struct kvm_vcpu *vmx_create_vcpu(struct kvm *kvm, unsigned int id)
 	vmx->pi_desc.sn = 1;
 }
 ```
-同时kvm_vm_ioctl_create_vcpu => kvm_arch_vcpu_setup => vcpu_load, vcpu_put会对pi_desc做一些修改，后面结合虚拟机vCPU调度进行代码分析。
+同时`kvm_vm_ioctl_create_vcpu` => `kvm_arch_vcpu_setup` => `vcpu_load`, `vcpu_put`会对pi_desc做一些修改，
+后面结合虚拟机vCPU调度进行代码分析。
 
 ## vCPU调度与VT-d Posted Interrupt
 
@@ -88,7 +89,7 @@ vCPU调度就是指在VMM的管理下虚拟机的vCPU线程在这几种状态之
 
 ### vCPU 从 Runnable => Running
 
-当vCPU被调度器选中运行之前会调用VMM的回调函数，在kvm中这个函数时kvm_sched_in。
+当vCPU被调度器选中运行之前会调用VMM的回调函数，在kvm中这个函数时`kvm_sched_in`。
 ```c
 static void kvm_sched_in(struct preempt_notifier *pn, int cpu)
 {
@@ -97,11 +98,13 @@ static void kvm_sched_in(struct preempt_notifier *pn, int cpu)
 	if (vcpu->preempted)
 		vcpu->preempted = false;  #将vcpu被抢占的标志位清零
 
-	kvm_arch_sched_in(vcpu, cpu);     #调整一下ple window
-	kvm_arch_vcpu_load(vcpu, cpu);    #将VMCS加载到pCPU上准备运行了（这里可能是调度到其他pCPU上运行，也可能是继续在原来pCPU上运行）
+	kvm_arch_sched_in(vcpu, cpu); #调整一下ple window
+	#将VMCS加载到pCPU上准备运行了（这里可能是调度到其他pCPU上运行，也可能是继续在原来pCPU上运行）
+	kvm_arch_vcpu_load(vcpu, cpu); 
 }
 ```
-kvm_sched_in => kvm_arch_vcpu_load => vmx_vcpu_load => vmx_vcpu_pi_load，vCPU要从Runnable状态切换到Running状态了，
+`kvm_sched_in` => `kvm_arch_vcpu_load` => `vmx_vcpu_load` => `vmx_vcpu_pi_load`，
+vCPU要从Runnable状态切换到Running状态了，
 这时候要:刷新NDST为vCPU要运行到的pCPU的apic id，并设置SN=0（告知硬件我现在可以接收Posted Interrupt了）。
 
 ```c
@@ -153,7 +156,7 @@ static void vmx_vcpu_pi_load(struct kvm_vcpu *vcpu, int cpu)
 ```
 ### vCPU 从 Running => Runnable
 
-当vCPU被抢占或者时间片到期的时候vCPU被调度出来，这时候会触发回调函数kvm_sched_out。
+当vCPU被抢占或者时间片到期的时候vCPU被调度出来，这时候会触发回调函数`kvm_sched_out`。
 ```c
 static void kvm_sched_out(struct preempt_notifier *pn,
 			  struct task_struct *next)
@@ -162,11 +165,15 @@ static void kvm_sched_out(struct preempt_notifier *pn,
 
 	if (current->state == TASK_RUNNING)
 		vcpu->preempted = true;     #置上vcpu被抢占标志位
-	kvm_arch_vcpu_put(vcpu);	    #将vCPU的VMCS从当前pCPU上拿下来，并且保存一下vCPU的相关信息到VMCS中
+	
+	#将vCPU的VMCS从当前pCPU上拿下来，并且保存一下vCPU的相关信息到VMCS中
+	kvm_arch_vcpu_put(vcpu);	    
 }
 ```
-kvm_sched_out => vmx_vcpu_put => vmx_vcpu_pi_put，这里vCPU要被调度出来的，那么要把SN bit置位，告诉硬件我不在运行了，
-先别给我投递中断。
+
+`kvm_sched_out` => `vmx_vcpu_put` => `vmx_vcpu_pi_put`，这里vCPU要被调度出来的，
+那么要把SN bit置位（中断抑制），告诉硬件我不在运行了，先别给我投递中断，我暂时无法处理。
+
 ```c
 static void vmx_vcpu_pi_put(struct kvm_vcpu *vcpu)
 {
@@ -186,7 +193,8 @@ static void vmx_vcpu_pi_put(struct kvm_vcpu *vcpu)
 ### vCPU 从 Running => Blocked
 
 当vCPU在Running状态下非根模式执行hlt指令后会被VMM截获发生VM Exit（肯定不能让vCPU在非根模式下中止，这样会浪费CPU资源），
-这时候会调用vcpu_block函数来处理。
+这时候会调用`vcpu_block`函数来处理。
+
 ```c
 static inline int vcpu_block(struct kvm *kvm, struct kvm_vcpu *vcpu)
 {
@@ -221,8 +229,10 @@ static inline int vcpu_block(struct kvm *kvm, struct kvm_vcpu *vcpu)
 	return 1;
 }
 ```
-vcpu_block细分为3个阶段Pre Block, Block 和 Post Block。Pre Block阶段会调用pi_pre_block，
-这里会将vCPU添加到一个per pCPU的等待链表上，该链表记录了所有在这个pCPU上休眠的vCPU列表，然后更新NDST域。
+vcpu_block细分为3个阶段Pre Block, Block 和 Post Block。Pre Block阶段会调用`pi_pre_block`，
+这里会将vCPU添加到一个per pCPU的等待链表（waiting list）上，
+这个链表记录了所有在这个pCPU上休眠的vCPU列表，然后更新NDST域。
+
 ```c
 static int pi_pre_block(struct kvm_vcpu *vcpu)
 {
@@ -281,12 +291,12 @@ static int pi_pre_block(struct kvm_vcpu *vcpu)
 	return (vcpu->pre_pcpu == -1);
 }
 ```
-Pre Block阶段过后会调用kvm_vcpu_block，在这个函数中会调用schdule()主动把vCPU调度出去（休眠），让出pCPU执行其他vCPU的代码。
+Pre Block阶段过后会调用`kvm_vcpu_block`，在这个函数中会调用schdule()主动把vCPU调度出去（休眠），让出pCPU执行其他vCPU的代码。
 
 ### vCPU 从 Blocked => Runnable
 
-当vCPU休眠结束之后会调用vmx_post_block => __pi_post_block这时候vCPU结束睡眠被重新调度。
-注意这里会更新NDST并将vCPU从pCPU等待链表上删除，并且把NV置位POSTED_INTR_VECTOR。
+当vCPU休眠结束之后会调用`vmx_post_block` => `__pi_post_block`这时候vCPU结束睡眠被重新调度。
+注意这里会更新NDST并将vCPU从pCPU等待链表上删除，并且把NV置位`POSTED_INTR_VECTOR`。
 
 ```c
 static void __pi_post_block(struct kvm_vcpu *vcpu)
