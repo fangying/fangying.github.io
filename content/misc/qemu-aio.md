@@ -267,7 +267,27 @@ qemu-img 进行covert格式转换的时候创建了8个协程来并发处理转�
 
 [https://lists.gnu.org/archive/html/qemu-devel/2020-04/msg00204.html](https://lists.gnu.org/archive/html/qemu-devel/2020-04/msg00204.html)
 
-根据Paolo Bonzini的回复和总结，这个问题可以简化为一个smp编程场景
+问题的讨论点聚焦在qemu用共享变量进行线程间通信，问题场景为：
+
+```
+When using C11 atomics, non-seqcst reads and writes do not participate
+in the total order of seqcst operations.  In util/async.c and util/aio-posix.c,
+in particular, the pattern that we use
+
+          write ctx->notify_me                 write bh->scheduled
+          read bh->scheduled                   read ctx->notify_me
+          if !bh->scheduled, sleep             if ctx->notify_me, notify
+
+needs to use seqcst operations for both the write and the read.  In
+general this is something that we do not want, because there can be
+many sources that are polled in addition to bottom halves.  The
+alternative is to place a seqcst memory barrier between the write
+and the read.  This also comes with a disadvantage, in that the
+memory barrier is implicit on strongly-ordered architectures and
+it wastes a few dozen clock cycles.
+```
+
+根据Paolo Bonzini的回复和总结，这个问题可以简化为一个smp编程场景下
 多线程之间共享变量的一个同步模型：
 
 * aio_ctx_prepare里面：主线程写`notify_me`，然后又读取bh->flags | BH_SCHEDULE的值来判是休眠还是处理bh；
