@@ -358,15 +358,17 @@ Launch qemu虚拟机进程，初始配置8G内存2个numa node，最大支持内
 
 手动上线：
 ```bash
-  for i in `grep -l offline         /sys/devices/system/memory/memory*/state`
+  for i in `grep -l offline /sys/devices/system/memory/memory*/state`
   do 
-  echo online > $i 
+      echo online > $i 
   done
 ```
 
-udev设备自动上线
+udev设备自动上线。编辑udev rules创建文件
+/etc/udev/rules.d/99-hotplug-memory.rules
 ```
-  ACTION=="add", SUBSYSTEM=="memory", ATTR{state}="online"
+# automatically online hot-plugged memory
+ACTION=="add", SUBSYSTEM=="memory", ATTR{state}="online"
 ```
 
 ## 2. CPU Hotplug 特性
