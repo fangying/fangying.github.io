@@ -12,7 +12,7 @@ tags: memory model
 随着SMP的出现，多线程编程模型被广泛应用，在多线程模型下对共享变量的访问变成了一个复杂的问题。
 于是我们有必要了解一下内存模型，这是多处理器架构下并发编程里面的一个基础概念。
 
-## 什么是内存模型？
+## 1. 什么是内存模型？
 
 到底什么是内存模型呢？看到有两种不同的观点：
 
@@ -32,11 +32,13 @@ C++11引入memory order的意义在于我们现在有了一个与运行平台无
 我们的多线程终于可以跨平台啦！优秀~
 
 一个良好的memory model定义包含3个方面：
+
 * Atomic Operations
 * Partial order of operations
 * Visable effects of operations
 
-## C11/C++11内存模型
+Note: You can't use volatile to safely exchange data between threads.
+## 2. C11/C++11内存模型
 
 C/C++11标准中提供了6种memory model:
 ```c++
@@ -50,9 +52,17 @@ enum memory_order {
 };
 ```
 
-## Java内存模型
+### 2.1 memory order releaxed
+### 2.2 memory order consume
+### 2.3 memory order acquire
+### 2.4 memory order release
+### 2.5 memory order acq_rel
+### 2.6 memory order seq_cst
 
-## Reference
+
+## 3. Java内存模型
+
+## 4. Reference
 
 * 1.[C++11 内存模型](https://wizardforcel.gitbooks.io/cpp-11-faq/26.html)
 * 1.[高并发编程](https://zhuanlan.zhihu.com/p/48161056)
