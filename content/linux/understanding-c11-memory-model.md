@@ -37,6 +37,8 @@ C++11引入memory order的意义在于我们现在有了一个与运行平台无
 * Partial order of operations
 * Visable effects of operations
 
+C11/C++11使用atomic来描述memory model，
+
 Note: You can't use volatile to safely exchange data between threads.
 ## 2. C11/C++11内存模型
 
@@ -67,3 +69,4 @@ enum memory_order {
 * 1.[C++11 内存模型](https://wizardforcel.gitbooks.io/cpp-11-faq/26.html)
 * 1.[高并发编程](https://zhuanlan.zhihu.com/p/48161056)
 * 1.[Common Compiler Optimisations are Invalid](http://plv.mpi-sws.org/c11comp/popl15.pdf)
+* 1.[CppCon 2015: Michael Wong “C++11/14/17 atomics and memory model..."](https://www.youtube.com/watch?v=DS2m7T6NKZQ)
