@@ -31,6 +31,10 @@ C++11引入memory order的意义在于我们现在有了一个与运行平台无
 让我们可以在high level languange层面实现对多处理器对共享内存的交互式控制。
 我们的多线程终于可以跨平台啦！优秀~
 
+一个良好的memory model定义包含3个方面：
+* Atomic Operations
+* Partial order of operations
+* Visable effects of operations
 
 ## C11/C++11内存模型
 
@@ -52,3 +56,4 @@ enum memory_order {
 
 * 1.[C++11 内存模型](https://wizardforcel.gitbooks.io/cpp-11-faq/26.html)
 * 1.[高并发编程](https://zhuanlan.zhihu.com/p/48161056)
+* 1.[Common Compiler Optimisations are Invalid](http://plv.mpi-sws.org/c11comp/popl15.pdf)
