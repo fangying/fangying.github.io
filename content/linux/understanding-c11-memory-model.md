@@ -2,7 +2,7 @@
 author: Yori Fang
 title: Understanding Memory Model (draft)
 date: 2020-05-15 23:00
-status: published
+status: drafts
 slug: memory-model
 tags: memory model
 ---
