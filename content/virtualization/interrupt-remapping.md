@@ -10,6 +10,7 @@ Intel VT-d 虚拟化方案主要目的是解决IO虚拟化中的安全和性能�
 DMA Remapping通过IOMMU页表方式将直通设备对内存的访问限制到特定的domain中，在提高IO性能的同时完成了直通设备的隔离，保证了直通设备DMA的安全性。Interrupt Remapping则提供IO设备的中断重映射和路由功能，来达到中断隔离和中断迁移的目的，提升了虚拟化环境下直通设备的中断处理效率。
 
 思考一下为什么要搞中断重映射这么一套东西呢？直通设备的中断不能直通到虚拟机内部吗？
+
 我们知道直通场景下直通设备的MSI/MSI-X Msg信息都是由Guest直接分配的，那么问题来了设备发送中断的时候写的Msg地址是GPA，肯定不能直接往host上投递，否则就乱套了。在虚拟化场景下，直通设备的中断是无法直接投递到Guest中的，那么我们该怎么办？我们可以由IOMMU截获中断，先将其中断映射到host的某个中断上，然后再重定向（由VMM投递）到Guest内部。明白这一点，很重要！
 
 下面对VT-d Interrupt Remapping机制进行一点分析，主要参考资料是[Intel VT-d SPEC Chapter 5](https://www.intel.com/content/www/us/en/embedded/technology/virtualization/vt-directed-io-spec.html)。
