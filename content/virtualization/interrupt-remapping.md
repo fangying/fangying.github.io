@@ -9,7 +9,7 @@ Summary: VT-d Interrupt Remapping
 Intel VT-d 虚拟化方案主要目的是解决IO虚拟化中的安全和性能这两个问题，这其中最为核心的技术就是DMA Remapping和Interrupt Remapping。
 DMA Remapping通过IOMMU页表方式将直通设备对内存的访问限制到特定的domain中，在提高IO性能的同时完成了直通设备的隔离，保证了直通设备DMA的安全性。Interrupt Remapping则提供IO设备的中断重映射和路由功能，来达到中断隔离和中断迁移的目的，提升了虚拟化环境下直通设备的中断处理效率。
 
-思考一下为什么要搞中断重映射这么一套东西呢？直通设备的中断不能直通到虚拟机内部吗？
+思考一下为什么要搞中断重映射这么一套东西呢？**直通设备的中断不能直通到虚拟机内部吗？**
 
 我们知道直通场景下直通设备的MSI/MSI-X Msg信息都是由Guest直接分配的，那么问题来了设备发送中断的时候写的Msg地址是GPA，肯定不能直接往host上投递，否则就乱套了。在虚拟化场景下，直通设备的中断是无法直接投递到Guest中的，那么我们该怎么办？我们可以由IOMMU截获中断，先将其中断映射到host的某个中断上，然后再重定向（由VMM投递）到Guest内部。明白这一点，很重要！
 
@@ -32,25 +32,27 @@ Interrupt Remapping是需要硬件来支持的，这里的硬件应该主要是�
 
 ![Remapping format](images/remapping-format-interrupt-request.png)
 
-在Interrupt Remapping模式下，硬件查询系统软件在内存中预设的中断重映射表(Interrupt Remapping Table)来投递中断。中断重映射表由中断重映射表项(Interrupt Remapping Table Entry)构成，每个IRTE占用128bit（具体格式介绍见文末），中断重映射表的基地址存放在Interrupt Remapping Table Address Register中。硬件通过下面的方式去计算中断的interrupt_index：
+在Interrupt Remapping模式下，硬件查询系统软件在内存中预设的中断重映射表(Interrupt Remapping Table)来投递中断。中断重映射表由中断重映射表项(Interrupt Remapping Table Entry)构成，每个IRTE占用16字节（具体格式介绍见文末），中断重映射表的基地址存放在Interrupt Remapping Table Address Register中。硬件通过下面的方式去计算中断的`interrupt_index`：
 
+```
     if (address.SHV == 0) {
         interrupt_index = address.handle;
     } else {
         interrupt_index = (address.handle + data.subhandle);
     }
+```
 
-中断重映射硬件通过interrupt_index去重映射表中索引对应的IRTE，中断重映射硬件可以缓存那些经常使用的IRTE以提升性能。(注:由于handle为16bit，故每个IRT包含65536个IRTE，占用1MB内存空间)
+中断重映射硬件通过`interrupt_index`去重映射表中索引对应的IRTE，中断重映射硬件可以缓存那些经常使用的IRTE以提升性能。(注:由于handle为16bit，故每个IRT包含65536个IRTE，占用1MB内存空间)
 
 ### 2 外设的中断投递方式和中断处理
 
 针对不同的中断源，需要采用不同的方式来投递Remapping格式的中断。
 
-对I/OxAPIC而言，其Remapping格式中断投递格式如下图，软件需要按图中的格式来发起Remapping中断请求，这就要求需要修改“中断重定向表项”(Interrupt Redirection Table Entry)，读者可以参考[wiki](http://wiki.osdev.org/IOAPIC)对比下RTE相比于Compatibility格式有哪些不同。值得注意的是bit48这里需要设置为"1"用来标志此RTE为Remapping format，并且RTE的bit10:8固定为000b(即没有SubHandle)。而且vector字段必须和IRTE的vector字段相同！
+对I/OxAPIC而言，其Remapping格式中断投递格式如下图，软件需要按图中的格式来发起Remapping中断请求，这就要求需要修改“中断重定向表项”(Interrupt Redirection Table Entry)，**注意**不要将ioapic中断重定向和vtd中断重映射搞混淆，这是两个不同的概念，读者可以参考[wiki](http://wiki.osdev.org/IOAPIC)对比下RTE相比于Compatibility格式有哪些不同。值得注意的是bit48这里需要设置为"1"用来标志此RTE为Remapping format，并且RTE的bit10:8固定为000b(即没有SubHandle)。而且vector字段必须和IRTE的vector字段相同！
 
 ![I/OxAPIC Request Format](images/ioxapic-programming.png)
 
-对于MSI和MSI-X而言，其Remapping格式中断投递格式如下图，值得注意的是在Remapping格式下MSI中断支持multiple vector（大于32个中断向量），但软件必须连续分配N个连续的IRTE并且interrupt_index对应HANDLE号必须为N个连续的IRTE的首个。同样bit 4必须为"1"用来表示中断请求为Remapping格式。Data位全部设置为"0"。
+对于MSI和MSI-X而言，其Remapping格式中断投递格式如下图，值得注意的是在Remapping格式下MSI中断支持multiple vector（大于32个中断向量），但软件必须连续分配N个连续的IRTE并且`interrupt_index`对应HANDLE号必须为N个连续的IRTE的首个。同样bit 4必须为"1"用来表示中断请求为Remapping格式。Data位全部设置为"0"!
 
 ![MSI/MSI-X Request Format](images/msix-programming.png)
 
