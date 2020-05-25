@@ -1,6 +1,6 @@
 ---
 author: Yori Fang
-title: Understanding Memory Model (draft)
+title: Understanding C11/C++11 Memory Model (draft)
 date: 2020-05-15 23:00
 status: draft
 slug: memory-model
