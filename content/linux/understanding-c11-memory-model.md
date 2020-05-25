@@ -30,7 +30,7 @@ how different threads talk to the processor's memory.[7]
 ```
 C++11引入memory order的意义在于我们现在有了一个与运行平台无关和编译器无关的标准库，
 让我们可以在high level languange层面实现对多处理器对共享内存的交互式控制。
-我们的多线程终于可以跨平台啦！优秀~
+我们的多线程终于可以跨平台啦！我们可以借助内存模型写出更好更安全的并发代码。简直不要太优秀~
 
 一个良好的memory model定义包含3个方面：
 
@@ -66,7 +66,7 @@ memory_order_acq_rel | 同时包含memory_order_acquire和memory_order_release�
 memory_order_consume | 本线程中，所有后续的有关本原子类型的操作，必须在本条原子操作完成之后执行 |
 memory_order_seq_cst | 全部存取都按顺序执行 |
 
-
+下面举例一一说明，扒开内存模型的神秘面纱。
 
 ### 2.1 memory order releaxed
 
