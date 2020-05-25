@@ -25,7 +25,10 @@ tags: memory model
 
 2011年发布的C11/C++11 ISO Standard为我们带来了memory order的支持，引用C++11里的一段描述：
 ```
-The memory model means that C++ code now has a standardized library to call regardless of who made the compiler and on what platform it's running. There's a standard way to control how different threads talk to the processor's memory.[7]
+The memory model means that C++ code now has a standardized
+library to call regardless of who made the compiler and on
+what platform it's running. There's a standard way to control
+how different threads talk to the processor's memory.[7]
 ```
 C++11引入memory order的意义在于我们现在有了一个与运行平台无关和编译器无关的标准库，
 让我们可以在high level languange层面实现对多处理器对共享内存的交互式控制。
@@ -37,7 +40,7 @@ C++11引入memory order的意义在于我们现在有了一个与运行平台无
 * Partial order of operations
 * Visable effects of operations
 
-C11/C++11使用atomic来描述memory model，
+C11/C++11使用atomic来描述memory model，一起来学习一下吧。
 
 Note: You can't use volatile to safely exchange data between threads.
 
