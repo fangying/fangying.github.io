@@ -40,6 +40,7 @@ C++11引入memory order的意义在于我们现在有了一个与运行平台无
 C11/C++11使用atomic来描述memory model，
 
 Note: You can't use volatile to safely exchange data between threads.
+
 ## 2. C11/C++11内存模型
 
 C/C++11标准中提供了6种memory model:
@@ -54,9 +55,29 @@ enum memory_order {
 };
 ```
 
+枚举值                |         定义规则   |
+:-:                  |         :-:       | 
+memory_order_relaxed | 不对执行顺序做任何保证 |
+memory_order_acquire | 本线程中，所有后续的读操作必须在本条原子操作完成后执行 |
+memory_order_release | 本线程中，所有之前的写操作完成后才能执行本条原子操作 |
+memory_order_acq_rel | 同时包含memory_order_acquire和memory_order_release标记 |
+memory_order_consume | 本线程中，所有后续的有关本原子类型的操作，必须在本条原子操作完成之后执行 |
+memory_order_seq_cst | 全部存取都按顺序执行 |
+
+
+
+
+
 ### 2.1 memory order releaxed
+
+relaxed表示一种最为宽松的内存操作约定，Relaxed ordering 仅仅保证load()和store()是原子操作，除此之外，不提供任何跨线程的同步。
+
 ### 2.2 memory order consume
 ### 2.3 memory order acquire
+
+acquire和release必须放到一起使用，二者是相辅相成的关系，属于一个package deal。
+
+
 ### 2.4 memory order release
 ### 2.5 memory order acq_rel
 ### 2.6 memory order seq_cst
@@ -70,3 +91,4 @@ enum memory_order {
 * 1.[高并发编程](https://zhuanlan.zhihu.com/p/48161056)
 * 1.[Common Compiler Optimisations are Invalid](http://plv.mpi-sws.org/c11comp/popl15.pdf)
 * 1.[CppCon 2015: Michael Wong “C++11/14/17 atomics and memory model..."](https://www.youtube.com/watch?v=DS2m7T6NKZQ)
+* 1.[理解 C++ 的 Memory Order](http://senlinzhan.github.io/2017/12/04/cpp-memory-order/)
