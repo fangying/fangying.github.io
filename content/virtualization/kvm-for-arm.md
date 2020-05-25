@@ -2,7 +2,7 @@
 author: Yori Fang
 title: KVM for ARM64
 date: 2020-04-11 23:00
-status: hidden
+status: draft
 slug: kvm-for-arm
 tags: KVM, aarch64
 ---

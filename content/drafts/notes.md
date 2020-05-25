@@ -1,3 +1,11 @@
+---
+author: Yori Fang
+title: my-notes
+date: 2020-04-11 23:00
+status: draft
+slug: my-notes
+tags: notes
+---
 
 ```
 $ vim --version

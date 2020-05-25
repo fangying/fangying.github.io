@@ -2,9 +2,9 @@
 author: Yori Fang
 title: Performance Tuning On Virtualization Platform
 date: 2020-04-25 23:00
-status: hidden
+status: draft
 slug: virt-perf-tuning
-tags: KVM, x86, aarch64
+tags: perf
 ---
 
 虚拟化性能调优
