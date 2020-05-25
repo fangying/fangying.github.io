@@ -55,8 +55,8 @@ enum memory_order {
 };
 ```
 
-枚举值                |         定义规则   |
-:-:                  |         :-:       | 
+枚举值                |         定义规则    |
+:-                   |         :-         | 
 memory_order_relaxed | 不对执行顺序做任何保证 |
 memory_order_acquire | 本线程中，所有后续的读操作必须在本条原子操作完成后执行 |
 memory_order_release | 本线程中，所有之前的写操作完成后才能执行本条原子操作 |
