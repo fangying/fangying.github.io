@@ -379,9 +379,9 @@ QEMU在x86上很早就支持了CPU hotplug，但在aarch64上目前upstream还�
 
 CPU Hotplug主要涉及的点有：
 
-* 1.MADT(Multiple APIC Description Table)表构构建
-* 1.构建PPTT( Processor Properties Topology Table)表 
-* 1.扩展GED，支持CPU Hotplug Event
+1.MADT(Multiple APIC Description Table)表构构建
+1.构建PPTT( Processor Properties Topology Table)表 
+1.扩展GED，支持CPU Hotplug Event
 
 
 ## 3. Reference
