@@ -1,10 +1,10 @@
-Title: The Raft Consensus Algorithm
+Title: Courses
 Date: 2019-12-14 23:00
 Modified: 2019-12-14 23:00
-Tags: Raft
-Slug: the raft algorithm
+Tags: courses
+Slug: the courses
 Status: draft
 Authors: Yori Fang
-Summary: The Raft Consensus Algorithm
+Summary: courses
 
 http://www.cs.virginia.edu/~evans/cs216/
