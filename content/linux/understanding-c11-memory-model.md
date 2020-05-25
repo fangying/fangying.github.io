@@ -21,8 +21,6 @@ tags: memory model
 
 实际上A，B两种说法都是正确的，只不过是从不同的角度去说明memory order。
 
-![memory model](../images/memory-model.png)
-
 2011年发布的C11/C++11 ISO Standard为我们带来了memory order的支持，引用C++11里的一段描述：
 ```
 The memory model means that C++ code now has a standardized
@@ -46,7 +44,7 @@ Note: You can't use volatile to safely exchange data between threads.
 
 ## 2. C11/C++11内存模型
 
-C/C++11标准中提供了6种memory model:
+为了描述内存模型，C/C++11标准中提供了6种memory order:
 ```c++
 enum memory_order {
     memory_order_relaxed,
@@ -57,6 +55,7 @@ enum memory_order {
     memory_order_seq_cst
 };
 ```
+每种memory order的规则可以简要描述为：
 
 枚举值                |         定义规则    |
 :-                   |         :-         | 
@@ -66,8 +65,6 @@ memory_order_release | 本线程中，所有之前的写操作完成后才能执
 memory_order_acq_rel | 同时包含memory_order_acquire和memory_order_release标记 |
 memory_order_consume | 本线程中，所有后续的有关本原子类型的操作，必须在本条原子操作完成之后执行 |
 memory_order_seq_cst | 全部存取都按顺序执行 |
-
-
 
 
 
