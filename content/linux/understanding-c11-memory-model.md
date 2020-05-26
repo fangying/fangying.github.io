@@ -10,7 +10,7 @@ tags: memory model
 现代计算机体系结构上，CPU执行指令的速度远远大于CPU访问内存的速度，于是引入Cache机制来加速内存访问速度。
 除了Cache以外，分支预测和指令预取也在很大程度上提升了CPU的执行速度。
 随着SMP的出现，多线程编程模型被广泛应用，在多线程模型下对共享变量的访问变成了一个复杂的问题。
-于是我们有必要了解一下内存模型，这是多处理器架构下并发编程里面的一个基础概念。
+于是我们有必要了解一下内存模型，这是多处理器架构下并发编程里必须掌握的一个基础概念。
 
 ## 1. 什么是内存模型？
 
@@ -19,7 +19,7 @@ tags: memory model
 * A：内存模型是从来描述编程语言在支持多线程编程中对共享内存访问的顺序[1]。
 * B：内存模型的本质是指在单线程情况下CPU指令在多大程度上发生指令重排(reorder)[2]。
 
-实际上A，B两种说法都是正确的，只不过是从不同的角度去说明memory model的概念。
+实际上A，B两种说法都是正确的，只不过是在尝试从不同的角度去说明memory model的概念。
 个人认为，内存模型表达为“内存顺序模型”可能更加贴切一点。
 
 一个良好的memory model定义包含3个方面：
@@ -28,9 +28,10 @@ tags: memory model
 * Partial order of operations
 * Visable effects of operations
 
+**这里要强调的是**：
 我们这里所说的内存模型和CPU的体系结构、编译器实现和编程语言规范3个层面都有关系。
 
-首先，不同的CPU体系结构内存顺序模型是不一样的，但大致分为两种：
+首先，**不同的CPU体系结构内存顺序模型是不一样的**，但大致分为两种：
 
 | Architecture | Memory Model      |
 | :----------- | :---------------- |
@@ -41,17 +42,17 @@ tags: memory model
 | MIPS         | Weakly Ordered    |
 |              |
 
-x86_64和Sparc是强顺序模型TSO，这是一种接近程序顺序的顺序模型。
-谓Total，就是说，内存（在写操作上）是有一个全局的顺序的（所有人看到的一样的顺序），
+
+x86_64和Sparc是强顺序模型（Total Store Order），这是一种接近程序顺序的顺序模型。
+所谓Total，就是说，内存（在写操作上）是有一个全局的顺序的（所有人看到的一样的顺序），
 就好像在内存上的每个Store动作必须有一个排队，一个弄完才轮到另一个，这个顺序和你的程序顺序直接相关。
 所有的行为组合只会是所有CPU内存程序顺序的交织，不会发生和程序顺序不一致的地方[6]。
 TSO模型有利于多线程程序的编写，对程序员更加友好，但对芯片实现者不友好。
-CPU为了TSO的承诺，可能会牺牲一些并发上的执行效率。
+CPU为了TSO的承诺，会牺牲一些并发上的执行效率。
 
 弱内存模型（简称WMO，Weak Memory Ordering），是把是否要求强制顺序这个要求直接交给程序员的方法。
 换句话说，CPU不去保证这个顺序模型（除非他们在一个CPU上就有依赖），
-程序员要主动插入内存屏障指令来强化这个“可见性”。
-也没有一个全局的对所有CPU都是一样的Total Order[4]。
+程序员要主动插入内存屏障指令来强化这个“可见性”[4]。
 ARMv8，PowerPC和MIPS等体系结构都是弱内存模型。
 每种弱内存模型的体系架构都有自己的内存屏障指令，语义也不完全相同。
 弱内存模型下，硬件实现起来相对简单，处理器执行的效率也高，
@@ -60,12 +61,12 @@ ARMv8，PowerPC和MIPS等体系结构都是弱内存模型。
 对于多线程程序开发来说，对并发的数据访问我们一般到做同步操作，
 可以使用mutex，semaphore，conditional等重量级方案对共享数据进行保护。
 但为了实现更高的并发，需要使用内存共享变量做通信（Message Passing），
-这就对程序员的要求很高了，时时刻刻必须很清楚自己在做什么，
-否则程序的行为会让人很是迷惑。
-值得一提的是，并发虽好，但在设计程序的时候尽量不要和别人共享数据，
-能简单粗暴就不要搞太多投机取巧！要实现lock-free无锁编程真的有点难。
+这就对程序员的要求很高了，程序员必须时时刻刻必须很清楚自己在做什么，
+否则写出来的程序的执行行为会让人很是迷惑！
+值得一提的是，并发虽好，如果能够简单粗暴实现，就不要搞太多投机取巧！
+要实现lock-free无锁编程真的有点难。
 
-其次，不同的编程语言对内存模型都有自己的规范，例如：
+其次，**不同的编程语言对内存模型都有自己的规范**，例如：
 C/C++和Java等不同的编程语言都有定义内存模型相关规范。
 
 2011年发布的C11/C++11 ISO Standard为我们带来了memory order的支持，
@@ -92,7 +93,7 @@ C11/C++11使用atomic来描述memory model，而atomic操作可以用load()和re
 
 ## 2. C11/C++11内存模型
 
-为了描述内存模型，C/C++11标准中提供了6种memory order[x]:
+C/C++11标准中提供了6种memory order，来描述内存模型[6]:
 ```c++
 enum memory_order {
     memory_order_relaxed,
@@ -163,21 +164,22 @@ int main()
     return 0;
 }
 ```
-`cnt`是共享的全局变量，多个线程并发地对`cnt`执行RMW原子操作。
+`cnt`是共享的全局变量，多个线程并发地对`cnt`执行RMW（Read Modify Write）原子操作。
 这里只保证`cnt`的原子性，其他有依赖`cnt`的地方不保证任何的同步。
 
 ### 2.2 memory order consume
 
-consume要搭配release一起使用。很多时候，线程间只想针对有依赖关系的操作进行同步，
-除此之外线程中其他操作顺序如何不关系，这时候就可以用`consume`来完成这个操作。
+`consume`要搭配`release`一起使用。很多时候，**线程间只想针对有依赖关系的操作进行同步**，
+除此之外线程中其他操作顺序如何不关系，这时候就适合用`consume`来完成这个操作。
 例如：
 ```c
 b = *a;
 c = *b
 ```
 第二行的变量c依赖于第一行的执行结果，因此这两行代码是"Carries dependency"关系。
-`memory_order_consume`就是针对有明确依赖关系的语句来限定其执行顺序的一种内存顺序，
-显然`consume order`要比`releaxed order`要Strong一点。
+显然，由于`consume`是针对有明确依赖关系的语句来限定其执行顺序的一种内存顺序，
+而`releaxed`不提供任何顺序保证，
+所以`consume order`要比`releaxed order`要更加地Strong。
 
 ```c++
 #include <thread>
@@ -212,16 +214,19 @@ int main()
     t2.join();
 }
 ```
+
 assert(*p2 == "Hello")永远不会失败，但assert(data == 42)可能会。
-原因是p2和ptr直接有依赖关系，但data和ptr没有直接依赖关系，
-尽管线程1中data赋值在ptr.store()之前，线程2看到的data的值是不确定的。
+原因是：
+* p2和ptr直接有依赖关系，但data和ptr没有直接依赖关系，
+* 尽管线程1中data赋值在ptr.store()之前，线程2看到的data的值还是不确定的。
 
 ### 2.3 memory order acquire
 
-`acquire`和`release`必须放到一起使用，属于一个package deal。
+`acquire`和`release`也必须放到一起使用。
 `release`和`acquire`构成了synchronize-with关系，也就是同步关系。
 在这个关系下：线程A中所有发生在release x之前的值的写操作，
 对线程B的acquire x之后的任何操作都可见。
+
 ```c++
 #include <thread>
 #include <atomic>
@@ -257,12 +262,16 @@ int main()
 ```
 上面的例子中，
 sender线程中`data = 42`是sequence before原子变量ready的，
-sender和receiver在B和C处发生了同步，
-线程sender中B之前的所有读写对线程receiver都是可见的。
-
-
+sender和receiver在C和D处发生了同步，
+线程sender中C之前的所有读写对线程receiver都是可见的。
+显然，
+`release`和`acquire`组合在一起比`release`和`consume`组合更加Strong！
 
 ### 2.4 memory order release
+
+`release order`一般不单独使用，它和`acquire`和`consume`组成2种
+独立的内存顺序搭配。
+
 ### 2.5 memory order acq_rel
 ### 2.6 memory order seq_cst
 
