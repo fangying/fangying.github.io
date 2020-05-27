@@ -108,15 +108,27 @@ y.store(42, std::memory_order_relaxed); // B
 happens-before关系表示的不同线程之间的操作先后顺序。
 如果A happens-before B，则A的内存状态将在B操作执行之前就可见。
 happends-before关系满足传递性、非自反性和非对称性。
-happens before其实是综合了inter-thread happens before和synchronize-with两个关系。
+happens before包含了inter-thread happens before和synchronizes-with两种关系。
 
 ### synchronizes-with
 
+synchronizes-with关系强调的是变量被修改之后的传播关系（propagate），
+即如果一个线程修改某变量的之后的结果能被其它线程可见，那么就是满足synchronizes-with关系的[9]。
+另外synchronizes-with可以被认为是跨线程间的happends-before关系。
+显然，满足synchronizes-with关系的操作一定满足happens-before关系了。
+
+
 ### Carries dependency
 
+同一个线程内，表达式A sequenced-before 表达式B，并且表达式B的值是受表达式A的影响的一种关系，
+称之为"Carries dependency"。这个很好理解，例如：
+```
+a = 1;
+b = 2;
+c = a + b;
+```
 
-
-下面我们来一起学习一下内存模型吧。
+了解了上面一些基本概念，下面我们来一起学习一下内存模型吧。
 
 ## 2. C11/C++11内存模型
 
@@ -410,3 +422,4 @@ int main()
 6. [当我们在谈论 memory order 的时候，我们在谈论什么](https://segmentfault.com/p/1210000011132386/read)
 7. [https://en.cppreference.com/w/cpp/atomic/memory_order](https://en.cppreference.com/w/cpp/atomic/memory_order)
 8. [Atomic’s memory orders, what for? - Frank Birbacher [ACCU 2017]](https://www.youtube.com/watch?v=A_vAG6LIHwQ)
+9. [C++11中的内存模型下篇 - C++11支持的几种内存模型](https://www.codedump.info/post/20191214-cxx11-memory-model-2/#memory-order-relaxed)
