@@ -170,7 +170,7 @@ int main()
 ### 2.2 memory order consume
 
 `consume`要搭配`release`一起使用。很多时候，**线程间只想针对有依赖关系的操作进行同步**，
-除此之外线程中其他操作顺序如何不关系，这时候就适合用`consume`来完成这个操作。
+除此之外线程中其他操作顺序如何不关心，这时候就适合用`consume`来完成这个操作。
 例如：
 ```c
 b = *a;
@@ -217,6 +217,7 @@ int main()
 
 assert(*p2 == "Hello")永远不会失败，但assert(data == 42)可能会。
 原因是：
+
 * p2和ptr直接有依赖关系，但data和ptr没有直接依赖关系，
 * 尽管线程1中data赋值在ptr.store()之前，线程2看到的data的值还是不确定的。
 
@@ -260,29 +261,34 @@ int main()
     t2.join();
 }
 ```
-上面的例子中，
-sender线程中`data = 42`是sequence before原子变量ready的，
-sender和receiver在C和D处发生了同步，
-线程sender中C之前的所有读写对线程receiver都是可见的。
+上面的例子中：
+
+* sender线程中`data = 42`是sequence before原子变量ready的
+* sender和receiver在C和D处发生了同步
+* 线程sender中C之前的所有读写对线程receiver都是可见的
 显然，
 `release`和`acquire`组合在一起比`release`和`consume`组合更加Strong！
 
 ### 2.4 memory order release
 
 `release order`一般不单独使用，它和`acquire`和`consume`组成2种
-独立的内存顺序搭配。
+独立的内存顺序搭配。这里就不用展开啰里啰嗦了。
 
 ### 2.5 memory order acq_rel
+
+`acq_rel`是acquire和release的叠加，在`acq_rel`的内存顺序下，
+本线程内的读和写都不能
+
 ### 2.6 memory order seq_cst
 
 
 ## 3. Reference
 
-* 1.[C++11 内存模型](https://wizardforcel.gitbooks.io/cpp-11-faq/26.html)
-* 1.[高并发编程](https://zhuanlan.zhihu.com/p/48161056)
-* 1.[Common Compiler Optimisations are Invalid](http://plv.mpi-sws.org/c11comp/popl15.pdf)
-* 1.[CppCon 2015: Michael Wong “C++11/14/17 atomics and memory model..."](https://www.youtube.com/watch?v=DS2m7T6NKZQ)
-* 1.[理解 C++ 的 Memory Order](http://senlinzhan.github.io/2017/12/04/cpp-memory-order/)
-* 1.[理解弱内存顺序模型](https://zhuanlan.zhihu.com/p/94421667)
-* 1.[当我们在谈论 memory order 的时候，我们在谈论什么](https://segmentfault.com/p/1210000011132386/read)
-* 1.[https://en.cppreference.com/w/cpp/atomic/memory_order](https://en.cppreference.com/w/cpp/atomic/memory_order)
+1. [C++11 内存模型](https://wizardforcel.gitbooks.io/cpp-11-faq/26.html)
+1. [知乎专栏：高并发编程](https://zhuanlan.zhihu.com/p/48161056)
+1. [Common Compiler Optimisations are Invalid](http://plv.mpi-sws.org/c11comp/popl15.pdf)
+1. [CppCon 2015: Michael Wong “C++11/14/17 atomics and memory model..."](https://www.youtube.com/watch?v=DS2m7T6NKZQ)
+1. [理解 C++ 的 Memory Order](http://senlinzhan.github.io/2017/12/04/cpp-memory-order/)
+1. [理解弱内存顺序模型](https://zhuanlan.zhihu.com/p/94421667)
+1. [当我们在谈论 memory order 的时候，我们在谈论什么](https://segmentfault.com/p/1210000011132386/read)
+1. [https://en.cppreference.com/w/cpp/atomic/memory_order](https://en.cppreference.com/w/cpp/atomic/memory_order)
