@@ -89,6 +89,33 @@ C11/C++11使用atomic来描述memory model，而atomic操作可以用load()和re
      vs
  var1 = var2;                            // regular variables
 ```
+为了更好地描述内存模型，有4种关系术语需要了解一下。
+
+### sequenced-before
+
+同一个线程之内，语句A的执行顺序在语句B前面，那么就成为A sequenced-before B。
+它不仅仅表示两个操作之间的先后顺序，还表示了操作结果之间的可见性关系。
+两个操作A和操作B，如果有A sequenced-before B，除了表示操作A的顺序在B之前，还表示了操作A的结果操作B可见。
+例如：语句A是sequenced-before语句B的。
+
+```
+r2 = x.load(std::memory_order_relaxed); // A 
+y.store(42, std::memory_order_relaxed); // B
+```
+
+### happens-before
+
+happens-before关系表示的不同线程之间的操作先后顺序。
+如果A happens-before B，则A的内存状态将在B操作执行之前就可见。
+happends-before关系满足传递性、非自反性和非对称性。
+happens before其实是综合了inter-thread happens before和synchronize-with两个关系。
+
+### synchronizes-with
+
+### Carries dependency
+
+
+
 下面我们来一起学习一下内存模型吧。
 
 ## 2. C11/C++11内存模型
@@ -271,24 +298,115 @@ int main()
 
 ### 2.4 memory order release
 
-`release order`一般不单独使用，它和`acquire`和`consume`组成2种
-独立的内存顺序搭配。这里就不用展开啰里啰嗦了。
+`release order`一般不单独使用，它和`acquire`和`consume`组成2种独立的内存顺序搭配。
+
+这里就不用展开啰里啰嗦了。
 
 ### 2.5 memory order acq_rel
 
 `acq_rel`是acquire和release的叠加，在`acq_rel`的内存顺序下，
-本线程内的读和写都不能
+本线程内的读和写都不能在这个点进行重排，
+
+```c++
+#include <thread>
+#include <atomic>
+#include <cassert>
+#include <vector>
+ 
+std::vector<int> data;
+std::atomic<int> flag = {0};
+ 
+void thread_1()
+{
+    data.push_back(42);
+    flag.store(1, std::memory_order_release);
+}
+ 
+void thread_2()
+{
+    int expected=1;
+    while (!flag.compare_exchange_strong(expected, 2, std::memory_order_acq_rel)) {
+        expected = 1;
+    }
+}
+ 
+void thread_3()
+{
+    while (flag.load(std::memory_order_acquire) < 2)
+        ;
+    assert(data.at(0) == 42); // will never fire
+}
+ 
+int main()
+{
+    std::thread a(thread_1);
+    std::thread b(thread_2);
+    std::thread c(thread_3);
+    a.join(); b.join(); c.join();
+}
+```
 
 ### 2.6 memory order seq_cst
+
+seq_cst表示顺序一致性内存模型，
+
+```c
+#include <thread>
+#include <atomic>
+#include <cassert>
+ 
+std::atomic<bool> x = {false};
+std::atomic<bool> y = {false};
+std::atomic<int> z = {0};
+ 
+void write_x()
+{
+    x.store(true, std::memory_order_seq_cst);
+}
+ 
+void write_y()
+{
+    y.store(true, std::memory_order_seq_cst);
+}
+ 
+void read_x_then_y()
+{
+    while (!x.load(std::memory_order_seq_cst))
+        ;
+    if (y.load(std::memory_order_seq_cst)) {
+        ++z;
+    }
+}
+ 
+void read_y_then_x()
+{
+    while (!y.load(std::memory_order_seq_cst))
+        ;
+    if (x.load(std::memory_order_seq_cst)) {
+        ++z;
+    }
+}
+ 
+int main()
+{
+    std::thread a(write_x);
+    std::thread b(write_y);
+    std::thread c(read_x_then_y);
+    std::thread d(read_y_then_x);
+    a.join(); b.join(); c.join(); d.join();
+    assert(z.load() != 0);  // will never happen
+}
+```
+### 2.7 Relationship with volatile
 
 
 ## 3. Reference
 
 1. [C++11 内存模型](https://wizardforcel.gitbooks.io/cpp-11-faq/26.html)
-1. [知乎专栏：高并发编程](https://zhuanlan.zhihu.com/p/48161056)
-1. [Common Compiler Optimisations are Invalid](http://plv.mpi-sws.org/c11comp/popl15.pdf)
-1. [CppCon 2015: Michael Wong “C++11/14/17 atomics and memory model..."](https://www.youtube.com/watch?v=DS2m7T6NKZQ)
-1. [理解 C++ 的 Memory Order](http://senlinzhan.github.io/2017/12/04/cpp-memory-order/)
-1. [理解弱内存顺序模型](https://zhuanlan.zhihu.com/p/94421667)
-1. [当我们在谈论 memory order 的时候，我们在谈论什么](https://segmentfault.com/p/1210000011132386/read)
-1. [https://en.cppreference.com/w/cpp/atomic/memory_order](https://en.cppreference.com/w/cpp/atomic/memory_order)
+2. [知乎专栏：高并发编程](https://zhuanlan.zhihu.com/p/48161056)
+3. [The C/C++ Memory Model: Overview and Formalization](http://user.it.uu.se/~tjawe125/talks/cpp-memory-model-overview-and-formalization.pdf)
+4. [理解 C++ 的 Memory Order](http://senlinzhan.github.io/2017/12/04/cpp-memory-order/)
+5. [理解弱内存顺序模型](https://zhuanlan.zhihu.com/p/94421667)
+6. [当我们在谈论 memory order 的时候，我们在谈论什么](https://segmentfault.com/p/1210000011132386/read)
+7. [https://en.cppreference.com/w/cpp/atomic/memory_order](https://en.cppreference.com/w/cpp/atomic/memory_order)
+8. [Atomic’s memory orders, what for? - Frank Birbacher [ACCU 2017]](https://www.youtube.com/watch?v=A_vAG6LIHwQ)
