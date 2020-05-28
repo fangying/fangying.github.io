@@ -218,7 +218,7 @@ c = *b
 第二行的变量c依赖于第一行的执行结果，因此这两行代码是"Carries dependency"关系。
 显然，由于`consume`是针对有明确依赖关系的语句来限定其执行顺序的一种内存顺序，
 而`releaxed`不提供任何顺序保证，
-所以`consume order`要比`releaxed order`要更加地Strong。
+所以consume order要比releaxed order要更加地Strong。
 
 ```c++
 #include <thread>
@@ -310,7 +310,7 @@ int main()
 
 ### 2.4 memory order release
 
-`release order`一般不单独使用，它和`acquire`和`consume`组成2种独立的内存顺序搭配。
+release order一般不单独使用，它和`acquire`和`consume`组成2种独立的内存顺序搭配。
 
 这里就不用展开啰里啰嗦了。
 
@@ -360,7 +360,17 @@ int main()
 
 ### 2.6 memory order seq_cst
 
-seq_cst表示顺序一致性内存模型，
+`seq_cst`表示顺序一致性内存模型，在这个模型约束下不仅同一个线程内的执行结果是和程序顺序一致的，
+每个线程间互相看到的执行结果和程序顺序也保持顺序一致。
+显然，`seq_cst`的约束是最强的，这意味着要牺牲性能为代价。
+
+```
+        atomic int x (0);               atomic int y (0);
+    x. store (1, seq cst );     ||      y. store (1, seq cst );
+    int r1 = y.load( seq cst ); ||      int r2 = x.load( seq cst );
+                assert (r1 == 1 || r2 == 1);
+```
+下面是一个seq_cst的实例，
 
 ```c
 #include <thread>
@@ -409,6 +419,7 @@ int main()
     assert(z.load() != 0);  // will never happen
 }
 ```
+
 ### 2.7 Relationship with volatile
 
 
