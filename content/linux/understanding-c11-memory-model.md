@@ -1,6 +1,6 @@
 ---
 author: Yori Fang
-title: Deep Understanding of C11/C++11 Memory Model
+title: Understanding the C11/C++11 Memory Model
 date: 2020-05-15 23:00
 status: published
 slug: memory-model
