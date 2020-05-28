@@ -16,8 +16,8 @@ tags: memory model
 
 到底什么是内存模型呢？看到有两种不同的观点：
 
-* A：内存模型是从来描述编程语言在支持多线程编程中对共享内存访问的顺序[1]。
-* B：内存模型的本质是指在单线程情况下CPU指令在多大程度上发生指令重排(reorder)[2]。
+* A：内存模型是从来描述编程语言在支持多线程编程中对共享内存访问的顺序。
+* B：内存模型的本质是指在单线程情况下CPU指令在多大程度上发生指令重排(reorder)[1]。
 
 实际上A，B两种说法都是正确的，只不过是在尝试从不同的角度去说明memory model的概念。
 个人认为，内存模型表达为“内存顺序模型”可能更加贴切一点。
@@ -46,7 +46,7 @@ tags: memory model
 x86_64和Sparc是强顺序模型（Total Store Order），这是一种接近程序顺序的顺序模型。
 所谓Total，就是说，内存（在写操作上）是有一个全局的顺序的（所有人看到的一样的顺序），
 就好像在内存上的每个Store动作必须有一个排队，一个弄完才轮到另一个，这个顺序和你的程序顺序直接相关。
-所有的行为组合只会是所有CPU内存程序顺序的交织，不会发生和程序顺序不一致的地方[6]。
+所有的行为组合只会是所有CPU内存程序顺序的交织，不会发生和程序顺序不一致的地方[4]。
 TSO模型有利于多线程程序的编写，对程序员更加友好，但对芯片实现者不友好。
 CPU为了TSO的承诺，会牺牲一些并发上的执行效率。
 
@@ -79,7 +79,7 @@ how different threads talk to the processor's memory.[7]
 ```
 memory order的问题就是因为指令重排引起的, 指令重排导致 原来的内存可见顺序发生了变化,
 在单线程执行起来的时候是没有问题的, 但是放到 多核/多线程执行的时候就出现问题了,
-为了效率引入的额外复杂逻辑的的弊端就出现了[9]。
+为了效率引入的额外复杂逻辑的的弊端就出现了[8]。
 
 C++11引入memory order的意义在于我们现在有了一个与运行平台无关和编译器无关的标准库，
 让我们可以在high level languange层面实现对多处理器对共享内存的交互式控制。
@@ -125,14 +125,13 @@ synchronizes-with关系强调的是变量被修改之后的传播关系（propag
 另外synchronizes-with可以被认为是跨线程间的happends-before关系。
 显然，满足synchronizes-with关系的操作一定满足happens-before关系了。
 
-
 ### Carries dependency
 
 同一个线程内，表达式A sequenced-before 表达式B，并且表达式B的值是受表达式A的影响的一种关系，
 称之为"Carries dependency"。这个很好理解，例如：
 ```
-int *a = 1;
-int *b = 2;
+int *a = &var1;
+int *b = &var2;
 c = *a + *b;
 ```
 
@@ -482,16 +481,15 @@ int main() {
 
 ## 3. Reference
 
-1. [C++11 内存模型](https://wizardforcel.gitbooks.io/cpp-11-faq/26.html)
-2. [知乎专栏：高并发编程](https://zhuanlan.zhihu.com/p/48161056)
-3. [The C/C++ Memory Model: Overview and Formalization](http://user.it.uu.se/~tjawe125/talks/cpp-memory-model-overview-and-formalization.pdf)
-4. [理解 C++ 的 Memory Order](http://senlinzhan.github.io/2017/12/04/cpp-memory-order/)
-5. [理解弱内存顺序模型](https://zhuanlan.zhihu.com/p/94421667)
-6. [当我们在谈论 memory order 的时候，我们在谈论什么](https://segmentfault.com/p/1210000011132386/read)
-7. [https://en.cppreference.com/w/cpp/atomic/memory_order](https://en.cppreference.com/w/cpp/atomic/memory_order)
-8. [Youtube: Atomic’s memory orders, what for? - Frank Birbacher [ACCU 2017]](https://www.youtube.com/watch?v=A_vAG6LIHwQ)
-9. [C++11中的内存模型下篇 - C++11支持的几种内存模型](https://www.codedump.info/post/20191214-cxx11-memory-model-2/#memory-order-relaxed)
-10. [memory ordering, Gavin's blog](http://gavinchou.github.io/summary/c++/memory-ordering/)
-11. [c++11 内存模型解读](https://www.cnblogs.com/liyulong1982/p/5510880.html)
-12. [memory barriers in c, MariaDB FOUNDATION, pdf](https://mariadb.org/wp-content/uploads/2017/11/2017-11-Memory-barriers.pdf)
-13. [C++ memory order循序渐进](https://blog.csdn.net/wxj1992/java/article/details/103656486)
+1. [The C/C++ Memory Model: Overview and Formalization](http://user.it.uu.se/~tjawe125/talks/cpp-memory-model-overview-and-formalization.pdf)
+2. [知乎专栏：如何理解C++的6种memory order](https://www.zhihu.com/question/24301047/answer/83422523)
+3. [理解 C++ 的 Memory Order](http://senlinzhan.github.io/2017/12/04/cpp-memory-order/)
+4. [理解弱内存顺序模型](https://zhuanlan.zhihu.com/p/94421667)
+5. [当我们在谈论 memory order 的时候，我们在谈论什么](https://segmentfault.com/p/1210000011132386/read)
+6. [https://en.cppreference.com/w/cpp/atomic/memory_order](https://en.cppreference.com/w/cpp/atomic/memory_order)
+7. [Youtube: Atomic’s memory orders, what for? - Frank Birbacher [ACCU 2017]](https://www.youtube.com/watch?v=A_vAG6LIHwQ)
+8. [C++11中的内存模型下篇 - C++11支持的几种内存模型](https://www.codedump.info/post/20191214-cxx11-memory-model-2/#memory-order-relaxed)
+9.  [memory ordering, Gavin's blog](http://gavinchou.github.io/summary/c++/memory-ordering/)
+10. [c++11 内存模型解读](https://www.cnblogs.com/liyulong1982/p/5510880.html)
+11. [memory barriers in c, MariaDB FOUNDATION, pdf](https://mariadb.org/wp-content/uploads/2017/11/2017-11-Memory-barriers.pdf)
+12. [C++ memory order循序渐进](https://blog.csdn.net/wxj1992/java/article/details/103656486)
