@@ -95,6 +95,8 @@ atomic操作可以用load()和release()语义来描述。
      vs
  var1 = var2;                            // regular variables
 ```
+![atomic variable](../images/atomic_variable.png)
+
 为了更好地描述内存模型，有4种关系术语需要了解一下。
 
 ### sequenced-before
@@ -323,11 +325,21 @@ release order一般不单独使用，它和`acquire`和`consume`组成2种独立
 
 ### 2.5 memory order acq_rel
 
-`acq_rel`是acquire和release的叠加。
+`acq_rel`是acquire和release的叠加。中文不知道该咋描述好：
 ```
 A read-modify-write operation with this memory order is both an acquire operation and a release operation. No memory reads or writes in the current thread can be reordered before or after this store. All writes in other threads that release the same atomic variable are visible before the modification and the modification is visible in other threads that acquire the same atomic variable.
 ```
-For Example
+大致意思是：
+memory_order_acq_rel适用于read-modify-write operation，
+对于采用此内存序的read-modify-write operation，我们可以称为acq_rel operation，
+既属于acquire operation 也是release operation. 
+设有一个原子变量M上的acq_rel operation：
+自然的，该acq_rel operation之前的内存读写都不能重排到该acq_rel operation之后，
+该acq_rel operation之后的内存读写都不能重排到该acq_rel operation之前. 
+其他线程中所有对M的release operation及其之前的写入都对当前线程从该acq_rel operation开始的操作可见，
+并且截止到该acq_rel operation的所有内存写入都对另外线程对M的acquire operation以及之后的内存操作可见[13]。
+
+这里是一个例子，关于为什么要有`acq_rel`可以参考一下：
 
 ```c++
 #include <thread>
@@ -432,6 +444,41 @@ int main()
 
 ### 2.7 Relationship with volatile
 
+人生总是充满疑惑。可能你会思考？volatile关键字能够防止指令被编译器优化，那它能提供线程间(inter-thread)同步语义吗？
+答案是：不能！！！
+
+* 尽管volatile能够防止单个线程内部进行reorder，但多个线程同时访问同一个volatile变量，线程间是完全不提供同步保证。
+* 而且，volatile不提供原子性！
+* 并发的读写volatile变量是会产生数据竞争的，同时non volatile操作可以在volatile操作附近自由地reorder
+
+看一个例子，执行下面的并发程序，你不会得到一个为0的结果。
+```c++
+#include <thread>
+#include <iostream>
+
+volatile int count = 0;
+
+void increase() {
+    for (int i = 0; i < 1000000; i++) {
+        count++;
+    }
+}
+
+void decrease() {
+    for (int i = 0; i < 1000000; i++) {
+        count--;
+    }
+}
+
+int main() {
+    std::thread t1(increase);
+    std::thread t2(decrease);
+    t1.join();
+    t2.join();
+    std::cout << count << std::endl;
+}
+```
+
 
 ## 3. Reference
 
@@ -442,7 +489,9 @@ int main()
 5. [理解弱内存顺序模型](https://zhuanlan.zhihu.com/p/94421667)
 6. [当我们在谈论 memory order 的时候，我们在谈论什么](https://segmentfault.com/p/1210000011132386/read)
 7. [https://en.cppreference.com/w/cpp/atomic/memory_order](https://en.cppreference.com/w/cpp/atomic/memory_order)
-8. [Atomic’s memory orders, what for? - Frank Birbacher [ACCU 2017]](https://www.youtube.com/watch?v=A_vAG6LIHwQ)
+8. [Youtube: Atomic’s memory orders, what for? - Frank Birbacher [ACCU 2017]](https://www.youtube.com/watch?v=A_vAG6LIHwQ)
 9. [C++11中的内存模型下篇 - C++11支持的几种内存模型](https://www.codedump.info/post/20191214-cxx11-memory-model-2/#memory-order-relaxed)
 10. [memory ordering, Gavin's blog](http://gavinchou.github.io/summary/c++/memory-ordering/)
 11. [c++11 内存模型解读](https://www.cnblogs.com/liyulong1982/p/5510880.html)
+12. [memory barriers in c, MariaDB FOUNDATION, pdf](https://mariadb.org/wp-content/uploads/2017/11/2017-11-Memory-barriers.pdf)
+13. [C++ memory order循序渐进](https://blog.csdn.net/wxj1992/java/article/details/103656486)
