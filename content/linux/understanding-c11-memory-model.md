@@ -77,12 +77,18 @@ library to call regardless of who made the compiler and on
 what platform it's running. There's a standard way to control
 how different threads talk to the processor's memory.[7]
 ```
+memory order的问题就是因为指令重排引起的, 指令重排导致 原来的内存可见顺序发生了变化,
+在单线程执行起来的时候是没有问题的, 但是放到 多核/多线程执行的时候就出现问题了,
+为了效率引入的额外复杂逻辑的的弊端就出现了[9]。
+
 C++11引入memory order的意义在于我们现在有了一个与运行平台无关和编译器无关的标准库，
 让我们可以在high level languange层面实现对多处理器对共享内存的交互式控制。
 我们的多线程终于可以跨平台啦！我们可以借助内存模型写出更好更安全的并发代码。
 真棒，简直不要太优秀~
 
-C11/C++11使用atomic来描述memory model，而atomic操作可以用load()和release()语义来描述。
+C11/C++11使用memory order来描述memory model，
+而用来联系memory order的是atomic变量，
+atomic操作可以用load()和release()语义来描述。
 一个简单的atomic变量赋值可描述为：
 ```
  atomic_var1.store (atomic_var2.load()); // atomic variables
@@ -123,9 +129,9 @@ synchronizes-with关系强调的是变量被修改之后的传播关系（propag
 同一个线程内，表达式A sequenced-before 表达式B，并且表达式B的值是受表达式A的影响的一种关系，
 称之为"Carries dependency"。这个很好理解，例如：
 ```
-a = 1;
-b = 2;
-c = a + b;
+int *a = 1;
+int *b = 2;
+c = *a + *b;
 ```
 
 了解了上面一些基本概念，下面我们来一起学习一下内存模型吧。
@@ -155,6 +161,7 @@ enum memory_order {
 | memory_order_seq_cst | 全部存取都按顺序执行                                                     |
 |                      |
 
+![memory order](../images/memory_order.png)
 下面我们来举例一一说明，扒开内存模型的神秘面纱。
 
 ### 2.1 memory order releaxed
@@ -316,8 +323,11 @@ release order一般不单独使用，它和`acquire`和`consume`组成2种独立
 
 ### 2.5 memory order acq_rel
 
-`acq_rel`是acquire和release的叠加，在`acq_rel`的内存顺序下，
-本线程内的读和写都不能在这个点进行重排，
+`acq_rel`是acquire和release的叠加。
+```
+A read-modify-write operation with this memory order is both an acquire operation and a release operation. No memory reads or writes in the current thread can be reordered before or after this store. All writes in other threads that release the same atomic variable are visible before the modification and the modification is visible in other threads that acquire the same atomic variable.
+```
+For Example
 
 ```c++
 #include <thread>
@@ -370,7 +380,7 @@ int main()
     int r1 = y.load( seq cst ); ||      int r2 = x.load( seq cst );
                 assert (r1 == 1 || r2 == 1);
 ```
-下面是一个seq_cst的实例，
+下面是一个seq_cst的实例：
 
 ```c
 #include <thread>
@@ -434,3 +444,5 @@ int main()
 7. [https://en.cppreference.com/w/cpp/atomic/memory_order](https://en.cppreference.com/w/cpp/atomic/memory_order)
 8. [Atomic’s memory orders, what for? - Frank Birbacher [ACCU 2017]](https://www.youtube.com/watch?v=A_vAG6LIHwQ)
 9. [C++11中的内存模型下篇 - C++11支持的几种内存模型](https://www.codedump.info/post/20191214-cxx11-memory-model-2/#memory-order-relaxed)
+10. [memory ordering, Gavin's blog](http://gavinchou.github.io/summary/c++/memory-ordering/)
+11. [c++11 内存模型解读](https://www.cnblogs.com/liyulong1982/p/5510880.html)
