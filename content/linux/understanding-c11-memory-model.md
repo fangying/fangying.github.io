@@ -86,7 +86,7 @@ C++11引入memory order的意义在于我们现在有了一个与运行平台无
 我们的多线程终于可以跨平台啦！我们可以借助内存模型写出更好更安全的并发代码。
 真棒，简直不要太优秀~
 
-![atomic variable](../images/atomic_variable.png)
+<div align=center>![atomic variable](../images/atomic_variable.png)
 
 C11/C++11使用memory order来描述memory model，
 而用来联系memory order的是atomic变量，
