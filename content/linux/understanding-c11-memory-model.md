@@ -494,3 +494,4 @@ int main() {
 10. [c++11 内存模型解读](https://www.cnblogs.com/liyulong1982/p/5510880.html)
 11. [memory barriers in c, MariaDB FOUNDATION, pdf](https://mariadb.org/wp-content/uploads/2017/11/2017-11-Memory-barriers.pdf)
 12. [C++ memory order循序渐进](https://blog.csdn.net/wxj1992/java/article/details/103656486)
+13. [Memory Models for C/C++ Programers](https://arxiv.org/pdf/1803.04432.pdf)
