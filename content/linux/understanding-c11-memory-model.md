@@ -444,7 +444,9 @@ int main()
 
 ### 2.7 Relationship with volatile
 
-人生总是充满疑惑。可能你会思考？volatile关键字能够防止指令被编译器优化，那它能提供线程间(inter-thread)同步语义吗？
+人的一生总是充满了疑惑。
+
+可能你会思考？volatile关键字能够防止指令被编译器优化，那它能提供线程间(inter-thread)同步语义吗？
 答案是：不能！！！
 
 * 尽管volatile能够防止单个线程内部进行reorder，但多个线程同时访问同一个volatile变量，线程间是完全不提供同步保证。
