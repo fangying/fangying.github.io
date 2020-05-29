@@ -497,3 +497,4 @@ int main() {
 11. [memory barriers in c, MariaDB FOUNDATION, pdf](https://mariadb.org/wp-content/uploads/2017/11/2017-11-Memory-barriers.pdf)
 12. [C++ memory order循序渐进](https://blog.csdn.net/wxj1992/java/article/details/103656486)
 13. [Memory Models for C/C++ Programers](https://arxiv.org/pdf/1803.04432.pdf)
+14. [Memory Consistency Models: A Tutorial](https://www.cs.utexas.edu/~bornholt/post/memory-models.html)
