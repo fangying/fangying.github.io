@@ -2,7 +2,7 @@
 author: Yori Fang
 title: Understanding C11/C++11 Memory Model
 date: 2020-05-28 23:00
-status: draft
+status: published
 slug: memory-model
 tags: memory model
 ---
