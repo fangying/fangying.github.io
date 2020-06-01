@@ -131,10 +131,12 @@ synchronizes-with关系强调的是变量被修改之后的传播关系（propag
 同一个线程内，表达式A sequenced-before 表达式B，并且表达式B的值是受表达式A的影响的一种关系，
 称之为"Carries dependency"。这个很好理解，例如：
 ```
-int *a = &var1;
-int *b = &var2;
-c = *a + *b;
+int *a = &var1;     // A
+int *b = &var2;     // B
+c = *a + *b;        // C
 ```
+执行语句A和B与语句C之间就存在"Carries dependency"关系，
+因为c的值直接依赖于\*a和\*b的值。
 
 了解了上面一些基本概念，下面我们来一起学习一下内存模型吧。
 
