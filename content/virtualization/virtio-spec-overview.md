@@ -17,7 +17,8 @@ Summary: virtio overview
 
 在开始了解virtio之前，我们先思考一下几个相关问题：
 
-* virtio设备有哪几种呈现方式，virtio-pci设备的配置空间都有哪些内容？
+* virtio设备有哪几种呈现方式?
+* virtio-pci设备的配置空间都有哪些内容？
 * virtio前端和后端基于共享内存机制进行通信，它是凭什么可以做到无锁的？
 * virtio机制中有那几个关键的数据结构？virtio配置接口存放在哪里？virtio是如何工作的？
 * virtio前后端是如何进行通信的？irqfd和ioeventfd是什么回事儿？在virtio前后端通信中是怎么用到的？
@@ -26,12 +27,12 @@ Summary: virtio overview
 
 ## 0. 简单了解一下Virtio Spec协议
 
-virtio协议标准最早又IBM提出，virtio作为一套标准协议现在有专门的技术委员会进行管理，
+virtio协议标准最早由IBM提出，virtio作为一套标准协议现在有专门的技术委员会进行管理，
 具体的标准可以访问[`virtio`官网](http://docs.oasis-open.org/virtio/virtio/v1.0/virtio-v1.0.html)，
 开发者可以向技术委员会提供新的virtio设备提案（`RFC`），经过委员会通过后可以增加新的virtio设备类型。
 
 组成一个virtio设备的四要素包括：
-设备状态域，`feature bits`，设备配置空间，一个或者多个`virtqueue`。
+**设备状态域，`feature bits`，设备配置空间，一个或者多个`virtqueue`**。
 其中设备状态域包含6种状态：
 
 * ACKNOWLEDGE（1）：GuestOS发现了这个设备，并且认为这是一个有效的virtio设备；
@@ -47,8 +48,9 @@ bit24-bit37预给队列和feature协商机制，bit38以上保留给未来其他
 `VIRTIO_F_VERSION_1`这个feature bit用来表示设备是否支持virtio 1.0 spec标准。
  
  在virtio协议中，所有的设备都使用virtqueue来进行数据的传输。
- **每个设备可以有0个或者多个virtqueue**，每个virtqueue占用2个或者更多个4K的物理页。
- virtqueue有`Split Virtqueues`和`Packed Virtqueues`两种模式，在`Split virtqueues`模式下virtqueue被分成若干个部分，
+ **每个设备可以有0个或者多个virtqueue，每个virtqueue占用2个或者更多个4K的物理页**。
+ virtqueue有`Split Virtqueues`和`Packed Virtqueues`两种模式，
+ 在`Split virtqueues`模式下virtqueue被分成若干个部分，
  每个部分都是前端驱动或者后端单向可写的（不能两端同时写）。
  每个virtqueue都有一个16bit的queue size参数，表示队列的总长度。
  每个virtqueue由3个部分组成：
@@ -68,9 +70,9 @@ bit24-bit37预给队列和feature协商机制，bit38以上保留给未来其他
 1.  前端驱动将IO请求放到`Descriptor Table`中，然后将索引更新到`Available Ring`中，然后kick后端去取数据；
 1.  后端取出IO请求进行处理，然后结果刷新到`Descriptor Table`中再更新`Using Ring`，然后发送中断notify前端。
 
-从virtio协议可以了解到virtio设备支持3种设备呈现模式：
+从virtio协议可以了解到**virtio设备支持3种设备呈现模式**：
 
-* Virtio Over PCI BUS，依旧遵循PCI规范，挂在到PCI总线上；
+* Virtio Over PCI BUS，依旧遵循PCI规范，挂在到PCI总线上，作为virtio-pci设备呈现；
 * Virtio Over MMIO，部分不支持PCI协议的虚拟化平台可以使用这种工作模式，直接挂载到系统总线上；
 * Virtio Over Channel I/O：主要用在s390平台上，virtio-ccw使用这种基于channel I/O的机制。
 
@@ -78,6 +80,9 @@ bit24-bit37预给队列和feature协商机制，bit38以上保留给未来其他
 这样操作系统才知道这是一个什么类型的virtio设备，并调用对应的前端驱动和这个设备进行握手，进而将设备驱动起来。
 QEMU会给virtio设备模拟PCI配置空间，对于virtio设备来说PCI Vendor ID固定为0x1AF4，
 PCI Device ID 为 0x1000到0x107F之间的是virtio设备。
+同时，在不支持PCI协议的虚拟化平台上，virtio设备也可以直接通过MMIO进行呈现，
+virtio-spec 4.2 [Virtio Over MMIO](https://docs.oasis-open.org/virtio/virtio/v1.1/csprd01/virtio-v1.1-csprd01.html#x1-1440002)有针对virtio-mmio设备呈现方式的详细描述，mmio相关信息可以直接通过内核参数报告给Linux操作系统。
+本文主要基于virtio-pci展开讨论。
 
 前面提到virtio设备有`feature bits`，`virtqueue`等四要素，那么在virtio-pci模式下是如何呈现的呢？
 从virtio spec来看，老的virtio协议和新的virtio协议在这一块有很大改动。
@@ -139,12 +144,13 @@ struct virtio_pci_cap {
 传统的纯模拟设备在工作的时候，会触发频繁的陷入陷出，
 而且IO请求的内容要进行多次拷贝传递，严重影响了设备的IO性能。
 virtio为了提升设备的IO性能，采用了共享内存机制，
-前端驱动会提前申请好一段物理地址空间用来存放IO请求，然后将这段地址的GPA告诉QEMU。
+***前端驱动会提前申请好一段物理地址空间用来存放IO请求，然后将这段地址的GPA告诉QEMU***。
 前端驱动在下发IO请求后，QEMU可以直接从共享内存中取出请求，然后将完成后的结果又直接写到虚拟机对应地址上去。
-整个过程中可以做到直拿直取，省去了很多开销。
+**整个过程中可以做到直投直取，省去了不必要的数据拷贝开销**。
 
 **`Virtqueue`是整个virtio方案的灵魂所在**。每个virtqueue都包含3张表，
-`Descriptor Table`存放了IO请求描述符，`Available Ring`记录了当前哪些描述符是可用的，`Used Ring`记录了哪些描述符已经被后端使用了。
+`Descriptor Table`存放了IO请求描述符，`Available Ring`记录了当前哪些描述符是可用的，
+`Used Ring`记录了哪些描述符已经被后端使用了。
 
 ```
                           +------------------------------------+
