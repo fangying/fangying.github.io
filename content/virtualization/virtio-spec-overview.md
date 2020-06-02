@@ -322,10 +322,12 @@ virtio_pci_config_write  --> virtio_ioport_write --> virtio_pci_start_ioeventfd
                       --> kvm_vm_ioctl(kvm_state, KVM_IOEVENTFD, &kick)
 ```
 
-其实，这就是QEMU的`Fast MMIO`实现机制。我们可以看到，QEMU会为每个设备MMIO对应的MemoryRegion注册一个ioeventfd。
+其实，这就是QEMU的`Fast MMIO`实现机制。
+我们可以看到，QEMU会为每个设备MMIO对应的MemoryRegion注册一个ioeventfd。
 最后调用了一个KVM_IOEVENTFD ioctl到KVM内核里面，而在KVM内核中会将MMIO对应的（gpa,len,eventfd）信息会注册到KVM_FAST_MMIO_BUS上。
 这样当Guest访问MMIO地址范围退出后（触发`EPT Misconfig`），KVM会查询一下访问的GPA是否落在某段MMIO地址空间range内部，
-如果是的话就直接写eventfd告知QEMU，QEMU就会从coalesced mmio ring page中取MMIO请求（注：pio page和 mmio page是QEMU和KVM内核之间的共享内存页，已经提前mmap好了）。
+如果是的话就直接写eventfd告知QEMU，QEMU就会从coalesced mmio ring page中取MMIO请求
+（注：pio page和 mmio page是QEMU和KVM内核之间的共享内存页，已经提前mmap好了）。
 
 ```c
 #kvm内核代码virt/kvm/eventfd.c中
@@ -350,7 +352,8 @@ ioeventfd_write(struct kvm_vcpu *vcpu, struct kvm_io_device *this, gpa_t addr,
 }
 ```
 
-不了解`MMIO`是如何模拟的童鞋，可以结合本站的文章[`MMIO`模拟实现分析](https://kernelgo.org/mmio.html)去了解一下，不懂的可以在文章下面评论。
+不了解`MMIO`是如何模拟的童鞋，可以结合本站的文章[`MMIO`模拟实现分析](https://kernelgo.org/mmio.html)去了解一下，
+如果还是不懂的可以在文章下面评论。
 
 **后端通知前端，是通过中断的方式**，QEMU/KVM中有一套完整的中断模拟实现框架，
 
@@ -376,8 +379,9 @@ virtnet_probe
                 // 一个是configuration change中断（配置空间发生变化后，QEMU通知前端）
                 // 发送队列1个MSIx中断，接收队列1MSIx中断
 ```
+
 在QEMU/KVM这一侧，开始模拟MSIx中断，具体流程大致如下：
-```
+```c
 virtio_pci_config_write
   --> virtio_ioport_write
     --> virtio_set_status
@@ -419,7 +423,7 @@ kvm_vm_ioctl(s, KVM_IRQFD, &irqfd)
 
 ```
 
-从上面的流程可以看出，QEMU/KVM使用`irqfd`机制来模拟MSIx中断，
+从上面的流程可以看出，**QEMU/KVM使用`irqfd`机制来模拟MSIx中断**，
 即设备申请MSIx中断的时候会为MSIx分配一个gsi（这个时候会刷新irq routing table），
 并为这个gsi绑定一个`irqfd`，最后在内核中去`poll`这个`irqfd`。
 当QEMU处理完IO之后，就写MSIx对应的irqfd，给前端注入一个MSIx中断，告知前端我已经处理好IO了你可以来取结果了。
@@ -494,14 +498,16 @@ irqfd_wakeup(wait_queue_entry_t *wait, unsigned mode, int sync, void *key)
 ```
 
 这里还有一点没有想明白，结合代码和调试来看，virtio-blk/virtio-scsi的msi中断走irqfd机制，
-但是virtio-net（不开启vhost的情况下）不走irqfd，而是直接调用`virtio_notify`/`virtio_pci_notify`，最后通过KVM的ioctl投递中断？
+但是virtio-net（不开启vhost的情况下）不走irqfd，而是直接调用`virtio_notify`/`virtio_pci_notify`，
+最后通过KVM的ioctl投递中断？
 从代码路径上来看，后者明显路径更长，谁知道原因告诉我一下!!!。
 https://patchwork.kernel.org/patch/9531577/
 ```
 Once in virtio_notify_irqfd, once in virtio_queue_guest_notifier_read.
 
 Unfortunately, for virtio-blk + MSI + KVM + old Windows drivers we need the one in virtio_notify_irqfd.
-For virtio-net + vhost + INTx we need the one in virtio_queue_guest_notifier_read. ，这显然更长啊。 
+For virtio-net + vhost + INTx we need the one in virtio_queue_guest_notifier_read. 
+这显然路径更长啊。 
 ```
 
 Ok，到这里virtio前后端通信机制已经明了，最后一个小节我们以virtio-net为例，梳理一下virtio中的部分核心代码流程。
@@ -584,7 +590,9 @@ static int virtio_dev_probe(struct device *_d)
         err = drv->probe(dev); 
 }
 ```
+
 再看下`virtnet_probe`里面的一些关键的流程，这里包含了virtio-net网卡前端初始化的主要逻辑。
+
 ```c
 static int virtnet_probe(struct virtio_device *vdev)
 {
@@ -636,12 +644,13 @@ static int vp_find_vqs_msix(struct virtio_device *vdev, unsigned nvqs,
                                   vring_interrupt, 0,
                                   vp_dev->msix_names[msix_vec],
                                   vqs[i]);
-
 	}
 ```
+
 `vp_setup_vq`流程再往下走就开始分配共享内存页，至此建立起共享内存通信通道。
 值得注意的是一路传下来的callbacks参数其实传入了发送队列和接收队列的回调处理函数，
 好家伙，从`virtnet_find_vqs`一路传递到了`__vring_new_virtqueue`中最终赋值给了`vq->vq.callback`。
+
 ```
 static struct virtqueue *vring_create_virtqueue_split(
         unsigned int index,
@@ -668,7 +677,9 @@ static struct virtqueue *vring_create_virtqueue_split(
         vring_init(&vring, num, queue, vring_align); // 确定 descriptor table, available ring, used ring的位置。
 }
 ```
+
 我们看下如果`virtqueue`队列如果收到MSIx中断消息后，会调用哪个`hook`来处理？
+
 ```c
 irqreturn_t vring_interrupt(int irq, void *_vq)
 {
@@ -690,8 +701,10 @@ irqreturn_t vring_interrupt(int irq, void *_vq)
 }
 EXPORT_SYMBOL_GPL(vring_interrupt);
 ```
+
 不难想到中断服务程序里面会调用队列上的callback。
 我们再回过头来看下`virtnet_find_vqs`，原来接受队列的回调函数是`skb_recv_done`，发送队列的回调函数是`skb_xmit_done`。
+
 ```
 static int virtnet_find_vqs(struct virtnet_info *vi)
 {
@@ -702,6 +715,7 @@ static int virtnet_find_vqs(struct virtnet_info *vi)
 	}
 }
 ```
+
 OK，这个小节就到这里。Are you clear ?
 
 ### 3.2 virtio-net网卡收发在virtqueue上的实现
