@@ -6,25 +6,33 @@ Slug: posted-interrupt
 Authors: Yori Fang
 Summary: VT-d Posted Interrupt
 
-VT-d Interrupt Remapping的引入改变了以往设备中断的投递方式，Remapping格式的中断请求不再包含目标CPU的APIC-ID、中断vector号、投递方式等重要信息，而是仅仅提供了一个16 bit的interrupt_index用来索引中断重定向表项(IRTE)，这个改变带来的最大好处是提升了中断处理的灵活性。在虚拟化的环境下，为了提升虚拟机的中断实时性，Intel在Interrupt Remapping的基础上加以改进
-引入了Interrupt Posting机制，从硬件层面实现了中断隔离和中断自动迁移等重要特性。
+VT-d Interrupt Remapping的引入改变了以往设备中断的投递方式，
+Remapping格式的中断请求不再包含目标CPU的APIC-ID、中断vector号、投递方式等重要信息，
+而是仅仅提供了一个16 bit的interrupt_index用来索引中断重定向表项(IRTE)，
+这个改变带来的最大好处是**提升了中断处理的灵活性**。
+在虚拟化的环境下，为了提升虚拟机的中断实时性，Intel在Interrupt Remapping的基础上加以改进
+引入了Interrupt Posting机制，**从硬件层面实现了中断隔离和中断自动迁移等重要特性**。
 
 ### 1 Interrupt Posting 简介
 
-VT-d Interrupt Posting是基于Interrupt Remapping的一种扩展的中断处理方式，其主要用途是在虚拟化场景下，可以大幅提升VMM处理直通设备中断的效率。硬件通过Capability Register(CAP_REG)的PI位来报告interrupt posting capability。
+VT-d Interrupt Posting是基于Interrupt Remapping的一种扩展的中断处理方式，其主要用途是在虚拟化场景下，
+可以大幅提升VMM处理直通设备中断的效率。硬件通过Capability Register(CAP_REG)的PI位来报告interrupt posting capability。
 
-根据前面介绍[Interrupt Remapping](https://kernelgo.org/interrupt-remapping.html)的文章可以知道，所有的Remapping格式中断请求都需要通过中断重映射表来投递，IRTE中的Mode域(IM)用来指定这个remappable中断请求是interrupt-remapping方式还是interrupt-posting方式。
+根据前面介绍[Interrupt Remapping](https://kernelgo.org/interrupt-remapping.html)的文章可以知道，
+所有的Remapping格式中断请求都需要通过中断重映射表来投递，
+IRTE中的Mode域(IM)用来指定这个remappable中断请求是interrupt-remapping方式还是interrupt-posting方式。
 
 *   IRTE的IM位为0表示中断按照remappable方式处理；
 *   IRTE的IM位为1表示中断按照posted方式来处理。
 
-在Interrupt Posting模式下，新增了一个与VCPU相关的内存数据结构叫做"Posted Interrupt Descriptor"(PD)，这是一个64-Byte对齐的数据结构并且直接被硬件用来记录将要post的中断请求。PD结构包含以下的域：
+在Interrupt Posting模式下，新增了一个与VCPU相关的内存数据结构叫做"Posted Interrupt Descriptor"(PD)，
+这是一个64-Byte对齐的数据结构并且直接被硬件用来记录将要post的中断请求。PD结构包含以下的域：
 
 *   Posted Interrupt Request (PIR)域，提供记录需要post的中断占256bit每个bit代表一个中断号。
 *   Outstanding Notification (ON)域，由硬件来自动更新，用来表示是否有中断请求pending。当此位为0时，硬件通过修改其为1来产生一个通知事件告知中断请求到来。接收这个通知事件的实体(处理器或者软件)在处理这个posted interrupt时后必须将其清零。
 *   Suppress Notification (SN)域，表示non-urgent中断请求的通知事件是否要被supressed(抑制)。
 *   Notification Vector (NV)域，用来指定产生posted-interrupt“通知事件”(notification event)的vector号。
-*   Notification Destination (NDST)域，用来指定此中断要投递的VCP所运行物理CPU的APIC-ID。
+*   Notification Destination (NDST)域，用来指定此中断要投递的vCPU所运行物理CPU的APIC-ID。
 
     ![posted interrupt descriptor](images/posted-interrupt-descriptor.png)
 
