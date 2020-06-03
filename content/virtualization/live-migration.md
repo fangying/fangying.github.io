@@ -1,4 +1,4 @@
-Title:  QEMU Live Migration Internal (Draft)
+Title:  QEMU Live Migration Internal
 Date: 2020-2-23 23:00
 Modified: 2020-2-23 23:00
 Tags: live-migration
@@ -7,8 +7,6 @@ Status: draft
 Authors: Yori Fang
 Summary: QEMU live migration
 
-
-## qemu-kvm虚拟机热迁移技术
 
 虚拟机热迁移技术（VM live migration）是指在虚拟机正在运行的时候，
 在不影响虚拟机正常业务执行的情况下将虚拟机从一个物理机迁移到另外一台物理机上的一种技术方案。
@@ -20,14 +18,14 @@ Summary: QEMU live migration
 本文主要包含了以下几个关于热迁移的Topic：
 
 1. qemu-kvm虚拟机热迁移框架
-1. libvirt热迁移流程
-1. qemu热迁移关键流程
-1. kvm热迁移标脏，pml，大页内存
-1. multifd热迁移，压缩热迁移，热迁移限速
-1. userfault和postcopy
-1. vhost-user脏页跟踪
+2. libvirt热迁移流程
+3. qemu热迁移关键流程
+4. kvm热迁移标脏，pml，大页内存
+5. multifd热迁移，压缩热迁移，热迁移限速
+6. userfault和postcopy
+7. vhost-user脏页跟踪
 
-本文由于涵盖面较大，可能有点长，也有点啰嗦，我猜测一般人没有那个耐心看完的，除非你不是一般人。
+**本文由于涵盖面较大，可能有点长，也有点啰嗦，我猜测一般人没有那个耐心看完的，除非你不是一般人**。
 
 ## 1. qemu-kvm虚拟机热迁移原理和框架
 
@@ -77,12 +75,15 @@ Libvirt迁移也一直不断在重构和演进当中，目前最完整的v3协�
 * Finish阶段   （目的端）
     - 等待接受完成，并检查虚拟机状态
     - 如果迁移失败则kill虚拟机，否则resume虚拟机
-* Confirm      （源端）
+* Confirm     （源端）
     - 如果失败则resume虚拟机，否则kill虚拟机
 
 ## 3. QEMU热迁移
 
 当libvirt下发qmp热迁移命令`qmp_migrate`的时候，QEMU会创建热迁移线程。
+
+### 3.1 QEMU热迁移源端
+
 源端`qmp_migrate` -> `fd_start_outgoing_migration` -> `migrate_fd_connect` -> `qemu_thread_create`。
 
 QEMU 热迁移线程`migration_thread`负责整个QEMU热迁移的流程。
@@ -156,11 +157,11 @@ migration_thread
 }
 ```
 
-### 3.1内存、块设备迭代拷贝
+#### 3.1.1内存、块设备迭代拷贝
 
 
 
-### 3.2设备状态的保存和恢复
+#### 3.1.2设备状态的保存和恢复
 
 这里以virtio-blk设备为例，分析一下virtio-blk设备状态保存的具体实现。
 设备状态是在停机后再保存,而且很明显也不需要迭代，qemu热迁移代码是一直在不断重构的，
