@@ -275,8 +275,8 @@ assert(*p2 == "Hello")永远不会失败，但assert(data == 42)可能会。
 
 `acquire`和`release`也必须放到一起使用。
 `release`和`acquire`构成了synchronize-with关系，也就是同步关系。
-在这个关系下：线程A中所有发生在release x之前的值的写操作，
-对线程B的acquire x之后的任何操作都可见。
+在这个关系下：**线程A中所有发生在release x之前的值的写操作，
+对线程B的acquire x之后的任何操作都可见**。
 
 ```c++
 #include <thread>
@@ -332,6 +332,7 @@ release order一般不单独使用，它和`acquire`和`consume`组成2种独立
 A read-modify-write operation with this memory order is both an acquire operation and a release operation. No memory reads or writes in the current thread can be reordered before or after this store. All writes in other threads that release the same atomic variable are visible before the modification and the modification is visible in other threads that acquire the same atomic variable.
 ```
 大致意思是：
+
 memory_order_acq_rel适用于read-modify-write operation，
 对于采用此内存序的read-modify-write operation，我们可以称为acq_rel operation，
 既属于acquire operation 也是release operation. 
@@ -446,10 +447,10 @@ int main()
 
 ### 2.7 Relationship with volatile
 
-人的一生总是充满了疑惑。
+**人的一生总是充满了疑惑**。
 
-可能你会思考？volatile关键字能够防止指令被编译器优化，那它能提供线程间(inter-thread)同步语义吗？
-答案是：不能！！！
+可能你会思考，volatile关键字能够防止指令被编译器优化，那它能提供线程间(inter-thread)同步语义吗？
+答案是：**不能**！！！
 
 * 尽管volatile能够防止单个线程内对volatile变量进行reorder，但多个线程同时访问同一个volatile变量，线程间是完全不提供同步保证。
 * 而且，volatile不提供原子性！
@@ -483,6 +484,7 @@ int main() {
 }
 ```
 
+如果要进一步理解这个topic，建议可以听一下油管上的大拿视频，可以更好地理解memory model的含义。
 
 ## 3. Reference
 
