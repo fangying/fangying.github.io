@@ -82,10 +82,18 @@ Libvirt迁移也一直不断在重构和演进当中，目前最完整的v3协�
 
 当libvirt下发qmp热迁移命令`qmp_migrate`的时候，QEMU会创建热迁移线程。
 
-### 3.1 QEMU热迁移源端
+### 3.1 Source Behavior
 
-源端`qmp_migrate` -> `fd_start_outgoing_migration` -> `migrate_fd_connect` -> `qemu_thread_create`。
-
+Source下发热迁移，通过qmp命令来触发：
+```
+qmp_migrate 
+    -> tcp_start_outgoing_migration 
+        -> socket_start_outgoing_migration 
+            -> migration_fd_connect
+                -> multifd_save_setup
+                -> qemu_thread_create
+                    -> migration_thread
+```
 QEMU 热迁移线程`migration_thread`负责整个QEMU热迁移的流程。
 按照热迁移功能节点，可以划分成4个Step：
 
@@ -105,7 +113,7 @@ migration_thread
         FOREACH SaveStateEntry
             save_section_header          添加section header
 
-            /* 内存传输准备阶段 */	ram_save_setup
+            /* 内存传输准备阶段，定义好savevm_ram_handlers*/
             ram_save_setup
                 ram_init_all {
                     ram_init_bitmaps    初始化每个RAMblock的bitmap
@@ -113,7 +121,7 @@ migration_thread
                     migration_bitmap_sync_precopy    开启内存标脏
                         RAMBLOCK_FOREACH_MIGRATABLE 遍历所有的migratable RAMBlock
                         发送RAMBlock信息	
-		}
+		    }
 
 
 		/* 存储传输准备阶段 */	block_save_setup
@@ -383,3 +391,39 @@ vmstate_save_state_loop 1.046 pid=469556 name=b'timer' field=b'cpu_clock_offset'
 ```
 
 虚拟机状态发生改变的时候回调函数`vm_state_notify`,
+
+
+## 3.2 Destination Behavior
+
+```
+qmp_cmd_name: qmp_capabilities, arguments: {}                                   
+qmp_cmd_name: query-migrate-capabilities, arguments: {}                         
+qmp_cmd_name: migrate-set-capabilities, arguments: {"capabilities": [{"state": true, "capability": "events"}]}
+qmp_cmd_name: query-chardev, arguments: {}                                      
+qmp_cmd_name: query-hotpluggable-cpus, arguments: {}                            
+qmp_cmd_name: query-cpus-fast, arguments: {}                                    
+qmp_cmd_name: query-iothreads, arguments: {}                                    
+qmp_cmd_name: balloon, arguments: {"value": 34359738368}                        
+qmp_cmd_name: query-migrate-parameters, arguments: {}                           
+qmp_cmd_name: migrate-set-capabilities, arguments: {"capabilities": [{"state": false, "capability": "xbzrle"}, {"state": false, "capability": "auto-converge"}, {"state": false, "capability": "rdma-pin-all"}, {"state": false, "capability": "postcopy-ram"}, {"state": false, "capability": "compress"}, {"state": false, "capability": "pause-before-switchover"}, {"state": true, "capability": "late-block-activate"}, {"state": true, "capability": "multifd"}]}
+qmp_cmd_name: migrate-set-parameters, arguments: {"multifd-channels": 4, "tls-creds": "", "tls-hostname": ""}
+qmp_cmd_name: migrate-incoming, arguments: {"uri": "tcp:[::]:49152"}
+```
+
+```c
+qmp_migrate_incoming
+    -> qemu_start_incoming_migration
+        -> tcp_start_incoming_migration
+            -> socket_start_incoming_migration
+                -> socket_accept_incoming_migration
+                    -> migration_channel_process_incoming
+                        -> migraiton_incoming_setup
+                            -> migraiton_incoming_process
+                                -> process_incoming_migration_co
+```
+
+## 4. Conclusion
+
+## References
+
+1. https://www.qemu.org/docs/master/system/index.html
