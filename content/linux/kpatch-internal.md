@@ -7,3 +7,7 @@ Status: draft
 Authors: Yori Fang
 Summary: kpatch internal
 
+
+References:
+
+1. https://github.com/dynup/kpatch
