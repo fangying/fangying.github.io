@@ -9,6 +9,9 @@ tags: perf
 
 虚拟化性能调优
 
+虚拟化资源调度影响：
+HostOS和GuestOS的双重调度，不同的调度域（跨片调度、跨die调度、SMT调度）、vCPU复用、Cache资源竞争、Mem带宽竞争、芯片指令流水
+
 * mwait
   
 * async pagefault
