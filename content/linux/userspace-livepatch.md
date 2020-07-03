@@ -111,3 +111,6 @@ gs             0x0                 0
 6. http://articles.manugarg.com/aboutelfauxiliaryvectors
 7. https://man7.org/linux/man-pages/man5/elf.5.html
 8. https://www.cnblogs.com/mmmmar/p/6040325.html
+9. http://actes.sstic.org/SSTIC06/Playing_with_ptrace/SSTIC06-article-Bareil-Playing_with_ptrace.pdf
+10. https://en.wikipedia.org/wiki/Dynamic_software_updating
+11. https://github.com/torvalds/linux/tree/master/kernel/livepatch
