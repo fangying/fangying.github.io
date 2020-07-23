@@ -1,18 +1,30 @@
-Title:  Linux program load and execute
+Title:  Compile Load and Exectute
 Date: 2020-7-1 23:00
 Date: 2020-7-1 23:00
-Tags: execve
+Tags: elf
 Slug: load-and-execute
 Status: draft
 Authors: Yori Fang
-Summary: linux program load and execute
+Summary: Load and Execute
 
+学过C语言的我们都知道，当你写了一份源代码想要把它在操作系统上运行起来要经历
+**编译**、**装载**和**执行**这3个步骤。
+为了提升一下作为一个程序员的基本修养，有必要对这个知识点进行学习。学习之前准备了几个问题来探讨。
 
+* 1. c语言编译的基本流程是怎样的？
+* 2. 什么是ELF文件，它的组成结构是怎么样的？
+* 3. 程序链接的时候都做了什么?
+* 4. 什么是符号重定向，为什么需要符号重定向？
+* 5. 什么是GOT表，为什么需要它？
+* 6. 进程是如何装载的？
+* 7. 进程是从哪儿开始执行的？
 
 
 ### 1.编译
 
-目标文件的文件类型为ELF格式，本质是一个**可重定位文件(Relocatable File)**。
+![comiple load and execute](../images/compile-load-and-store.png)
+
+源代码进过编译后会生成一个ELF格式的**目标文件**，其本质是一个**可重定位文件(Relocatable File)**。
 
 
 | ELF 文件类型       | 说明                                                               |
@@ -26,11 +38,16 @@ Summary: linux program load and execute
 目标文件（ELF）文件是基于COFF规范制定的一种特殊格式，其中包含了代码、数据和用来完成连接点符号表、
 调试信息、字符串等。各类信息按照”段“(section)来存储，格式如下：
 
-![elf format](https://upload.wikimedia.org/wikipedia/commons/thumb/7/77/Elf-layout--en.svg/1920px-Elf-layout--en.svg.png)
+![elf format](https://upload-images.jianshu.io/upload_images/7066251-61a577f104e91156.png?imageMogr2/auto-orient/strip|imageView2/2/w/1200/format/webp)
 
-ELF文件的头部是一个ELF header的数据结构，用来描述整个ELF文件的组成信息，
+ELF文件的头部是一个ELF header的数据结构，用来描述整个ELF文件的组成信息。
 其中最为重要的是program header table和section header table，
-分别存放了程序表和段表在ELF里面的位置和大小信息。
+分别存放了**程序表**和**段表**在ELF里面的位置和大小信息。
+由于每个section header的大小是固定的，而它们的名称属性不可能一样长，
+所以需要一个专门的string section来保存它们的名称属性，
+而用来描述这个string section的section header在section表中的位置就由e_shstrndx来确认（e_shoff+ e_shentsize* e_shstrndx），
+以达到快速查询的目的。
+
 
 ### 2.链接
 
@@ -38,36 +55,34 @@ ELF文件的头部是一个ELF header的数据结构，用来描述整个ELF文�
 答案就是链接！链接的作用其实就是把各个目标文件之间相互引用的部分处理好，
 把这些目标文件“粘合”成一个可执行程序。
 
-链接器(linker)对目标文件进行链接，生成可执行程序的时候一般包含3个步骤：
+链接器(linker)对目标文件进行链接，生成可执行程序的时候一般包含2个步骤：
 
-* 地址空间分配： 扫描输入目标文件，获取各段长度，属性和位置信息，并将所有输入目标文件中的符号定义（Symbol Defination）和
+* **地址空间分配**： 扫描输入目标文件，获取各段长度，属性和位置信息，并将所有输入目标文件中的符号定义（Symbol Defination）和
   符号引用（Symbol Reference）收集起来，统一放到全局符号表中。
-* 符号解析(Symbol Resolution)：静态或者动态符号链接。
-* 重定位(Relocation)：读取输入段中的数据重定位信息并进行符号解析与重定位，调整代码地址。
+* **符号解析(Symbol Resolution)和重定位(Relocation)**：读取输入段中的重定位信息并进行符号解析与重定位，修正代码地址。
 
 地址空间分配很好理解，这个阶段链接器扫描所有的目标文件，将目标文件的相同段合并到一起，
 计算出整个程序占用的空间大小，在虚拟地址空间内分配一段空间来存放程序的各个段信息。
-对于符号解析和重定位而言，可以这么去理解。
+对于符号解析和重定位而言，可以这么去理解：
 译器在编译的时候，由于不知道变量或者函数的目标地址，所以会将操作指令的目标地址空置，
 然后为目标文件新增一个重定位段，记录符号的重定位信息，等到链接阶段再计算一个最终地址。
 
 例如，我们有个main.c的程序中使用了另外一个func.c的foo()函数，但是每个源文件都是单独编译的，
-编译器在编译的时候并不知道foo()函数的地址，而是暂时把这些调用foo函数的指令目标地址搁置，
-等待最后链接的时候去将这些指令的目标地址进行修正(fixup)。如果没有链接器，需要程序员自己去把
-每个foo的调用指令进行手工修正，填入foo函数的正确地址。当func.c有发生变动的时候，就要被编译器重新编译了，
+编译器在编译的时候并不知道foo()函数的地址，而是暂时把这些调用foo函数的指令目标地址*搁置*，
+等待最后链接的时候去将这些指令的目标地址进行*修正*(fixup)。如果没有链接器，需要程序员自己去把
+每个foo的调用指令进行手工修正，填入foo函数的正确地址。这样一来当func.c有发生变动的时候，就要被编译器重新编译，
 于是foo函数的地址发生了变化，那么程序员又要将main.c中所有调动foo函数的指令地址更新，
 这简直是个令程序员头秃的噩梦！还好我们有链接器，它会自动帮我们查找foo函数的地址，
-然后将程序中引用foo函数的指令进行自动修正。假设经过链接器链接后，需要对某些变量或者函数的地址进行
-重新修正，那么需要修正的地方我们称之为**重定位入口**（Relocation Entry），这个地址修正的过程
-称之为**重定位(Relocation)**。
+然后将程序中引用foo函数的指令进行*自动修正*。
+我们把这个经过链接器链接后对变量或者函数的地址进行重新修正的入口称之为**重定位入口**（Relocation Entry），
+这个地址修正的过程称之为**重定位(Relocation)**。
 
-下面举个例子进行说明：
+理论是抽象的，下面举个具体的例子来进行说明。
 
 
 
 GOT（global offset table）
 
-什么是重定向？为什么我们需要重定向？
 
 GOT 全局偏移表，连接器在执行链接的时候实际上要填充部分，保存了所有外部符号的地址信息。
 
@@ -82,3 +97,4 @@ GOT 全局偏移表，连接器在执行链接的时候实际上要填充部分�
 ### Ref
 
 1. https://www.cnblogs.com/fellow1988/p/6158240.html
+2. https://blog.csdn.net/npy_lp/article/details/102604380
