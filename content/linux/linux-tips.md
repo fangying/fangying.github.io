@@ -482,3 +482,16 @@ Activate ASLR:
 ```
 echo 0 > /proc/sys/kernel/randomize_va_space
 ```
+
+### qemu常用hmp/qmp命令
+
+查询qom设备树：
+```
+virsh qemu-monitor-command openeuler-test --hmp "info qom-tree"
+```
+
+查询设备属性：
+```
+virsh qemu-monitor-command openeuler-test '{"execute": "qom-get", "arguments": {"path": "/machine", "property": "gic-version"}}'
+virsh qemu-monitor-command openeuler-test '{"execute": "qom-get", "arguments": {"path": "/machine/unattached/device[1]", "property": "mp-affinity"}}'
+```
