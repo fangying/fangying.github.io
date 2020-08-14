@@ -352,7 +352,7 @@ ARM体系结构和x86存在不少差异，其中差异最大的还是中断控�
 
 ### 6. References
 
-1. [ARMv8 Architecture Reference Manual](https://static.docs.arm.com/ddi0553/a/DDI0553A_e_armv8m_arm.pdf)
+1. [ARMv8 Architecture Reference Manual](https://developer.arm.com/documentation/ddi0487/latest)
 1. [ARMv8-A Address Translation Version 1.0](https://static.docs.arm.com/100940/0100/armv8_a_address%20translation_100940_0100_en.pdf)
 1. [ARM64 Address Translation](http://www.wowotech.net/memory_management/arm64-memory-addressing.html)
 1. [SMMU architecture version 3.0 and version 3.1](https://static.docs.arm.com/ihi0070/b/SMMUv3_architecture_specification_IHI0070B.pdf)
