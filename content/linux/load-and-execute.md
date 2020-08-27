@@ -25,7 +25,13 @@ Summary: Load and Execute
 
 ![comiple load and execute](../images/compile-load-and-store.png)
 
-源代码进过编译后会生成一个ELF格式的**目标文件**，其本质是一个**可重定位文件(Relocatable File)**。
+源代码进过编译后会生成一个ELF格式的**目标文件**，而ELF文件是基于COFF规范制定的一种特殊格式，
+这个文件是程序和数据的载体能够被操作系统解析并加载到内存中运行。其格式如下：
+
+
+```bash
+
+```
 
 
 | ELF 文件类型       | 说明                                                               |
@@ -36,8 +42,7 @@ Summary: Load and Execute
 | Core Dump File     | 核心转储文件，进程意外终止时的信息转储文件                         |
 |                    |
 
-目标文件（ELF）文件是基于COFF规范制定的一种特殊格式，其中包含了代码、数据和用来完成连接点符号表、
-调试信息、字符串等。各类信息按照”段“(section)来存储，格式如下：
+
 
 ![elf format](http://luomuxiaoxiao.com/wp-content/uploads/2018/10/cs01-elf.png)
 
