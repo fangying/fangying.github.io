@@ -283,7 +283,7 @@ gdb --args $QEMU_BINARY \
 
 #### 将进程proc cmdline格式化一下
 ```
-sed -i "s/ -/ \\\ \n-/g" cmd.txt
+sed -i "s/ -/ \\\ \n-/g" cmd.txt && sed -i 's/ *$//' cmd.txt
 ```
 
 #### 使用quilt补丁管理工具来管理补丁
