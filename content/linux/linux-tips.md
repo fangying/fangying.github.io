@@ -509,3 +509,19 @@ $QEMU_BIN \
     -drive file=/root/ljj/opensrc/stratovirt/rootfs.ext4,id=rootfs,readonly=off \
     -nographic 
 ```
+
+### AArch64 QEMU UEFI boot with kernel
+```
+QEMU_BIN=/root/fangying/opensrc/qemu/build/aarch64-softmmu/qemu-system-aarch64                                                                                                                                  
+$QEMU_BIN \                                                                     
+    -machine virt-4.1,accel=kvm,usb=off,dump-guest-core=off,gic-version=3 \     
+    -cpu host \                                                                 
+    -smp 1 \                                                                    
+    -m 2048 \                                                                   
+    -kernel /root/fangying/opensrc/linux/arch/arm64/boot/Image \                
+    -append "console=ttyAMA0 root=/dev/vda rw pci=off reboot=k panic=1 " \      
+    -drive file=/usr/share/edk2/aarch64/QEMU_EFI-pflash.raw,if=pflash,format=raw,unit=0,readonly=on \
+    -drive file=/var/lib/libvirt/qemu/nvram/fangying_openeuler_VARS.fd,if=pflash,format=raw,unit=1 \
+    -drive file=/root/ljj/opensrc/stratovirt/rootfs.ext4,id=rootfs,readonly=off \
+    -nographic 
+```
