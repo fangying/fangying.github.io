@@ -495,3 +495,17 @@ virsh qemu-monitor-command openeuler-test --hmp "info qom-tree"
 virsh qemu-monitor-command openeuler-test '{"execute": "qom-get", "arguments": {"path": "/machine", "property": "gic-version"}}'
 virsh qemu-monitor-command openeuler-test '{"execute": "qom-get", "arguments": {"path": "/machine/unattached/device[1]", "property": "mp-affinity"}}'
 ```
+
+### AArch64 Qemu Direct Boot
+```
+QEMU_BIN=/root/fangying/opensrc/qemu/build/aarch64-softmmu/qemu-system-aarch64  
+$QEMU_BIN \                                                                     
+    -machine virt-4.1,accel=kvm,usb=off,dump-guest-core=off,gic-version=3 \     
+    -cpu host \                                                                 
+    -smp 1 \                                                                    
+    -m 2048 \                                                                   
+    -kernel /root/fangying/opensrc/linux/arch/arm64/boot/Image \                
+    -append "console=ttyAMA0 root=/dev/vda rw pci=off reboot=k panic=1 " \      
+    -drive file=/root/ljj/opensrc/stratovirt/rootfs.ext4,id=rootfs,readonly=off \
+    -nographic 
+```
