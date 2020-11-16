@@ -525,3 +525,13 @@ $QEMU_BIN \
     -drive file=/root/ljj/opensrc/stratovirt/rootfs.ext4,id=rootfs,readonly=off \
     -nographic 
 ```
+### EDK2日志开关
+以ArmVirt主板为例，我们为例查看详细的UEFI启动日志，需要打开一个日志开关。
+在文件：ArmVirtPkg/ArmVirt.dsc.inc中找到：DEBUG_PRINT_ERROR_LEVEL，
+该开关通过bitmask控制日志级别。
+```
+[Defines]
+  DEFINE DEBUG_PRINT_ERROR_LEVEL = 0x8000004F
+改为：
+  DEFINE DEBUG_PRINT_ERROR_LEVEL = 0xFFFFFFFF
+```
