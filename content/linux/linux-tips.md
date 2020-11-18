@@ -535,3 +535,14 @@ $QEMU_BIN \
 改为：
   DEFINE DEBUG_PRINT_ERROR_LEVEL = 0xFFFFFFFF
 ```
+然后再编译我们的edk2，使用DEBUG模式:
+```
+yum install iasl libuuid-devel -y
+cd edk2
+git submodule update --init
+make -C BaseTools -j
+NCPUS=`/usr/bin/getconf _NPROCESSORS_ONLN`
+BUILD_OPTION="-t GCC5 -n $NCPUS -b DEBUG" 
+. ./edksetup.sh
+build $BUILD_OPTION
+```
