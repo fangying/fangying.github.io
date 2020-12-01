@@ -546,3 +546,25 @@ BUILD_OPTION="-t GCC5 -n $NCPUS -b DEBUG"
 . ./edksetup.sh
 build $BUILD_OPTION
 ```
+
+### CMake 引入外部库
+
+例如我们将libboundscheck动态库引入工程，需要定义：
+
+* `link_directories`指定libboundscheck动态库的寻找路径；
+* `target_link_libraries`指定库名字为boundscheck；
+* `target_include_directories`指定头文件查找路径
+
+```
+cmake_minimum_required(VERSION 3.15)
+project(TestPrjt C)
+
+set(CMAKE_C_STANDARD 99)
+
+
+link_directories(/usr/local/lib）
+
+add_executable(TestPrjt main.c)
+target_link_libraries(TestPrjt boundscheck)
+target_include_directories(TestPrjt PRIVATE /usr/local/include/libboundscheck)
+```
