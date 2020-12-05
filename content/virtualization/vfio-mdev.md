@@ -96,7 +96,10 @@ static int __init vfio_mdev_init(void)
 ```
 
 当mdev设备在加载的时候，mdev bus driver负责将设备绑定到指定的iommu group上，具体流程是：
-mdev create -> mdev_probe -> mdev_attach_iommu, drv->probe(dev) -> vfio_mdev_probe -> vfio_add_group_dev。
+
+mdev create -> mdev_probe -> mdev_attach_iommu, drv->probe(dev) 
+        -> vfio_mdev_probe -> vfio_add_group_dev。
+
 `mdev_probe`的时候会创建一个iommu group，然后将设备添加到这个iommu group，
 再调用`vfio_mdev_probe`将设备添加到一个vfio group当中。
 
@@ -124,8 +127,8 @@ struct mdev_parent_ops {
 ```
 
 `mdev_register_device`所做的事情是创建一个`parent device`并对其进行初始化
-(很奇怪，取名为mdev_register_parent_device似乎更合适啊）。
-mdev parent设备创建的时候，会在sysfs路径`/sys/class/mdev_bus/`下面创建一堆目录结构，
+(很奇怪，取名为`mdev_register_parent_device`似乎更合适啊）。
+`mdev` `parent`设备创建的时候，会在sysfs路径`/sys/class/mdev_bus/`下面创建一堆目录结构，
 用户态通过sysfs接口可以完成mdev设备创建，删除，查询等操作。
 
 ```c
@@ -174,7 +177,7 @@ struct mdev_parent_ops {
 ```
 
 `mdev_parent_ops`定义了一些属性，这些属性给QEMU/Libvirt等管理接口提供了一些查询和配置单个mdev设备实例的接口，
-例如`dev_attr_groups`,`mdev_attr_groups`和`supported_config`等。
+例如：`dev_attr_groups`,`mdev_attr_groups`和`supported_config`等。
 
 * dev_attr_groups: attributes of the parent device
 * mdev_attr_groups: attributes of the mediated device
