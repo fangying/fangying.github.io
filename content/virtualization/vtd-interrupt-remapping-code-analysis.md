@@ -267,12 +267,17 @@ static irqreturn_t vfio_msihandler(int irq, void *arg)
 QEMU向虚拟机呈现设备的PCI配置空间信息 
 	-> 设备驱动加载，读写PCI配置空间Enable MSI
 	-> VM Exit到QEMU中处理vfio_pci_write_config
-	-> QEMU调用vfio_msi_enable使能MSI中断
-	-> kvm_set_irq_routing更新中断路由表PRT，
-		kvm_irqfd_assign注册irqfd和gsi的映射关系，
-		vfio_pci_set_msi_trigger分配Host irq并分配对应的IRTE和刷新中断重映射表，
-		vfio_msi_set_vector_signal注册Host irq的中断处理函数vfio_msihandler 
-	-> vfio_msihandler写了irqfd这样就触发了EPOLLIN事件 
+	-> QEMU调用vfio_msi_enable使能直通设备MSI中断
+        vfio_msix_vector_do_use分配一个MSI中断
+            ->vfio_add_kvm_msi_virq
+	        kvm_irqchip_add_msi_route -> kvm_set_irq_routing新建一个MSI中断路由表项，
+            kvm_irqchip_add_irqfd_notifier_gsi -> kvm_irqchip_assign_irqfd注册irqfd和gsi的映射关系
+        vfio_enable_vectors设置VFIO的MSI中断触发方式，VFIO_DEVICE_SET_IRQS
+            vfio_pci_set_irqs_ioctl 内核drivers/vfio/pci/vfio_pci.c
+		    vfio_pci_set_msi_trigger分配Host irq并分配对应的IRTE和刷新中断重映射表，
+		    vfio_msi_set_vector_signal注册Host irq的中断处理函数vfio_msihandler 
+        irq_bypass_register_producer 将fd注册到kvm
+    -> vfio_msihandler写了irqfd这样就触发了EPOLLIN事件 
 	-> irqfd接受到EPOLLIN事件，调用irqfd_wakeup
 	-> kvm_arch_set_irq_inatomic 尝试直接注入中断，如果被BLOCK了（vCPU没有退出？）就调用 schedule_work(&irqfd->inject)，让kworker延后处理
 	-> irqfd_inject向虚拟机注入中断 

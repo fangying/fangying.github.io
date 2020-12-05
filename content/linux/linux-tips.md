@@ -568,3 +568,55 @@ add_executable(TestPrjt main.c)
 target_link_libraries(TestPrjt boundscheck)
 target_include_directories(TestPrjt PRIVATE /usr/local/include/libboundscheck)
 ```
+
+### VFIO 直通虚拟机
+
+查询网卡的PCI外设号码
+```
+ sudo ethtool -i enp6s0
+[sudo] password for fang: 
+driver: alx
+version: 5.6.0-rc3+
+firmware-version: 
+expansion-rom-version: 
+bus-info: 0000:00:1f.6
+supports-statistics: yes
+supports-test: no
+supports-eeprom-access: no
+supports-register-dump: no
+supports-priv-flags: no
+```
+
+加载驱动
+```
+modprobe vfio vfio-pci
+```
+
+bind到vfio-pci驱动上
+```
+readlink /sys/bus/pci/devices/0000:00:1f.6/iommu_group
+
+echo "bind"
+echo "vfio-pci" > "/sys/bus/pci/devices/0000:00:1f.6/driver_override"
+echo 0000:00:1f.6 > /sys/bus/pci/drivers_probe
+
+echo "unbind"
+echo "0000:00:1f.6" > "/sys/bus/pci/devices/0000:00:1f.6/driver/unbind"
+echo "0000:00:1f.6" > /sys/bus/pci/drivers_probe
+```
+启动虚拟机了：
+```
+gdb --args /home/fang/code/fang/qemu/build/x86_64-softmmu/qemu-system-x86_64 \
+        -enable-kvm -m 2048 \
+        -boot c \
+        -drive driver=qcow2,file=$PWD/centos7.qcow2 \
+        -netdev tap,id=tap0,ifname=$E1000_TAP_NAME,script=no \
+        -device e1000,netdev=tap0,id=net0 \
+        -netdev tap,id=tap1,ifname=$VIRTIO_NET_TAP_NAME,script=no \
+        -device virtio-net-pci,netdev=tap1,id=net1,addr=05.0 \
+        -device piix3-usb-uhci,id=uhci,addr=04.0 \
+        -smp cpus=4 \
+        -vnc :88 \
+        -cdrom virtio-win-0.1.141.iso \
+        -device vfio-pci,host=0000:00:1f.6,id=hostdev0
+```

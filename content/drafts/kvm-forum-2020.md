@@ -8,3 +8,6 @@ Authors: Yori Fang
 Summary: KVM Forum 2020
 
 https://kvmforum2020.sched.com/
+
+
+Hypervisor-mananged linear address translation (intel       )

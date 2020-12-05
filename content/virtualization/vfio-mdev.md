@@ -97,8 +97,7 @@ static int __init vfio_mdev_init(void)
 
 当mdev设备在加载的时候，mdev bus driver负责将设备绑定到指定的iommu group上，具体流程是：
 
-mdev create -> mdev_probe -> mdev_attach_iommu, drv->probe(dev) 
-        -> vfio_mdev_probe -> vfio_add_group_dev。
+mdev create -> mdev_probe -> mdev_attach_iommu, drv->probe(dev) -> vfio_mdev_probe -> vfio_add_group_dev
 
 `mdev_probe`的时候会创建一个iommu group，然后将设备添加到这个iommu group，
 再调用`vfio_mdev_probe`将设备添加到一个vfio group当中。
