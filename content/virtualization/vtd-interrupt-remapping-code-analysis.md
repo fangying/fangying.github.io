@@ -170,8 +170,7 @@ vfio_enable_vectors
 vfio_msi_enable -> pci_alloc_irq_vectors -> pci_alloc_irq_vectors_affinity -> __pci_enable_msi_range -> msi_capability_init -> pci_msi_setup_msi_irqs -> arch_setup_msi_irqs -> x86_msi.setup_msi_irqs -> native_setup_msi_irqs -> msi_domain_alloc_irqs -> __irq_domain_alloc_irqs,irq_domain_activate_irq
 
 这里内核调用栈比较深，我们只需要知道`vfio_msi_enable`最终调用到了`__irq_domain_alloc_irqs` -> `intel_irq_remapping_alloc`.
-在`intel_irq_remapping_alloc`中申请这个中断对应的IRTE。这里先调用的`alloc_irte`函数返回irte在中断重映射表中的index号（即中断重映射表的索引号），
-再调用`intel_irq_remapping_prepare_irte`去填充irte。
+在`intel_irq_remapping_alloc`中申请这个中断对应的IRTE。这里先调用的`alloc_irte`函数返回irte在中断重映射表中的index号（即中断重映射表的索引号），再调用`intel_irq_remapping_prepare_irte`去填充irte。
 
 ```c
 static int intel_irq_remapping_alloc(struct irq_domain *domain,
@@ -204,7 +203,7 @@ vfio_msi_set_block
 irq_bypass_register_producer
 __connect
 kvm_arch_irq_bypass_add_producer
-vmx_update_pi_irte    #在Posted Interrupt模式下在这里刷新irte为Posted Interrupt 模式
+vmx_update_pi_irte    #在Posted Interrupt模式下在这里刷新irte为Posted Interrupt模式
 irq_set_vcpu_affinity
 intel_ir_set_vcpu_affinity
 modify_irte
