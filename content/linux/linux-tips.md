@@ -620,3 +620,22 @@ gdb --args /home/fang/code/fang/qemu/build/x86_64-softmmu/qemu-system-x86_64 \
         -cdrom virtio-win-0.1.141.iso \
         -device vfio-pci,host=0000:00:1f.6,id=hostdev0
 ```
+
+### PL011 串口调试
+```
+QEMU_BIN=/root/fangying/opensrc/qemu-fangying/build/aarch64-softmmu/qemu-system-aarch64
+$QEMU_BIN \                                                                     
+    -machine virt-4.0,accel=kvm,gic-version=3 \                                 
+    -cpu host \                                                                 
+    -smp 1 \                                                                    
+    -nographic \                                                                
+    -m 512M \                                                                   
+    -kernel /root/fangying/opensrc/linux/vmlinux.bin \                          
+    -drive id=test,file=/root/fangying/vm/rootfs_arm,format=raw,if=none \       
+    -device virtio-blk-device,drive=test \                                      
+    -device pci-bridge,chassis_nr=1,bus=pcie.0 \                                                      
+    -append 'console=ttyAMA0 root=/dev/vda' \                                   
+    -qmp unix:/tmp/qemu.sock,server,nowait \                                    
+    -trace events=/tmp/events \                                                 
+    -D /var/log/qemu.log 
+```
