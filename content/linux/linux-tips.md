@@ -639,3 +639,10 @@ $QEMU_BIN \
     -trace events=/tmp/events \                                                 
     -D /var/log/qemu.log 
 ```
+
+### Rust调试
+
+运行Rust程序传入RUST_BACKTRACE=full
+```
+RUST_BACKTRACE=full cargo run ...
+```
