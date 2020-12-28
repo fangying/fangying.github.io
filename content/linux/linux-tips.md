@@ -545,6 +545,7 @@ NCPUS=`/usr/bin/getconf _NPROCESSORS_ONLN`
 BUILD_OPTION="-t GCC5 -n $NCPUS -b DEBUG" 
 . ./edksetup.sh
 build $BUILD_OPTION
+build -t GCC5 -n 128 -b DEBUG -a AARCH64 -p ArmVirtPkg/ArmVirtQemu.dsc
 ```
 
 ### CMake 引入外部库
