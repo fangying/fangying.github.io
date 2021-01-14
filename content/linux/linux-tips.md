@@ -647,3 +647,14 @@ $QEMU_BIN \
 ```
 RUST_BACKTRACE=full cargo run ...
 ```
+
+### Libvirt增加外部接口
+
+```
+scripts/check-aclrules.py 白名单
+driver-hypervisor.h 定义声明
+src/libvirt-domain.c 接口定义实现
+src/qemu/qemu-driver.c driver接口实现
+remote_driver.c增加定义
+src/libvirt_public.syms 增加定义
+```
