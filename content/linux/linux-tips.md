@@ -658,3 +658,29 @@ src/qemu/qemu-driver.c driver接口实现
 remote_driver.c增加定义
 src/libvirt_public.syms 增加定义
 ```
+
+### 虚拟机使用spice协议
+
+```
+    <channel type='spicevmc'>                                                                         
+     <target type='virtio' name='com.redhat.spice.0' state='connected'/>       
+     <alias name='channel4'/>                                                  
+     <address type='virtio-serial' controller='0' bus='0' port='5'/>           
+    </channel>                                                                  
+    <input type='tablet' bus='usb'>                                             
+     <alias name='input0'/>                                                    
+     <address type='usb' bus='0' port='1'/>                                    
+    </input>                                                                    
+    <input type='keyboard' bus='usb'>                                           
+     <alias name='input1'/>                                                    
+     <address type='usb' bus='0' port='2'/>                                    
+    </input>                                                                    
+    <graphics type='spice' port='5900' autoport='yes' listen='0.0.0.0'>         
+    <listen type='address' address='0.0.0.0'/>                                
+    </graphics>                                                                 
+    <video>                                                                     
+     <model type='virtio' vram='16384' heads='1' primary='yes'/>               
+     <alias name='video0'/>                                                    
+     <address type='pci' domain='0x0000' bus='0x03' slot='0x04' function='0x0'/>
+    </video>   
+```
