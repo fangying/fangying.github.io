@@ -688,7 +688,7 @@ src/libvirt_public.syms 增加定义
 ## 一个较为完整的虚拟机
 
 ```
-usr/bin/qemu-system-x86_64 \
+/usr/bin/qemu-system-x86_64 \
 	-name guest=fangying_uefi,debug-threads=on \
 	-S \
 	-object secret,id=masterKey0,format=raw,file=/var/lib/libvirt/qemu/domain-2-fangying_uefi/master-key.aes \
