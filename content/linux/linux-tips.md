@@ -688,67 +688,42 @@ src/libvirt_public.syms 增加定义
 ## 一个较为完整的虚拟机
 
 ```
-QEMU_BIN=/root/fangying/opensrc/qemu-debug/build/aarch64-softmmu/qemu-system-aarch64                  
-$QEMU_BIN \                                                                                           
-    -name guest=qemu-test,debug-threads=on \                                                          
-    -machine virt-4.1,accel=kvm,usb=off,dump-guest-core=off,gic-version=3 \                           
-    -cpu host \                                                                                       
-    -drive file=/usr/share/edk2/aarch64/QEMU_EFI-pflash.raw,if=pflash,format=raw,unit=0,readonly=on \ 
-    -drive file=/var/lib/libvirt/qemu/nvram/fangying_openeuler_VARS.fd,if=pflash,format=raw,unit=1 \  
-    -m 32768 \                                                                                        
-    -overcommit mem-lock=off \                                                                        
-    -smp 16,sockets=2,dies=1,cores=4,threads=2 \                                                      
-    -uuid 0001f3a8-3755-4416-9587-21b0c5b5324b \                                                      
-    -no-user-config \                                                                                     
-    -nodefaults \                                                                                     
-    -rtc base=utc \                                                                                       
-    -no-shutdown \                                                                                    
-    -boot strict=on \                                                                                     
-    -device pcie-root-port,port=0x8,chassis=1,id=pci.1,bus=pcie.0,multifunction=on,addr=0x1 \         
-    -device pcie-root-port,port=0x9,chassis=2,id=pci.2,bus=pcie.0,addr=0x1.0x1 \                          
-    -device pcie-pci-bridge,id=pci.3,bus=pci.1,addr=0x0 \                                             
-    -device pcie-root-port,port=0xa,chassis=4,id=pci.4,bus=pcie.0,addr=0x1.0x2 \                      
-    -device pcie-root-port,port=0xb,chassis=5,id=pci.5,bus=pcie.0,addr=0x1.0x3 \                      
-    -device pcie-root-port,port=0xc,chassis=6,id=pci.6,bus=pcie.0,addr=0x1.0x4 \                      
-    -device pcie-root-port,port=0xd,chassis=7,id=pci.7,bus=pcie.0,addr=0x1.0x5 \                      
-    -device pcie-root-port,port=0xe,chassis=8,id=pci.8,bus=pcie.0,addr=0x1.0x6 \                      
-    -device pcie-root-port,port=0xf,chassis=9,id=pci.9,bus=pcie.0,addr=0x1.0x7 \                      
-    -device pcie-root-port,port=0x10,chassis=10,id=pci.10,bus=pcie.0,multifunction=on,addr=0x2 \      
-    -device pcie-root-port,port=0x11,chassis=11,id=pci.11,bus=pcie.0,addr=0x2.0x1 \                   
-    -device pcie-root-port,port=0x12,chassis=12,id=pci.12,bus=pcie.0,addr=0x2.0x2 \                   
-    -device pcie-root-port,port=0x13,chassis=13,id=pci.13,bus=pcie.0,addr=0x2.0x3 \                   
-    -device pcie-root-port,port=0x14,chassis=14,id=pci.14,bus=pcie.0,addr=0x2.0x4 \                   
-    -device pcie-root-port,port=0x15,chassis=15,id=pci.15,bus=pcie.0,addr=0x2.0x5 \                   
-    -device pcie-root-port,port=0x16,chassis=16,id=pci.16,bus=pcie.0,addr=0x2.0x6 \                   
-    -device pcie-root-port,port=0x17,chassis=17,id=pci.17,bus=pcie.0,addr=0x2.0x7 \                   
-    -device pcie-root-port,port=0x18,chassis=18,id=pci.18,bus=pcie.0,multifunction=on,addr=0x3 \      
-    -device pcie-root-port,port=0x19,chassis=19,id=pci.19,bus=pcie.0,addr=0x3.0x1 \                   
-    -device pcie-root-port,port=0x1a,chassis=20,id=pci.20,bus=pcie.0,addr=0x3.0x2 \                   
-    -device pcie-root-port,port=0x1b,chassis=21,id=pci.21,bus=pcie.0,addr=0x3.0x3 \                   
-    -device pcie-root-port,port=0x1c,chassis=22,id=pci.22,bus=pcie.0,addr=0x3.0x4 \                   
-    -device pcie-root-port,port=0x1d,chassis=23,id=pci.23,bus=pcie.0,addr=0x3.0x5 \                   
-    -device pcie-root-port,port=0x1e,chassis=24,id=pci.24,bus=pcie.0,addr=0x3.0x6 \                   
-    -device pcie-root-port,port=0x1f,chassis=25,id=pci.25,bus=pcie.0,addr=0x3.0x7 \                   
-    -device pcie-root-port,port=0x20,chassis=26,id=pci.26,bus=pcie.0,multifunction=on,addr=0x4 \      
-    -device pcie-root-port,port=0x21,chassis=27,id=pci.27,bus=pcie.0,addr=0x4.0x1 \                   
-    -device pcie-root-port,port=0x22,chassis=28,id=pci.28,bus=pcie.0,addr=0x4.0x2 \                   
-    -device pcie-root-port,port=0x23,chassis=29,id=pci.29,bus=pcie.0,addr=0x4.0x3 \                   
-    -device pcie-root-port,port=0x24,chassis=30,id=pci.30,bus=pcie.0,addr=0x4.0x4 \
-    -device usb-ehci,id=usb,bus=pci.3,addr=0x1 \                                
-    -device virtio-scsi-pci,id=scsi0,bus=pci.4,addr=0x0 \                       
-    -device virtio-serial-pci,id=virtio-serial0,bus=pci.3,addr=0x2 \            
-    -drive file=/root/fangying/vm/openeuler-debug.qcow2,format=qcow2,if=none,id=drive-scsi0-0-0-0,cache=none,aio=native \
-    -device scsi-hd,bus=scsi0.0,channel=0,scsi-id=0,lun=0,device_id=drive-scsi0-0-0-0,drive=drive-scsi0-0-0-0,id=scsi0-0-0-0,bootindex=1,write-cache=on \
-    -drive file=/root/fangying/vm/openEuler-20.03-LTS-aarch64-dvd.iso,format=raw,if=none,id=drive-scsi0-0-0-1,readonly=on,cache=none,aio=native \
-    -device scsi-cd,bus=scsi0.0,channel=0,scsi-id=0,lun=1,device_id=drive-scsi0-0-0-1,drive=drive-scsi0-0-0-1,id=scsi0-0-0-1,bootindex=2,write-cache=on \
-    -chardev pty,id=charserial0 \                                               
-    -serial chardev:charserial0 \                                               
-    -device usb-tablet,id=input0,bus=usb.0,port=1 \                             
-    -device usb-kbd,id=input1,bus=usb.0,port=2 \                                
-    -vnc 0.0.0.0:99 \                                                           
-    -device virtio-gpu-pci,id=video0,max_outputs=1,bus=pci.3,addr=0x4 \         
-    -device virtio-balloon-pci,id=balloon0,bus=pci.3,addr=0x3 \                 
-    -sandbox on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny \
-    -msg timestamp=on \                                                         
-    -monitor stdio 
+usr/bin/qemu-system-x86_64 \
+	-name guest=fangying_uefi,debug-threads=on \
+	-S \
+	-object secret,id=masterKey0,format=raw,file=/var/lib/libvirt/qemu/domain-2-fangying_uefi/master-key.aes \
+	-machine pc-i440fx-4.1,accel=kvm,usb=off,dump-guest-core=off \
+	-cpu host,kvm-pv-eoi=on \
+	-drive file=/usr/share/edk2/ovmf/OVMF.fd,if=pflash,format=raw,unit=0,readonly=on \
+	-drive file=/usr/share/edk2/ovmf/OVMF_VARS.fd,if=pflash,format=raw,unit=1 \
+	-m 16384 \
+	-overcommit mem-lock=off \
+	-smp 16,sockets=16,cores=1,threads=1 \
+	-uuid a1f00325-9972-486e-a127-6f0b14b44a3f \
+	-no-user-config \
+	-nodefaults \
+	-chardev socket,id=charmonitor,fd=30,server,nowait \
+	-mon chardev=charmonitor,id=monitor,mode=control \
+	-rtc base=utc,clock=vm,driftfix=slew \
+	-no-hpet \
+	-global kvm-pit.lost_tick_policy=delay \
+	-no-shutdown \
+	-boot strict=on \
+	-device piix3-usb-uhci,id=usb,bus=pci.0,addr=0x1.0x2 \
+	-device usb-ehci,id=usb1,bus=pci.0,addr=0x4 \
+	-device nec-usb-xhci,id=usb2,bus=pci.0,addr=0x5 \
+	-device virtio-scsi-pci,id=scsi0,bus=pci.0,addr=0x6 \
+	-device virtio-serial-pci,id=virtio-serial0,bus=pci.0,addr=0x7 \
+	-drive file=/mnt/sdc/fangying/x86/fangying_uefi.qcow2,format=qcow2,if=none,id=drive-virtio-disk0,cache=none,aio=native \
+	-device virtio-blk-pci,scsi=off,bus=pci.0,addr=0x9,drive=drive-virtio-disk0,id=virtio-disk0,bootindex=1,write-cache=on \
+	-netdev tap,fd=33,id=hostnet0,vhost=on,vhostfd=34 \
+	-device virtio-net-pci,netdev=hostnet0,id=net0,mac=52:24:01:d9:dc:53,bus=pci.0,addr=0x3 \
+	-chardev pty,id=charserial0 \
+	-device isa-serial,chardev=charserial0,id=serial0 \
+	-vnc 0.0.0.0:0 \
+	-device cirrus-vga,id=video0,bus=pci.0,addr=0x2 \
+	-device virtio-balloon-pci,id=balloon0,bus=pci.0,addr=0x8 \
+	-sandbox on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny \
+	-msg timestamp=on
+
 ```
