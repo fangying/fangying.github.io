@@ -11,7 +11,7 @@ Summary: Use vim8 on Apple M1 MacOS bigSur
 由于是ARM64架构，在刚上来的时候很多研发工具软件对系统的支持还不是太完善，但经过几个月的
 发展目前已经基本能够满足日常开发需求。
 
-安利一个网站和一个Github Repo可以方便地查询到各种生态软件对Apple M1的支持最新进展情况。
+安利3个传送门，可以方便地查询到各种生态软件对Apple M1的支持最新进展情况。
 
 * 传送门1：
 
@@ -21,8 +21,11 @@ https://isapplesiliconready.com/zh
 
 https://github.com/ThatGuySam/doesitarm
 
-由于我们是从事系统开发的软件行业，vim成为了日常看代码的必备工具，为此有必要设置一下Apple M1下的
-vim8工作环境。
+* 传送门3：
+
+https://doesitarm.com/
+
+由于我们是从事系统开发的软件行业，vim成为了日常看代码的必备工具，为此有必要设置一下Apple M1下的vim8工作环境。
 
 ## 配置vim8
 
