@@ -47,7 +47,7 @@ PLUGINS = [
         'assets',
         'extract_toc',
         'tipue_search',
-        'liquid_tags.img',
+        'liquid_tags',
         'neighbors',
         'render_math',
         'related_posts',
