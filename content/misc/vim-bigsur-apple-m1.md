@@ -138,7 +138,8 @@ gutentags: [job stderr]: 'ctags: Warning: --extra option is obsolete; use --extr
 gutentags: [job stderr]: 'ctags: Warning: Unsupported kind: ''I'' for --c++-kinds option'
 gutentags: Finished gtags_cscope job.
 ```
-原来是在M1上我们编译的ctags有些命令有所差异。解决办法：修改-extra参数为-extras，去掉c++-kinds上的'I'。
+原因是在M1上我们编译的ctags支持的参数命令上和X86平台上差异。
+解决办法：修改-extra参数为-extras，去掉c++-kinds上的'I'。
 修改后对应的配置项为:
 ```
 let g:gutentags_ctags_extra_args = ['--fields=+niazS', '--extras=+q']           
@@ -147,3 +148,5 @@ let g:gutentags_ctags_extra_args += ['--c-kinds=+px']
 ```
 改完之后应该就没有E433错误了。
 到这里就可以在Apple M1上愉快的使用vim8来看代码了。
+
+Peace.
