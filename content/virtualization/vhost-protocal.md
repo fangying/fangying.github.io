@@ -1,6 +1,6 @@
 Title: the vhost protocal
 Date: 2019-12-12 23:00
-Tags: vhost protocal, vhost-net, virtio-net, vhost-user
+Tags: vhost protocal
 Slug: vhost-protocal
 Authors: Yori Fang
 Summary: the vhost protocal
