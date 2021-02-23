@@ -69,7 +69,7 @@ brew install nodejs
 ```
 
 这里直接使用coc.nvim推荐的默认配置，
-从https://github.com/neoclide/coc.nvim直接拷贝就行了，追加到init.vim。
+从[coc.nvim](https://github.com/neoclide/coc.nvim)直接拷贝就行了，追加到init.vim。
 
 ```
 " TextEdit might fail if hidden is not set.
@@ -240,7 +240,7 @@ https://github.com/fangying/vim/blob/master/init.vim
 ## 配置rust-analyzer的支持
 
 使用:CocConfig命令，新增配置文件，开启对rust-analyzer的支持。
-提前下载rust-analyzer二进制，放到~/.cargo/bin目录下，不然会提升找不到。
+记得提前下载rust-analyzer二进制，放到~/.cargo/bin目录下，不然会提升找不到。
 
 ```
 {                                                                                                                                              
