@@ -2,7 +2,7 @@ Title: Use NeoVim on Apple M1 MacOS bigSur
 Date: 2021-2-22 23:00
 Modified: 2021-2-22 23:00
 Tags: neovim
-Slug: vim-bigSur-apple-m1
+Slug: neovim-bigSur-apple-m1
 Status: published
 Authors: Yori Fang
 Summary: Use neovim on Apple M1 MacOS bigSur
