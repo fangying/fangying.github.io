@@ -762,3 +762,11 @@ $QEMU_BIN \
     -vnc 0.0.0.0:99 \                                                           
     -device virtio-gpu-pci,id=video0,max_outputs=1,bus=pci.3,addr=0x4  
 ```
+
+
+## Make rootfs using installroot
+
+```
+sudo dnf --releasever 33 --nogpgcheck --installroot /mnt/rootfs install systemd yum passwd dnf fedora-release --noplugins
+sed -i "s|root:x|root:|" etc/password
+```
