@@ -641,7 +641,7 @@ $QEMU_BIN \
     -D /var/log/qemu.log 
 ```
 
-## x86 Direct Boot
+## x86 Direct Boot microvm
 
 ```
 qemu-system-x86_64 \
@@ -778,7 +778,25 @@ $QEMU_BIN \
     -vnc 0.0.0.0:99 \                                                           
     -device virtio-gpu-pci,id=video0,max_outputs=1,bus=pci.3,addr=0x4  
 ```
-
+## x86 UEFI Direct Boot
+```
+qemu-system-x86_64 \                                                            
+    -M pc \                                                                     
+    -cpu host \                                                                 
+    -smp cpus=4 \                                                               
+    -enable-kvm \                                                               
+    -m 2048 \                                                                   
+    -nographic \                                                                
+    -net none \                                                                 
+    -drive if=pflash,format=raw,unit=0,file=/home/fang/code/opensrc/edk2/Build/OvmfX64/DEBUG_GCC5/FV/OVMF_CODE.fd,readonly=on \                                   
+    -drive if=pflash,format=raw,unit=1,file=/home/fang/code/opensrc/edk2/Build/OvmfX64/DEBUG_GCC5/FV/OVMF_VARS.fd \
+    -device virtio-blk-pci,id=blk0,drive=image \                                
+    -device piix3-usb-uhci,id=uhci \                                            
+    -device usb-tablet \                                                        
+    -drive if=none,id=image,file=$PWD/dummy.raw,format=raw \                    
+    -monitor telnet::12345,server,nowait \                                      
+    -serial stdio
+```
 
 ## Make rootfs using installroot
 
