@@ -804,3 +804,13 @@ qemu-system-x86_64 \
 sudo dnf --releasever 33 --nogpgcheck --installroot /mnt/rootfs install systemd yum passwd dnf fedora-release --noplugins
 sed -i "s|root:x|root:|" etc/password
 ```
+
+## QOM qmp example
+
+```
+virsh qemu-monitor-command vmname '{"execute": "qom-list-types}"' --pretty
+virsh qemu-monitor-command vmname '{"execute": "qom-list", "arguments": {"path": "/machine/"}}' --pretty
+virsh qemu-monitor-command vmname '{"execute": "qom-list", "arguments": {"path": "/machine/peripheral"}}' --pretty
+virsh qemu-monitor-command vmname '{"execute": "qom-list", "arguments": {"path": "/machine/unattached"}}' --pretty
+virsh qemu-monitor-command vmname '{"execute": "device-list-properities, "arguments": {"typename": "virtio-serial-pci"}}' --pretty
+```
