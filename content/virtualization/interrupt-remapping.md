@@ -20,7 +20,7 @@ DMA Remapping通过IOMMU页表方式将直通设备对内存的访问限制到�
 Interrupt Remapping的出现改变了x86体系结构上的中断投递方式，外部中断源发出的中断请求格式发生了较大的改变，
 中断请求会先被中断重映射硬件（IOMMU）截获后再通过查询中断重映射表的方式最终投递到目标CPU上。
 这些外部设备中断源则包括了中断控制器(I/OxAPICs)以及MSI/MSIX兼容设备PCI/PCIe设备等。
-Interrupt Remapping是需要硬件来支持的，这里的硬件应该主要是指的IOMMU（尽管intel手册并没有直接说明），Interrupt Remapping的Capability是通过Extended Capability Register BIT 3来报告的，如果该位为1表示支持中断重映射。
+Interrupt Remapping是需要硬件来支持的，这里的硬件应该主要是指的IOMMU（尽管intel手册并没有直接说明），Interrupt Remapping的Capability是通过Extended Capability Register BIT3来报告的，如果该位为1表示支持中断重映射。
 
 ![Extended Capability Register](../images/Extended-Capability-Register.png)
 
