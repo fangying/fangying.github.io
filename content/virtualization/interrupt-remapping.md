@@ -34,7 +34,8 @@ Interrupt Remapping是需要硬件来支持的，这里的硬件应该主要是�
 
 ![Remapping format](../images/remapping-format-interrupt-request.png)
 
-在Interrupt Remapping模式下，外设发起中断请求被IOMMU截获，然后硬件自动查询OS在内存中预设的中断重映射表(Interrupt Remapping Table)根据表里的描述来投递中断。中断重映射表由中断重映射表项(Interrupt Remapping Table Entry)构成，每个`IRTE`占用16字节（具体格式介绍见文末），中断重映射表的基地址存放在Interrupt Remapping Table Address Register中。
+在Interrupt Remapping模式下，外设发起中断请求被IOMMU截获，然后硬件自动查询OS在内存中预设的中断重映射表(Interrupt Remapping Table)根据表里的描述来投递中断。中断重映射表由中断重映射表项(Interrupt Remapping Table Entry)构成，每个`IRTE`占用16字节（具体格式介绍见文末），中断重映射表的基地址存放在IRTA(Interrupt Remapping Table Address Register)寄存器中。
+
 ![Interrupt Remapping Table Address Register](../images/Interrupt-Remapping-Table-Address-Register.png)
 
 硬件通过下面的方式去计算中断的`interrupt_index`：
