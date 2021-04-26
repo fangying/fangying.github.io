@@ -814,3 +814,11 @@ virsh qemu-monitor-command vmname '{"execute": "qom-list", "arguments": {"path":
 virsh qemu-monitor-command vmname '{"execute": "qom-list", "arguments": {"path": "/machine/unattached"}}' --pretty
 virsh qemu-monitor-command vmname '{"execute": "device-list-properities, "arguments": {"typename": "virtio-serial-pci"}}' --pretty
 ```
+
+## 使用 Virsh console 登陆虚拟机
+
+需要给虚拟机启用一个服务：
+```
+systemctl start serial-getty@ttyS0.service
+```
+```
