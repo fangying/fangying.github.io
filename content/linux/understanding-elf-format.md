@@ -1,15 +1,17 @@
-Title:  Compile Load and Exectute
+Title:  Understanding the ELF format
 Date: 2021-2-8 23:00
 Tags: elf
-Slug: load-and-execute
+Slug: understanding-elf
 Status: draft
 Authors: Yori Fang
-Summary: Load and Execute
+Summary: ELF
 
-学过C语言的后我们都知道，当你写了一份源代码想要把它在操作系统上运行起来要经历**编译**、**装载**和**执行**这3个步骤。
-那么你是否正真理解了编译、装载和执行背后的逻辑？
-最近在做一个Userspace Live Patching相关的项目，刚好会涉及到编译链接等基本知识。
-为了提升一下作为一个程序员的基本修养，有必要对这个知识点进行学习。学习之前准备了几个问题来探讨。
+在Unix Like的操作系统上，我们编译程序的源代码后通常会生成一个ELF格式的二进制文件。
+ELF文件被操作系统加载后就可以运行，那么你是否好奇在编译、装载和执行背后的逻辑？
+本文我们就来一起探索一下ELF文件格式，并了解一下它是如何被操作系统加载和执行的。
+
+这里我们以C语言为例，我们知道源代码在操作系统上运行起来要经历**编译**、**装载**和**执行**这3个步骤。
+为了提升程序员的基本修养，我们有必要对这个知识点进行学习。在学习之前准备了几个问题来探讨。
 
 1. c语言编译的基本流程是怎样的？
 2. 什么是ELF文件，它的组成结构是怎么样的？
@@ -19,30 +21,23 @@ Summary: Load and Execute
 6. 什么是GOT/PLT表，为什么需要它？
 7. 进程是如何被装载并从哪儿开始执行的？
 
-### 1.编译
+## 1. 代码编译
 
-![comiple load and execute](../images/compile-load-and-store.png)
-
-源代码进过编译后会生成一个ELF格式的**目标文件**，而ELF文件是基于COFF规范制定的一种特殊格式，
-这个文件是程序和数据的载体能够被操作系统解析并加载到内存中运行。其格式如下：
-
-
-```bash
-
-```
-
+![comiple load and execute](../images/c-language-compilation.png)
+源代码的编译主要经历预处理、编译、汇编和链接这4个阶段。预处理主要是对C语言中的一些宏定义进行展开，
+编译是将源代码编译成汇编代码，汇编是将汇编代码编译成目标文件，链接则是将一堆目标程序链接成一个可执行程序，
+这个可执行程序就是我们说的ELF(Executable and Linkable Format)格式。
 
 | ELF 文件类型       | 说明                                                               |
 | :----------------- | :----------------------------------------------------------------- |
 | Relocatable File   | 包含代码和数据，可以用来链接成可执行文件或者静态库文件和动态库文件 |
 | Executable File    | 可以被直接执行的程序                                               |
-| Shared Ojbect File | 包含代码和数据，一种是静态链接库一种是动态链接库                       |
+| Shared Ojbect File | 包含代码和数据，一种是静态链接库一种是动态链接库                   |
 | Core Dump File     | 核心转储文件，进程意外终止时的信息转储文件                         |
 |                    |
 
 
-
-![elf format](http://luomuxiaoxiao.com/wp-content/uploads/2018/10/cs01-elf.png)
+![elf format](../images/elf-format.png)
 
 ELF文件的头部是一个ELF header的数据结构，用来描述整个ELF文件的组成信息。
 其中最为重要的是program header table和section header table，

@@ -18,22 +18,26 @@ DMA Remapping通过IOMMU页表方式将直通设备对内存的访问限制到�
 ### 1 Interrupt Remapping 简介
 
 Interrupt Remapping的出现改变了x86体系结构上的中断投递方式，外部中断源发出的中断请求格式发生了较大的改变，
-中断请求会先被中断重映射硬件截获后再通过查询中断重映射表的方式最终投递到目标CPU上。
+中断请求会先被中断重映射硬件（IOMMU）截获后再通过查询中断重映射表的方式最终投递到目标CPU上。
 这些外部设备中断源则包括了中断控制器(I/OxAPICs)以及MSI/MSIX兼容设备PCI/PCIe设备等。
-Interrupt Remapping是需要硬件来支持的，这里的硬件应该主要是指的IOMMU（尽管intel手册并没有直接说明），Interrupt Remapping的Capability是通过Extended Capability Register来报告的。
+Interrupt Remapping是需要硬件来支持的，这里的硬件应该主要是指的IOMMU（尽管intel手册并没有直接说明），Interrupt Remapping的Capability是通过Extended Capability Register BIT 3来报告的，如果该位为1表示支持中断重映射。
 
-在没有使能Interrupt Remapping的情况下，设备中断请求格式称之为*Compatibility format*，其结构主要包含一个32bit的Address和一个32bit的Data字段，Address字段包含了中断要投递的目标CPU的APIC ID信息，Data字段主要包含了要投递的vecotr号和投递方式。结构如下图：
+![Extended Capability Register](../images/Extended-Capability-Register.png)
 
-![Compatibility format](images/Compatibility-format-interrupt-request.png)
+在没有使能Interrupt Remapping的情况下，设备中断请求格式称之为*Compatibility format*，主要包含一个32bit的Address和一个32bit的Data字段，Address字段包含了中断要投递的目标CPU的APIC ID信息，Data字段主要包含了要投递的vecotr号和投递方式。结构如下图：
 
-其中Address的bit 4为Interrupt Format位，用来标志这个Request是Compatibility format（bit4=0）还是Remapping format (bit 4=1)。
+![Compatibility format](../images/Compatibility-format-interrupt-request.png)
 
-在开启了Interrupt Remapping之后，设备的中断请求格式称之为*Remapping format*，其结构同样由一个32bit的Address和一个32bit的Data字段构成。但与Compatibility format不同的是此时Adress字段不再包含目标CPU的APIC ID信息而是提供了一个16bit的HANDLE索引，并且Address的bit 4为"1"表示Request为Remapping format。同时bit 3是一个标识位(SHV)，用来标志Request是否包含了SubHandle，当该位置位时表示Data字段的低16bit为SubHandle索引。Remapping format的中断请求格式如下图：
+其中Address的bit 4为Interrupt Format位，用来标志这个Request是Compatibility format（bit4=0）还是Remapping format (bit4=1)。
 
-![Remapping format](images/remapping-format-interrupt-request.png)
+在开启了Interrupt Remapping之后，设备的中断请求格式称之为*Remapping format*，其同样由一个32bit的Address和一个32bit的Data字段构成。但与Compatibility format不同的是此时Adress字段不再包含目标CPU的APIC ID信息而是仅包含了一个16bit的HANDLE索引，并且Address的bit4为"1"表示Request为Remapping format。同时bit3是一个标识位(SHV)，用来标志Request是否包含了SubHandle，当该位置位时表示Data字段的低16bit为SubHandle索引。Remapping format的中断请求格式如下图：
 
-在Interrupt Remapping模式下，硬件查询系统软件在内存中预设的中断重映射表(Interrupt Remapping Table)来投递中断。中断重映射表由中断重映射表项(Interrupt Remapping Table Entry)构成，每个IRTE占用16字节（具体格式介绍见文末），中断重映射表的基地址存放在Interrupt Remapping Table Address Register中。硬件通过下面的方式去计算中断的`interrupt_index`：
+![Remapping format](../images/remapping-format-interrupt-request.png)
 
+在Interrupt Remapping模式下，外设发起中断请求被IOMMU截获，然后硬件自动查询OS在内存中预设的中断重映射表(Interrupt Remapping Table)根据表里的描述来投递中断。中断重映射表由中断重映射表项(Interrupt Remapping Table Entry)构成，每个`IRTE`占用16字节（具体格式介绍见文末），中断重映射表的基地址存放在Interrupt Remapping Table Address Register中。
+![Interrupt Remapping Table Address Register](../images/Interrupt-Remapping-Table-Address-Register.png)
+
+硬件通过下面的方式去计算中断的`interrupt_index`：
 ```
     if (address.SHV == 0) {
         interrupt_index = address.handle;
@@ -51,15 +55,15 @@ Interrupt Remapping是需要硬件来支持的，这里的硬件应该主要是�
 
 对I/OxAPIC而言，其Remapping格式中断投递格式如下图，软件需要按图中的格式来发起Remapping中断请求，这就要求需要修改“中断重定向表项”(Interrupt Redirection Table Entry)，**注意**不要将ioapic中断重定向和vtd中断重映射搞混淆，这是两个不同的概念，读者可以参考[wiki](http://wiki.osdev.org/IOAPIC)对比下RTE相比于Compatibility格式有哪些不同。值得注意的是bit48这里需要设置为"1"用来标志此RTE为Remapping format，并且RTE的bit10:8固定为000b(即没有SubHandle)。而且vector字段必须和IRTE的vector字段相同！
 
-![I/OxAPIC Request Format](images/ioxapic-programming.png)
+![I/OxAPIC Request Format](../images/ioxapic-programming.png)
 
 对于MSI和MSI-X而言，其Remapping格式中断投递格式如下图，值得注意的是在Remapping格式下MSI中断支持multiple vector（大于32个中断向量），但软件必须连续分配N个连续的IRTE并且`interrupt_index`对应HANDLE号必须为N个连续的IRTE的首个。同样bit 4必须为"1"用来表示中断请求为Remapping格式。Data位全部设置为"0"!
 
-![MSI/MSI-X Request Format](images/msix-programming.png)
+![MSI/MSI-X Request Format](../images/msix-programming.png)
 
 中断重映射的硬件处理步骤如下：
 
-* 硬件识别到物理地址0xFEEx_xxxx范围内的DWORD写请时，将该请求认定为中断请求；
+* IOMMU识别到物理地址0xFEEx_xxxx范围内的DWORD写请时，将该请求认定为中断请求；
 * 当Interrupt Remapping没有使能时，所有的中断都按照Compatibility format来处理；
 * 当Intgrrupt Remapping被使能时，中断请求处理流程如下：
 
@@ -76,13 +80,13 @@ Interrupt Remapping是需要硬件来支持的，这里的硬件应该主要是�
 *   分配一个IRTE并且按照IRTE的格式要求填好IRTE的每个属性；
 *   按照Remapping format的要求对中断源进行编程，在合适的时候触发一个Remapping format格式的中断请求。
 
-![Interrupt Remapping Figure](images/interrupt-remapping-fig.png)
+![Interrupt Remapping Figure](../images/interrupt-remapping-fig.png)
 
 ### 附：Remapping格式中断重映射表项的格式
 
 Interrupt Remapping格式的中断重映射表项的格式为（下篇会介绍Interrupt Posting格式的中断重映射表项）:
 
-![VT-d Interrupt Remapping Table Entry](images/irte-for-remapped-interrupts.png)
+![VT-d Interrupt Remapping Table Entry](../images/irte-for-remapped-interrupts.png)
 
 其中比较关键的中断描述信息为：
 
