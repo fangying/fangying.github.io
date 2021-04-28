@@ -134,10 +134,38 @@ struct virtio_pci_cap {
 };
 ```
 只是略微不同的是，virtio-pci的Capability有一个统一的结构，
-其中`cfg_type`表示Cap的类型，bar表示这个配置结构被映射到的BAR空间号。
+其中`cfg_type`表示Cap的类型，`bar`表示这个配置结构被映射到的BAR空间号。
 这样每个配置结构都可以通过BAR空间直接访问，或者通过PCI配置空间的`VIRTIO_PCI_CAP_PCI_CFG`域进行访问。
 每个Cap的具体结构定义可以参考virtio spec 4.1.4.3小节。
-
+为了方便理解这里以一张virtio-net网卡为例：
+```
+[root@localhost ~]# lspci -vvvs 04:00.0
+04:00.0 Ethernet controller: Red Hat, Inc. Virtio network device (rev 01)
+	Subsystem: Red Hat, Inc. Device 1100
+	Physical Slot: 0-1
+	Control: I/O+ Mem+ BusMaster+ SpecCycle- MemWINV- VGASnoop- ParErr- Stepping- SERR+ FastB2B- DisINTx+
+	Status: Cap+ 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort- <TAbort- <MAbort- >SERR- <PERR- INTx-
+	Latency: 0
+	Interrupt: pin A routed to IRQ 21
+	Region 1: Memory at fe840000 (32-bit, non-prefetchable) [size=4K]
+	Region 4: Memory at fa600000 (64-bit, prefetchable) [size=16K]
+	Expansion ROM at fe800000 [disabled] [size=256K]
+	Capabilities: [dc] MSI-X: Enable+ Count=10 Masked-
+		Vector table: BAR=1 offset=00000000
+		PBA: BAR=1 offset=00000800
+	Capabilities: [c8] Vendor Specific Information: VirtIO: <unknown>
+		BAR=0 offset=00000000 size=00000000
+	Capabilities: [b4] Vendor Specific Information: VirtIO: Notify
+		BAR=4 offset=00003000 size=00001000 multiplier=00000004
+	Capabilities: [a4] Vendor Specific Information: VirtIO: DeviceCfg
+		BAR=4 offset=00002000 size=00001000
+	Capabilities: [94] Vendor Specific Information: VirtIO: ISR
+		BAR=4 offset=00001000 size=00001000
+	Capabilities: [84] Vendor Specific Information: VirtIO: CommonCfg
+		BAR=4 offset=00000000 size=00001000
+```
+MSI-X的vector table和PBA放到了BAR1里面，
+BAR4里放了common cfg，设备isr状态信息，device cfg，driver notify信息等。
 
 # 1. 前后端数据共享
 

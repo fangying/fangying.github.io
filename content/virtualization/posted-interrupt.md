@@ -25,7 +25,7 @@ IRTE中的Mode域(IM)用来指定这个remappable中断请求是interrupt-remapp
 *   IRTE的IM位为0表示中断按照remappable方式处理；
 *   IRTE的IM位为1表示中断按照posted方式来处理。
 
-在Interrupt Posting模式下，新增了一个与VCPU相关的内存数据结构叫做"Posted Interrupt Descriptor"(PD)，
+在Interrupt Posting模式下，新增了一个与VCPU相关的内存数据结构叫做`Posted Interrupt Descriptor`(PD)，
 这是一个64-Byte对齐的数据结构并且直接被硬件用来记录将要post的中断请求。PD结构包含以下的域：
 
 *   Posted Interrupt Request (PIR)域，提供记录需要post的中断占256bit每个bit代表一个中断号。
@@ -70,7 +70,7 @@ IRTE中的Mode域(IM)用来指定这个remappable中断请求是interrupt-remapp
 
 ### 3 Interrupt Posting 的软件处理步骤
 
-当一个设备被直通给虚拟机后，虚拟机初始化的过程中VMM会设置好此设备的MSI/MSI-X中断对应的IRTE并标志IM位为1b，标志这是一个Posted Interrupt。当直通设备投递一个中断后，硬件首先会去查询irq对应的IRTE并从IRTE中提取记录的Posted Interrupt Descriptor地址和vector信息，然后更新PIR域和ON域并且将vector信息写入到VCPU的vAPIC Page中，直接给处于None Root模式的VCPU注入一个中断，整个过程不需要VMM的介入从而十分高效。Intel的虚拟化专家FengWu使用下面的图很好的描述了Interrupt Posting的处理过程：
+当一个设备被直通给虚拟机后，虚拟机初始化的过程中VFIO会设置好此设备在Host侧分配的MSI/MSI-X中断对应的IRTE并标志IM位为1b，标志这是一个Posted Interrupt。当直通设备投递一个中断后，中断请求会被IOMMU硬件截获，硬件首先会去查询irq对应的IRTE并从IRTE中提取记录的`Posted Interrupt Descriptor`地址和vector信息，然后更新PIR域和ON域，并且将vector信息写入到VCPU的vAPIC Page中，直接给处于None Root模式的VCPU注入一个中断，整个过程不需要VMM的介入从而十分高效。Intel的虚拟化专家FengWu使用下面的图很好的描述了Interrupt Posting的处理过程：
 
 ![Posted Interrupt Handling](images/posted-interrupt-handling.png)
 
@@ -79,14 +79,14 @@ IRTE中的Mode域(IM)用来指定这个remappable中断请求是interrupt-remapp
 
 1.  为虚拟机的每个VCPU分配一个PD用来存放此VCPU的Posted Interrupt信息（PD的地址会被记录到VCPU的VMSC里面）；
 2.  VMM需要在每个PCPU上安排2个中断vector用来接受通知事件：
-    -   其中一个物理vector被称之为'Active Notification Vector' (ANV)，它被用来post通知事件到处于Running状态的VCPU上（这个IPI中断是guest接收的）。
-    -   另一个物理vector被称之为'Wake-up Notification Vector' (WNV)，它被用来post通知事件到处于Blocked状态的VCPU上（这个IPI中断是host接收的）。
+    -   其中一个物理vector被称之为`Active Notification Vector` (ANV)，它被用来post通知事件到处于Running状态的VCPU上（这个IPI中断是guest接收的）。
+    -   另一个物理vector被称之为`Wake-up Notification Vector` (WNV)，它被用来post通知事件到处于Blocked状态的VCPU上（这个IPI中断是host接收的）。
 3.  对于直通到此虚拟机的直通设备，VMM都会干预进来（因为虚拟机的IOxAPIC,LAPIC等都是kvm内核模块来模拟的），VMM能够知道到每个VCPU上的vector号分配情况；
 4.  对于每个直通设备的中断：
     -   VMM会为每个中断源分配一个IRTE，并且把对应的guest分配的vecotr号填入到IRTE的vector域。
     -   VMM会将每个VCPU对应的PD地址填入到此中断源的对用的IRTE地址域。
     -   如果此中断需要立即处理，那么VMM会将对此中断源对应的IRTE中URG域置成1。
-5.  同时VMM还需要为VCPU使能APICv特性（包括了'virtual-interrupt delivery'和'process posted interrupts'），并且将此VCPU的VMCS域POSTED_INTR_NV配置为ANV，并将申请的PD的地址配置到VMCS的POSTED_INTR_DESC_ADDR域来告诉VCPU它关联的PD在哪儿。（注：这些操作在VCPU初始化流程中完成）
+5.  同时VMM还需要为VCPU使能APICv特性（包括了`virtual-interrupt delivery`和`process posted interrupts`），并且将此VCPU的VMCS域POSTED_INTR_NV配置为ANV，并将申请的PD的地址配置到VMCS的POSTED_INTR_DESC_ADDR域来告诉VCPU它关联的PD在哪儿。（注：这些操作在VCPU初始化流程中完成）
 6.  在VCPU调度的过程中，VMM需要按照下面的方式来管理VCPU的调度状态：
     -   当VCPU被scheduler选中调度进来运行的的时候，此时VCPU的状态被标志为'Active'状态。这个时候VMM需要将PD的NV域更新为ANV的值。
     同时在这种场景下，此VCPU上接受的Posted Interrupt中断会被直接复制到vAPIC Page中，guest在非根模式下就能直接处理此中断，而不需要VMM的参与。
