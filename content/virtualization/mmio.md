@@ -190,4 +190,4 @@ static bool set_mmio_spte(struct kvm_vcpu *vcpu, u64 *sptep, gfn_t gfn,
 MMIO是通过设置spte的保留位来标志的．
 
 * 虚拟机内部第一次访问MMIO的gpa时，发生了EPT_VIOLATION然后check gpa发现对应的pfn不存在（QEMU没有注册），那么认为这是个MMIO，于是`set_mmio_spte`来标志它的spte是一个MMIO．
-* 后面再次访问这个gpa时就发生EPT_MISCONFIG了，进而愉快地调用`handle_ept_misconfig` -> `handle_mmio_page_fault` -> `x86_emulate_instruction` 来处理所有的MMIO操作了．
+* 后面再次访问这个gpa时就发生EPT_MISCONFIG了，进而愉快地调用`handle_ept_misconfig` -> `kvm_mmu_page_fault` -> `x86_emulate_instruction` 来处理所有的MMIO操作了．
