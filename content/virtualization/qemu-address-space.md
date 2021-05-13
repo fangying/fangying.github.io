@@ -18,4 +18,4 @@ Status: published
 
 如果太小了看不清，请看：
 
-https://kernelgo.org/images/qemu-address-space.svg
+[https://kernelgo.org/images/qemu-address-space.svg](https://kernelgo.org/images/qemu-address-space.svg)
