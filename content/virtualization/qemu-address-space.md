@@ -12,7 +12,7 @@ Status: published
     one picture is worth ten thousand words!
 ```
 
-![Xun](https://pics5.baidu.com/feed/f636afc379310a55247f1a4d1f3c89ad832610aa.jpeg?token=aaa732d9830552b0edb74272f7bb9cb7&s=AFCC7A23CABB27AF7E213CA70100E0E1)
+![Xun](../images/luxun.jpeg)
 
 
 所以，上图：
