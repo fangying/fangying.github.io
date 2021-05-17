@@ -16,6 +16,7 @@ Status: published
 
 
 所以，上图：
+
 ![qemu-address-space](../images/qemu-address-space.svg)
 
 如果太小了看不清，请看：
