@@ -7,7 +7,7 @@ Authors: Yori Fang
 Summary: picture of qemu address space
 Status: published
 
-鲁迅曾今说过：
+鲁迅先生曾今说过：
 ```
     one picture is worth ten thousand words!
 ```

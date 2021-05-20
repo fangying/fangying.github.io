@@ -1,4 +1,4 @@
-Title: Tips on Linux
+GTitle: Tips on Linux
 Date: 2018-6-12 23:00
 Modified: 2018-6-12 23:00
 Tags: x86
@@ -819,6 +819,6 @@ virsh qemu-monitor-command vmname '{"execute": "device-list-properities, "argume
 
 需要给虚拟机启用一个服务：
 ```
+grubby --update-kernel=ALL --args=console=ttyS0,115200
 systemctl start serial-getty@ttyS0.service
-```
 ```
