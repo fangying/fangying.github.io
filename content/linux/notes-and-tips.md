@@ -1,4 +1,4 @@
-GTitle: Tips on Linux
+Title: Tips on Linux
 Date: 2018-6-12 23:00
 Modified: 2018-6-12 23:00
 Tags: x86
