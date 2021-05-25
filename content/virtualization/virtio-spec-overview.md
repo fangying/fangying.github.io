@@ -37,7 +37,7 @@ virtio协议标准最早由IBM提出，virtio作为一套标准协议现在有�
 
 * ACKNOWLEDGE（1）：GuestOS发现了这个设备，并且认为这是一个有效的virtio设备；
 * DRIVER (2) : GuestOS知道该如何驱动这个设备；
-* FAILED (128) : GuestOS无法正常驱动这个设备，Something is wriong；
+* FAILED (128) : GuestOS无法正常驱动这个设备，Something is wrong；
 * FEATURES_OK (8) : GuestOS认识所有的feature，并且feature协商一完成；
 * DRIVER_OK (4) : 驱动加载完成，设备可以投入使用了；
 * DEVICE_NEEDS_RESET (64) ：设备触发了错误，需要重置才能继续工作。
@@ -62,13 +62,13 @@ bit24-bit37预给队列和feature协商机制，bit38以上保留给未来其他
 ```
  
  * Descriptor Table：存放IO传输请求信息；
- * Available Ring：记录了Descriptor Table表中的哪些项被更新了，前端Driver可写但后端只读；
- * Used Ring：记录Descriptor Table表中哪些请求已经被提交到硬件，前端Driver只读但后端可写。
+ * Available Ring：记录了Descriptor Table表中的I/O请求下发信息，前端Driver可写后端只读；
+ * Used Ring：记录Descriptor Table表中已被提交到硬件的信息，前端Driver只读后端可写。
  
 整个virtio协议中设备IO请求的工作机制可以简单地概括为：
 
-1.  前端驱动将IO请求放到`Descriptor Table`中，然后将索引更新到`Available Ring`中，然后kick后端去取数据；
-1.  后端取出IO请求进行处理，然后结果刷新到`Descriptor Table`中再更新`Using Ring`，然后发送中断notify前端。
+1.  前端驱动将IO请求放到`Descriptor Table`中，然后将索引更新到`Available Ring`中，最后kick后端去取数据；
+1.  后端取出IO请求进行处理，然后将结果刷新到`Descriptor Table`中再更新`Using Ring`，然后发送中断notify前端。
 
 从virtio协议可以了解到**virtio设备支持3种设备呈现模式**：
 
