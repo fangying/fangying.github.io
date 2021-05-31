@@ -18,11 +18,11 @@ Posted Interrupt是基于Interrupt Remapping机制实现的，关于VT-d Posted 
 
 为了支持VT-d Posted Interrup Inter为vCPU引入了Posted Interrupt Descriptor数据结构，其中有pir，on,sn,nv,ndst等几个关键域。
 
-PIR域记录了要给虚拟机vCPU投递的vector号（由硬件自动写入并由VMM软件读取），
-当中断到来时ON标志位自动置位告知guest我有中断要投递给你了，
-SN标志位是VMM软件用来告知VT-d硬件当前vCPU不在Running状态你不要给我投中断了我收不到，
-NV是主机上配合Poste Interrupt工作的一个中断vector（它的值只能是wakeup_vector或者notification vector），
-NDST存放当前vCPU所在PCPU的apicid（由VMM负责刷新，确保中断可以自动迁移到目的pCPU上）。
+* PIR：记录了要给虚拟机vCPU投递的vector号（由硬件自动写入并由VMM软件读取）；
+* ON：当中断到来时ON标志位自动置位告知guest我有中断要投递给你了；
+* SN：是VMM软件用来告知VT-d硬件当前vCPU不在Running状态你不要给我投中断了我收不到；
+* NV：是主机上配合Poste Interrupt工作的一个中断vector（它的值只能是wakeup_vector或者notification vector）；
+* NDST：存放当前vCPU所在PCPU的apicid（由VMM负责刷新，确保中断可以自动迁移到目的pCPU上）。
 
 ```c
 /* Posted-Interrupt Descriptor */
@@ -294,6 +294,14 @@ static int pi_pre_block(struct kvm_vcpu *vcpu)
 Pre Block阶段过后会调用`kvm_vcpu_block`，在这个函数中会调用schdule()主动把vCPU调度出去（休眠），让出pCPU执行其他vCPU的代码。
 
 ### vCPU 从 Blocked => Runnable
+
+可以从这么一种场景理解：如果vcpu0和vcpu1都在同一个物理CPU上运行，某一时刻vcpu0正在运行，
+vcpu1还处于休眠状态，这是外部设备产生了一个中断需要注入到vcpu1上，Device会按照初始化配置
+的MSI-x中断格式给提交一个Interrupt Reqeust，由于提交的是Remapping格式中断会被IOMMU截获。
+IOMMU查询IRTE解析出vcpu1对应点PD和NV（notification vector），但此时vcpu1还在睡觉，
+因此NV是被设置成wakeup vector的。物理cpu接受到wakeup interrupt，导致正在运行的vcpu0被kick到
+root模式下，在wakeup interrupt handler中遍历blocked_vcpu_on_cpu链表得知vcpu1上有个中断
+需要处理，将vcpu1扔到运行队列中，将vcpu从Block状态变为Runnale状态。
 
 当vCPU休眠结束之后会调用`vmx_post_block` => `__pi_post_block`这时候vCPU结束睡眠被重新调度。
 注意这里会更新NDST并将vCPU从pCPU等待链表上删除，并且把NV置位`POSTED_INTR_VECTOR`。
