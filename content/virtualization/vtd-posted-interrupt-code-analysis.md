@@ -303,6 +303,30 @@ IOMMU查询IRTE解析出vcpu1对应点PD和NV（notification vector），但此�
 root模式下，在wakeup interrupt handler中遍历blocked_vcpu_on_cpu链表得知vcpu1上有个中断
 需要处理，将vcpu1扔到运行队列中，将vcpu从Block状态变为Runnale状态。
 
+```c
+/*                                                                              
+ * Handler for POSTED_INTERRUPT_WAKEUP_VECTOR.                                  
+ */                                                                             
+void pi_wakeup_handler(void)                                                                                                   
+{                                                                               
+    struct kvm_vcpu *vcpu;
+	// 获取当前物理CPU的id                                                      
+    int cpu = smp_processor_id();                                               
+
+	// 遍历当前物理CPU的blocked_vcpu_list                                                                      
+    spin_lock(&per_cpu(blocked_vcpu_on_cpu_lock, cpu));                         
+    list_for_each_entry(vcpu, &per_cpu(blocked_vcpu_on_cpu, cpu),               
+            blocked_vcpu_list) {                                                
+        struct pi_desc *pi_desc = vcpu_to_pi_desc(vcpu);                        
+
+		// 检测vcpu的PD是否ON被硬件置位                                                                        
+        if (pi_test_on(pi_desc) == 1)                                           
+            kvm_vcpu_kick(vcpu);                                                
+    }                                                                           
+    spin_unlock(&per_cpu(blocked_vcpu_on_cpu_lock, cpu));                       
+}         
+```
+
 当vCPU休眠结束之后会调用`vmx_post_block` => `__pi_post_block`这时候vCPU结束睡眠被重新调度。
 注意这里会更新NDST并将vCPU从pCPU等待链表上删除，并且把NV置位`POSTED_INTR_VECTOR`。
 
