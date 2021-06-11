@@ -301,9 +301,9 @@ Pre Block阶段过后会调用`kvm_vcpu_block`，在这个函数中会调用schd
 可以从这么一种场景理解：如果vcpu0和vcpu1都在同一个物理CPU上运行，某一时刻vcpu0正在运行，
 vcpu1还处于休眠状态，这是外部设备产生了一个中断需要注入到vcpu1上：
 
-* 1. Device会按照初始化配置的MSI-x中断格式给提交一个Interrupt Reqeust，由于提交的是Remapping格式中断会被IOMMU截获。
-* 2. IOMMU查询IRTE解析出vcpu1对应点PD和NV（notification vector），但此时vcpu1还在睡觉，因此NV是被设置成wakeup vector的。
-* 3. 物理cpu接收到wakeup interrupt，导致正在运行的vcpu0被kick到root模式下，在wakeup interrupt handler中遍历`blocked_vcpu_on_cpu`链表，
+* Device会按照初始化配置的MSI-x中断格式给提交一个Interrupt Reqeust，由于提交的是Remapping格式中断会被IOMMU截获。
+* IOMMU查询IRTE解析出vcpu1对应点PD和NV（notification vector），但此时vcpu1还在睡觉，因此NV是被设置成wakeup vector的。
+* 物理cpu接收到wakeup interrupt，导致正在运行的vcpu0被kick到root模式下，在wakeup interrupt handler中遍历`blocked_vcpu_on_cpu`链表，
 得知vcpu1上有个中断需要处理，将vcpu1扔到运行队列中，将vcpu从Block状态变为Runnale状态。
 
 ```c
