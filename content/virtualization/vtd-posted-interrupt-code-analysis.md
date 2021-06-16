@@ -363,3 +363,7 @@ static void __pi_post_block(struct kvm_vcpu *vcpu)
 }
 ```
 剩下一种状态转换路径 vCPU从 Runable => Blocked状态，这和从Running状态切换成Blocked状态一致，这里不再赘述！
+
+整个VT-d Posted Interrupt 工作原理如下图所示：
+
+![vtd posted interrupt](../images/vtd-posted-interrupt-explain.svg)

@@ -261,6 +261,10 @@ static irqreturn_t vfio_msihandler(int irq, void *arg)
 
 ![device passthrough interrupt handling](../images/interrupt-remapping-pic.PNG)
 
+或者参考一下下面的原理图：
+
+![vt-d interrupt remapping](../images/vtd-interrupt-remapping-explain.svg)
+
 总结一下中断重映射Enable和处理流程：
 ```
 QEMU向虚拟机呈现设备的PCI配置空间信息 
