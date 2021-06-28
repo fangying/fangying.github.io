@@ -192,50 +192,11 @@ Nvidia vGPU方案中使用mdev框架对GPU进行分时复用，可以将一个GP
 
 [https://patchwork.freedesktop.org/series/66987/](https://patchwork.freedesktop.org/series/66987/)
 
-这个是最近Jason Wang在搞的一个东东，目的是为了搞一个基于mdev的virtio卸载技术方案，
+这个是最近Jason Wang在搞的一个东东，目的是为了搞一个vDPA的技术方案，
 这个方案还是有点意思。我们知道virtio半虚拟化通过前后端内存共享的方式，减少了IO过程中的数据拷贝流程，
-提升了模拟设备的性能，virtio和mdev结合则可以进一步提升性能，因为我们可以直接将virtio virtqueue里面的
-io请求地址提供硬件，让硬件直接通过DMA从virtqueue里面做IO请求，是不是很赞？
-
-简单地分析了一下他的这组补丁，补丁为mdev device新增了一个`class id`的概念（设备在创建的时候要指定自己的class id），
-通过这个`class id`去区分设备类，然后还向mdev device里面塞进了一个`vfio_mdev_device_ops`指针，
-这使得vfio-mdev设备和virtio-mdev设备可以拥有不同的callback函数组。
-为此还对`mdev_parent_ops`做了改动，将设备驱动callback单独挪到了`vfio_mdev_device_ops`里面，
-这样以后`mdev_parent_ops`专职负责mdev device的创建、销毁和sysfs接口处理了。
-
-```c
-struct mdev_device {
-        struct device dev;
-        struct mdev_parent *parent;
-        guid_t uuid;
-        void *driver_data;
-        struct list_head next;
-        struct kobject *type_kobj;
-        struct device *iommu_device;
-        bool active;
-+       u16 class_id;
-+       union {
-+               const struct vfio_mdev_device_ops *vfio_ops;
-+       };
-};
-
-+static const struct vfio_mdev_device_ops vfio_mdev_ops = {
-+	.open			= vfio_ap_mdev_open,
-+	.release		= vfio_ap_mdev_release,
-+	.ioctl			= vfio_ap_mdev_ioctl,
-+};
-
- static const struct mdev_parent_ops vfio_ap_matrix_ops = {
- 	.owner			= THIS_MODULE,
- 	.supported_type_groups	= vfio_ap_mdev_type_groups,
- 	.mdev_attr_groups	= vfio_ap_mdev_attr_groups,
- 	.create			= vfio_ap_mdev_create,
- 	.remove			= vfio_ap_mdev_remove,
--	.open			= vfio_ap_mdev_open,
--	.release		= vfio_ap_mdev_release,
--	.ioctl			= vfio_ap_mdev_ioctl,
- };
-```
+提升了模拟设备的性能。vDPA的核心思想是Qemu模拟vDPA设备的控制面，**将设备的数据面直接卸载到硬件上**，
+因为我们可以直接将virtio virtqueue里面的io请求地址提供给硬件，让硬件直接通过DMA从virtqueue里面做IO请求，是不是很赞？
+这个vDPA方案要求硬件支持virtqueue作为数据面，目前只有少量新硬件支持。
 
 ## 4. Refs
 
