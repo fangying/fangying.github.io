@@ -36,6 +36,7 @@ Hi，我叫Fang Ying，Yori Fang是我的英文名字。 出生于1990年7月，
 * 2019.10.16  Limin Chang 捐赠 50 RMB
 * 2021.4.3    X-Prologue 捐赠 100 RMB
 * 2021.6.8    疯狂小企鹅 捐赠 10 RMB
+* 2021.7.27   olly 捐赠 20 RMB
 
 ---------------------------------------
 
@@ -67,3 +68,4 @@ You can conntact with me via WeChat, and can also encourage me to keep writting 
 * 2019.10.16  Limin Chang donated 50 RMB
 * 2021.4.3    X-Prologue donated 100 RMB
 * 2021.6.8    Crazy penguin donated 10 RMB
+* 2021.7.27   olly donated 20 RMB
