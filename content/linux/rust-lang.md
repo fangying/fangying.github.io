@@ -126,6 +126,14 @@ rust-gdb使用方法：
 * 例如: let mytype: &MyType = &x.lock().unwrap() //借用
 * 或者: let mytype = *x.lock().unwrap() //解引用
 
+关于Rust函数入参：mut a:&T 和a:&mut T的区别
+| Rust          | C/C++            | 含义            | 解释                 |
+| ------------- | ---------------- | ----------------- | ---------------------- |
+| a:&T          | const T* const a | 都不能修改   | 不可变引用的不可变绑定 |
+| mut a: &T     | const T* a       | 不能修改a指向内容 | 不可变引用的可变绑定 |
+| a: &mut T     | T * const a      | 不能修改a     | 可变引用的不可变绑定 |
+| mut a: &mut T | T* a             | 都可以修改   | 可变引用的可变绑定 |
+参考：https://www.zhihu.com/search?type=content&q=%26mut%20*mut
 ### Ref
 
 1. [Rust Programming Language (wikipedia)](https://en.wikipedia.org/wiki/Rust_(programming_language))
