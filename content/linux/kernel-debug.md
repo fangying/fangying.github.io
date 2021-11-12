@@ -14,36 +14,50 @@ Summary: Debug Linux Kernel
 ## 重新编译内核
 
 编译的时候开启内核参数CONFIG_DEBUG_INFO和CONFIG_GDB_SCRIPTS再进行编译，
-如果硬件支持CONFIG_FRAME_POINTER也一并开启．
+如果硬件支持CONFIG_FRAME_POINTER也一并开启，但要关闭CONFIG_DEBUG_INFO_REDUCED。
 
 ```bash
+cd /home/fang/Code/opensrc/linux
 make modules -j`nproc`
 make -j`nproc` 
 ```
 
 ## 调试内核
 
-用下的命令行拉起QEMU，这里可以从自己的OS上选取一个initramfs传给QEMU，
+用下的命令行拉起QEMU，这里可以从自己的OS上选取一个initramfs传给QEMU或者直接挂载一个rootfs镜像，
 记得配上`nokaslr`以免内核段基地址被随机映射．
 这里`-S`参数可以让QEMU启动后CPU先Pause住不运行，
 `-s`参数是`-gdb tcp::1234`的简写，意思是让QEMU侧的gdb server侦听在1234端口等待调试．
 
 ```bash
-/mnt/code/qemu/x86_64-softmmu/qemu-system-x86_64 \
-    -machine pc-i440fx-2.8,accel=kvm,kernel_irqchip \
-    -cpu host \
-    -m 4096,slots=4,maxmem=16950M \
+/data/vm/qemu/x86_64-softmmu/qemu-system-x86_64 \
+	-machine pc,accel=kvm \
+	-cpu host \
     -smp 4 \
-    -chardev pty,id=charserial0 \
-    -device isa-serial,chardev=charserial0,id=serial0 \
-    -netdev tap,id=tap0,ifname=virbr0-nic,vhost=on,script=no \
-    -device virtio-net-pci,netdev=tap0 \
-    -kernel $KERNEL_SRC/arch/x86/boot/bzImage \
-    -initrd /boot/vmlinuz-4.14.0-rc2-fangying \
-    -append 'console=ttyS0 nokaslr' \
-    -vnc :9 \
-    -S -s
+	-m 4096M \
+	-nodefaults \
+	-nographic \
+	-drive id=test,file=$(pwd)/fedora33.raw,format=raw,if=none \
+	-device virtio-blk-pci,drive=test \
+	-netdev tap,id=tap,ifname=virbr0-tap,script=no,downscript=no \
+	-device virtio-net-pci,netdev=tap \
+	-kernel /home/fang/Code/opensrc/linux/vmlinux \
+	-append "nokaslr earlyprintk=ttyS0 console=ttyS0 tsc=realiable root=/dev/vda rw" \
+	-serial stdio -S -s
 ```
+用上面的qemu脚本拉起虚拟机，关键是最后的`-S -s`参数的含义是让qemu运行内建的gdbserver并监听在本地的1234
+端口。**注意**：测试发现高版本的qemu内建的gdbserver好像有兼容性问题，我用qemu-6.0发现无法调试内核，
+但是回退到qemu-4.0可以调试内核。下载qemu自己编译一个合适的版本：
+```
+git clone https://github.com/qemu/qemu.git
+cd qemu
+git checkout v4.0.0
+./configure --enable-kvm --target-list=x86_64-softmmu --disable-werror
+make -j
+# 目标文件是：
+x86_64-softmmu/qemu-system-x86_64
+```
+
 gdb可能会报错`Remote 'g' packet reply is too long:`，这个时候的解决办法是打上一个补丁然后重新编译gdb.
 
 问题处在static void process_g_packet (struct regcache *regcache)函数，6113行，屏蔽对buf_len的判断．
@@ -135,3 +149,5 @@ x86_64-softmmu/qemu-system-x86_64 \
 ## 参考文献
 
 1.[linux kernel debug with qemu](http://nickdesaulniers.github.io/blog/2018/10/24/booting-a-custom-linux-kernel-in-qemu-and-debugging-it-with-gdb/)
+
+2.[Debugging kernel and modules via gdb](https://01.org/linuxgraphics/gfx-docs/drm/dev-tools/gdb-kernel-debugging.html)
