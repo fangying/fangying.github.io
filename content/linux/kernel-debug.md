@@ -58,7 +58,8 @@ make -j
 x86_64-softmmu/qemu-system-x86_64
 ```
 
-gdb可能会报错`Remote 'g' packet reply is too long:`，这个时候的解决办法是打上一个补丁然后重新编译gdb.
+如果运行后，gdb可能会报错`Remote 'g' packet reply is too long:`，
+这个时候的解决办法是打上一个补丁然后重新编译gdb.
 
 问题处在static void process_g_packet (struct regcache *regcache)函数，6113行，屏蔽对buf_len的判断．
 
@@ -100,9 +101,16 @@ gdb可能会报错`Remote 'g' packet reply is too long:`，这个时候的解决
     }
 ```
 
+编辑~/.gdbinit文件，让gdb自动加载vmlinux-gdb.py文件，
+```
+add-auto-load-safe-path /path/to/linux-build
+```
 开始愉快地调试内核了:
 ```bash
-$ gdb vmlinux 
+$ cd linux
+$ gdb vmlinux
+$ lx-symbols
+$ 
 (gdb) target remote :1234
 Remote debugging using :1234
 0x000000000000fff0 in cpu_hw_events ()
