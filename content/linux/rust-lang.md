@@ -137,6 +137,16 @@ rust-gdb使用方法：
 
 参考: [https://www.zhihu.com/search?type=content&q=%26mut%20*mut](https://www.zhihu.com/search?type=content&q=%26mut%20*mut)
 
+零成本抽象：
+
+Rust中零成本抽象是基于范型和Trait来实现的。
+
+关于智能指针：
+
+智能指针是指实现了Deref Trait或者Drop Trait语义的类型。
+智能指针的**智能**体现在：（1）可以自动解引用；（2）可以自动管理内存，安全无忧；
+
+
 ### Reference
 
 1. [Rust Programming Language (wikipedia)](https://en.wikipedia.org/wiki/Rust_(programming_language))
