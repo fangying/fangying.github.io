@@ -822,3 +822,26 @@ virsh qemu-monitor-command vmname '{"execute": "device-list-properities, "argume
 grubby --update-kernel=ALL --args=console=ttyS0,115200
 systemctl start serial-getty@ttyS0.service
 ```
+
+## 配置SRIOV网卡
+
+注意：virtio-net网卡的mac地址是通过virtio_net_config配置给虚拟机的。·
+```
+...
+ <devices>
+   ...
+   <interface type='hostdev' managed='yes'>
+     <source>
+       <address type='pci' domain='0' bus='11' slot='16' function='0'/>
+     </source>
+     <mac address='52:54:00:6d:90:02'>
+     <vlan>
+        <tag id='42'/>
+     </vlan>
+     <virtualport type='802.1Qbh'>
+       <parameters profileid='finance'/>
+     </virtualport>
+   </interface>
+   ...
+ </devices>
+```
