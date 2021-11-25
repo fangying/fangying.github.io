@@ -597,11 +597,12 @@ bind到vfio-pci驱动上
 ```
 readlink /sys/bus/pci/devices/0000:00:1f.6/iommu_group
 
-echo "bind"
+echo "bind to vfio-pci"
+echo 0000:00:1f.6 > /sys/bus/pci/devices/0000:00:1f.6/driver/unbind
 echo "vfio-pci" > "/sys/bus/pci/devices/0000:00:1f.6/driver_override"
 echo 0000:00:1f.6 > /sys/bus/pci/drivers_probe
 
-echo "unbind"
+echo "bind back"
 echo "0000:00:1f.6" > "/sys/bus/pci/devices/0000:00:1f.6/driver/unbind"
 echo "0000:00:1f.6" > /sys/bus/pci/drivers_probe
 ```
