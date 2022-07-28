@@ -26,6 +26,10 @@ Hi，我叫Fang Ying，Yori Fang是我的英文名字。 出生于1990年7月，
 ![wx-fangying](https://kernelgo.org/images/wx-fangying.jpg)
 ![wx-zanshang](https://kernelgo.org/images/wx-zanshang.jpg)
 
+这里推荐一下组里大佬的虚拟化Tech Blog，欢迎小伙伴们关注和订阅。
+
+![ZhouYiBo](https://kernelgo.org/images/wx-zhouyibo.jpg)
+
 ### 捐赠列表
 
 * 2020.10.8  CDX 捐赠100 RMB
