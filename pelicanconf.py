@@ -3,10 +3,10 @@ SITENAME = 'kernel.love'
 SITEURL = 'https://kernel.love'
 TIMEZONE = 'Asia/Shanghai'
 
-DEFAULT_LANG = 'zh'
-DATE_FORMATS = {'zh':'%Y-%m-%d %H:%M'}
 
 PATH = 'content'
+DEFAULT_LANG = u'en'
+DATE_FORMATS = {'zh':'%Y-%m-%d %H:%M'}
 
 # Feed generation is usually not desired when developing
 FEED_ALL_ATOM = None
@@ -28,6 +28,7 @@ SOCIAL = (('https://github.com/fangying', '#'),
 # defaults
 DEFAULT_PAGINATION = False
 USE_FOLDER_AS_CATEGORY = True
+DELETE_OUTPUT_DIRECTORY = False
 
 # markdown extensions
 md_extensions = [
