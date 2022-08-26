@@ -27,7 +27,7 @@ after_success:
 - cd output
 - git init
 - git config user.name "Yori Fang"
-- git config user.email "fangying2725@gmail.com"
+- git config user.email "fangying712@gmail.com"
 - git config --global push.default simple
 - echo "kernelgo.org" >> CNAME
 - git add .
