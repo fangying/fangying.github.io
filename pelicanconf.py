@@ -80,4 +80,4 @@ SITE_DESCRIPTION = (
         )
 
 # show site license
-SITE_LICENSE = u'<span xmlns:dct="http://purl.org/dc/terms/" property="dct:title"> kernelgo"</span> by <a xmlns:cc="http://creativecommons.org/ns#" href="https://kernel.love" property="cc:attributionName" rel="cc:attributionURL">Yori Fang</a> is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/3.0/deed.en_US">Creative Commons Attribution-ShareAlike 3.0 Unported License</a>.'
+SITE_LICENSE = u'<span xmlns:dct="http://purl.org/dc/terms/" property="dct:title"> kernel.love"</span> by <a xmlns:cc="http://creativecommons.org/ns#" href="https://kernel.love" property="cc:attributionName" rel="cc:attributionURL">Yori Fang</a> is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/3.0/deed.en_US">Creative Commons Attribution-ShareAlike 3.0 Unported License</a>.'
