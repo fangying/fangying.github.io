@@ -23,5 +23,8 @@ jobs:
     - name: Build
       run: make html
       
+    - name: Prepare
+      run: chmod +x deploy.sh
+
     - name: Deploy
       run: ./deploy.sh
