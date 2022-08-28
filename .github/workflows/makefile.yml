@@ -13,18 +13,18 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-      
+
     - name: Install dependencies
       run: pip install -r requirements.txt
-      
+
     - name: Pull submodules
       run: git submodule update --init --recursive
-      
+
     - name: Build
       run: make html
-      
-    - name: Prepare
-      run: chmod +x deploy.sh
 
     - name: Deploy
-      run: ./deploy.sh
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./output
