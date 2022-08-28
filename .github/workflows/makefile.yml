@@ -17,5 +17,8 @@ jobs:
     - name: Install dependencies
       run: pip install -r requirements.txt
       
+    - name: Pull submodules
+      run: git submodule update --recursive
+      
     - name: Build
       run: make html
