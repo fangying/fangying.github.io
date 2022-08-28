@@ -9,4 +9,4 @@ git config --global push.default simple
 git commit -m "latest release `date +"%Y-%m-%d %H:%M"`"
 git remote add upstream "git@github.com:YoriFang/yorifang.github.io.git"
 echo "kernel.love" >> CNAME
-git push -u upstream html --force
+git push -u upstream main --force
