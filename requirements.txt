@@ -1,0 +1,12 @@
+beautifulsoup4
+cssmin
+cssutils
+ghp-import
+markdown
+pelican
+peru
+pysvg
+typogrify
+webassets
+Pillow
+Piexif
