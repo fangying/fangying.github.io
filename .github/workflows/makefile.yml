@@ -23,12 +23,5 @@ jobs:
     - name: Build
       run: make html
       
-  deploy:
-
-    runs-on: ubuntu-latest
-    needs: build
-    
-    steps:
-    
     - name: Deploy
       run: ./deploy.sh
