@@ -66,7 +66,7 @@ MENUITEMS = (
 
 SITEMAP = {
         "format": "xml",
-        "priorities": {"articles": 0.8, "indexes": 0.8, "pages": 0.8},
+        "priorities": {"articles": 0.5, "indexes": 0.5, "pages": 0.5},
         "changefreqs": {"articles": "monthly", "indexes": "daily", "pages": "monthly"},
         }
 
