@@ -5,7 +5,7 @@ TIMEZONE = 'Asia/Shanghai'
 
 
 PATH = 'content'
-DEFAULT_LANG = u'zh'
+DEFAULT_LANG = u'en'
 DATE_FORMATS = {'zh':'%Y-%m-%d %H:%M'}
 
 # Feed generation is usually not desired when developing

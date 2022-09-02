@@ -19,13 +19,13 @@ Hi，我叫Fang Ying，Yori Fang是我的英文名字。 出生于1990年7月，
 
 * Mail:   fangying2725@gmail.com
 * Github: https://github.com/fangying
-* WeChat: [Yori Fang](https://kernelgo.org/pages/about.html)
+* WeChat: [Yori Fang](https://kernel.love/pages/about.html)
 
 也可以通过WeChat赞赏来支持这个站点（所有的赞赏都会列出在本站中，非营利性用途，用于支付域名和Cloud Server的费用）。
 感谢您的支持，一起学习一起进步，加油！
 
-![wx-fangying](https://kernelgo.org/images/wx-fangying.jpg)
-![wx-zanshang](https://kernelgo.org/images/wx-zanshang.jpg)
+![wx-fangying](https://kernel.love/images/wx-fangying.jpg)
+![wx-zanshang](https://kernel.love/images/wx-zanshang.jpg)
 
 ### 捐赠列表
 
@@ -53,7 +53,7 @@ technology based on DPU environment.
 
 * Mail:   fangying2725@gmail.com
 * Github: https://github.com/fangying
-* WeChat: [Yori Fang](https://kernelgo.org/pages/about.html)
+* WeChat: [Yori Fang](https://kernel.love/pages/about.html)
 
 You can conntact with me via WeChat, and can also encourage me to keep writting by donation.
 
