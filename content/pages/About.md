@@ -42,16 +42,14 @@ Hi，我叫Fang Ying，Yori Fang是我的英文名字。 出生于1990年7月，
 ---------------------------------------
 
 Hi all, my name is Fang Ying and Yori Fang is my English name.
-
-I was born in July 1990.
-
-Graduated From:
+I was born in July 1990 and Graduated From:
 
 *   College of Electronic and Information Zhejiang University as Master 2013-2016
 *   College of Computer Science and Engineering Northeastern University as Bachelor 2009-2013
 
-I'm now working on things related to linux kernel and OS virtualization. I'm a virtualization developer,
-working on KVM and QEMU.
+I'm now working on things related to linux kernel and OS virtualization. Mainly focus on
+working feature development for KVM and QEMU, ligh weight virtual machine runtime and virtualization
+technology based on DPU environment.
 
 * Mail:   fangying2725@gmail.com
 * Github: https://github.com/fangying
