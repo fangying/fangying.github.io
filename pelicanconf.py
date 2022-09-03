@@ -74,6 +74,8 @@ SITEMAP = {
 IGNORE_FILES=['drafts/*']
 
 # SEO
+GOOGLE_ANALYTICS = 'G-946NSPLZFL'
+
 SITE_DESCRIPTION = (
         "Happy Coding",
         "Kernel & Love"
