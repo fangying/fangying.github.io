@@ -22,8 +22,8 @@ LINKS = (('kernel', 'https://kernel.org/'),
         ('You can modify those links in your config file', '#'),)
 
 # Social widget
-SOCIAL = (('https://github.com/fangying', '#'),
-        ('Another social link', '#'),)
+SOCIAL = (('github', 'https://github.com/fangying'),
+         ('Another social link', '#'),)
 
 # defaults
 DEFAULT_PAGINATION = False
