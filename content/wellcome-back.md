@@ -10,5 +10,4 @@ Slug: wellcome-back
 少了。让不少喜欢这个技术博客的小伙伴们比较失望，经常碰到小伙伴问我为啥最近没有更新了，
 这让我深感惭愧！
 
-所以今天重新收拾了一下博客，换了一个域名: [https://kernel.love](https://kernel.love)，
-重新出发，加油！
+所以今天重新收拾了一下博客，换了一个域名: [https://kernel.love](https://kernel.love)，重新出发，加油！
