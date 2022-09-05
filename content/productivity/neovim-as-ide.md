@@ -1,5 +1,6 @@
 Title: 打造全功能Neovim IDE
 Date: 2022-9-03 20:20
+Tags: neovim
 Slug: neovim-as-ide
 
 ![Neovim](../images/neovim-as-ide.png)

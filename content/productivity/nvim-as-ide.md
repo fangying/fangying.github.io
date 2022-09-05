@@ -1,5 +1,6 @@
 Title: 打造开箱即用的Neovim IDE
 Date: 2022-9-04 8:20
+Tags: nvim
 Slug: nvim-as-ide
 
 # 1. 前言
