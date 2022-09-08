@@ -3,6 +3,10 @@ Date: 2022-9-04 8:20
 Tags: nvim
 Slug: nvim-as-ide
 
+
+
+![nvim-as-ide](../images/nvim-as-ide.png)
+
 # 1. 前言
 
 自从Neovim横空出世之后，提供了比Vim更好的可扩展性。后来Vim也觉醒了不再固步自封，开始追赶Neovim的步伐。二者之间良性竞争，互相吸纳对方的优点。经过多年的发展，二者之间的差异已经比较小了，大部分三方插件都能同时兼容Neovim和Vim。Neovim和Vim两个项目是开源项目间竞争发展的一个好的例子。
@@ -64,7 +68,7 @@ dotfiles仓库里面包含了我自己在用的nvim，tmux，alacritty配置文�
 coc.nvim提供了一站式的LSP服务，集成了众多的语言LSP Server，建议看下`coc.nvim`的项目文档，了解`coc.nvim`的具体使用方法。初始化之后，我们安装一些必要的`coc.nvim`集成的子插件。例如，下面的命令coc会帮忙安装json，rust-analyzer，clangd，go，typescript等语言的LSP Server这样可以支持对语言的自动补全。
 
 ```bash
-:CocInstall coc-json coc-rust-analyzer coc-clangd coc-go coc-tsserver coc-yaml coc-snippets
+:CocInstall coc-json coc-python coc-rust-analyzer coc-clangd coc-go coc-tsserver coc-yaml coc-snippets
 ```
 
 也可以安装一个叫做coc-marketplace的插件，这样可以用marketplace查看和管理coc的各种插件。
