@@ -12,13 +12,10 @@ Hi all, my name is Fang Ying and Yori Fang is my English name. I was born in Jul
 * College of Electronic and Infomation Zhejiang University as Master 2013-2016
 * College of Computer Science Northeastern University as Bachelor 2009-2013
 
-I'm now working on things related to linux kernel and OS virtualization. Mainly focus on
-working feature development for KVM and QEMU, ligh weight virtual machine runtime and virtualization
-technology based on DPU environment.
+I'm now working on things related to linux kernel and OS virtualization. Mainly focus on feature development for KVM and QEMU, light weight virtual machine runtime and virtualization technology based on DPU environment.
 
 You can keep in touch with me using:
 
 * eMail:  [fangying712@gmail.com](fangying712@gmail.com)
 * Github: [https://github.com/fangying](https://github.com/fangying)
 * WeChat: [Yori Fang](https://kernelgo.org/pages/about.html)
-
