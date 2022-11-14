@@ -14,6 +14,8 @@ Linux虚拟机通常能够在半虚拟化下工作的很好，因为内核本身
 这些特性会让Windows和HyperV的Guest认为他们运行在HyperV兼容的Hypervisor上，
 这样Guest就会自动开启一些半虚拟化的性能优化。
 
+翻译原文：![hyper-v enlightenment](https://www.qemu.org/docs/master/system/i386/hyperv.html)
+
 ### 设置HyperV启迪
 
 默认情况下Qemu/KVM不会开启任何的HyperV启迪，qemu支持将单个的启迪特性通过cpu flags配置传入来尝试使能，例如：
