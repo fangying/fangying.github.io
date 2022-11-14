@@ -190,7 +190,7 @@ Windows和HyperV Guest需要知道这个信息来合适的消除SMT相关的CPU 
 *   **hv-version-id-minor** 设置'Minor Version'（16bits）
 *   **hv-version-id-spack** 设置‘Service Pack’ (32bits)
 *   **hv-version-id-sbranch** 设置'Service Branch'（8bits）
-*  ** hv-version-id-snumber** 设置‘Service Number’ (24bits)
+*   **hv-version-id-snumber** 设置‘Service Number’ (24bits)
 
 注意：**hv-version-id-x**不是启迪特性，因此在没有其他启迪特性配置的时候不会使能这个HyperV标志。
 
