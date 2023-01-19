@@ -23,7 +23,7 @@ Slug: para-virt-remote-tlb-flush
 因此`HAVE_RCU_TABLE_FREE`被引入来释放这些页。
 这会确保所有的cpu会在释放页之前，至少调用一次`smp_callback`过程。
 
-这组patch依赖于 ticketlocks[1] and KVM Paravirt Spinlock patches[2]
+这组patch依赖于 ticketlocks and KVM Paravirt Spinlock patches。
 
 ```
 Nikunj A. Dadhania (6):

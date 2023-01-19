@@ -6,7 +6,11 @@ Slug: hyperv-enlightenment
 
 ![hyperv-logo](https://www.pikpng.com/pngl/m/361-3613517_microsoft-hyper-v-logo-microsoft-hyper-v-logo.png)
 
-本文不是为了分析HyperV，而是来分析一下当前KVM中对hyperv的一些增强的支持，这些HyperV增强能过对KVM场景下Windows虚拟机的性能有提升帮助。
+
+
+本文不是为了分析HyperV，而是来分析一下当前KVM中对hyperv的一些增强的支持，
+
+这些HyperV Enlightenment能够对KVM场景下Windows虚拟机的性能提升有帮助。
 在大多数场景下通过软件模拟的硬件性能会比较差，为此KVM实现了自己的半虚拟化接口。
 Linux虚拟机通常能够在半虚拟化下工作的很好，因为内核本身会同步支持半虚拟化。
 但通常来说为一些闭源的操作系统来实现这些就比较困难了，例如Microsoft Windows。
@@ -14,7 +18,7 @@ Linux虚拟机通常能够在半虚拟化下工作的很好，因为内核本身
 这些特性会让Windows和HyperV的Guest认为他们运行在HyperV兼容的Hypervisor上，
 这样Guest就会自动开启一些半虚拟化的性能优化。
 
-翻译原文：![hyper-v enlightenment](https://www.qemu.org/docs/master/system/i386/hyperv.html)
+翻译原文：[hyper-v enlightenment](https://www.qemu.org/docs/master/system/i386/hyperv.html)
 
 ### 设置HyperV启迪
 
@@ -253,5 +257,4 @@ Hyper-V顶级功能spec和其他信息：
 
 * https://github.com/MicrosoftDocs/Virtualization-Documentation
 * https://docs.microsoft.com/en-us/virtualization/hyper-v-on-windows/tlfs/tlfs
-
 
