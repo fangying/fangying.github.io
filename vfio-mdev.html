@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://kernelgo.org/theme/css/style.min.css?fc5adb95">
+
+        <link rel="dns-prefetch" href="//fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin>
+
+        <meta name="author" content="Yori Fang" />
+
+        <meta name="description" content="VFIO mdev Framework
+" />
+        <meta property="og:type" content="article" />
+        <meta name="twitter:card" content="summary">
+
+<meta name="keywords" content="vfio mdev, virtualization, " />
+
+<meta property="og:title" content="VFIO Mediated Devices Introduction "/>
+<meta property="og:url" content="https://kernelgo.org/vfio-mdev.html" />
+<meta property="og:description" content="VFIO mdev Framework" />
+<meta property="og:site_name" content="kernelgo" />
+<meta property="og:article:author" content="Yori Fang" />
+<meta property="og:article:published_time" content="2019-10-31T23:00:00+08:00" />
+<meta name="twitter:title" content="VFIO Mediated Devices Introduction ">
+<meta name="twitter:description" content="VFIO mdev Framework">
+
+        <title>VFIO Mediated Devices Introduction  · kernelgo
+</title>
+<script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+     (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+     m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+     })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+    ga('create', 'UA-107392039-1', 'auto');
+    ga('send', 'pageview');
+</script>
+
+
+    </head>
+    <body>
+        <div id="content">
+            <div class="navbar navbar-static-top">
+                <div class="navbar-inner">
+                    <div class="container-fluid">
+                        <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                        </a>
+                        <a class="brand" href="https://kernelgo.org/"><span class=site-name>kernelgo</span></a>
+                        <div class="nav-collapse collapse">
+                            <ul class="nav pull-right top-menu">
+                                <li >
+                                    <a href=
+                                       https://kernelgo.org
+                                    >Home</a>
+                                </li>
+                                <li ><a href="https://kernelgo.org/pages/about.html">About</a></li>
+                                <li ><a href="https://kernelgo.org/categories.html">Categories</a></li>
+                                <li ><a href="https://kernelgo.org/tags.html">Tags</a></li>
+                                <li ><a href="https://kernelgo.org/archives.html">Archives</a></li>
+                                <li><form class="navbar-search" action="https://kernelgo.org/search.html" onsubmit="return validateForm(this.elements['q'].value);"> <input type="text" class="search-query" placeholder="Search" name="q" id="tipue_search_input"></form></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="container-fluid">
+                <div class="row-fluid">
+                    <div class="span1"></div>
+                    <div class="span10">
+<article itemscope>
+<div class="row-fluid">
+    <header class="page-header span10 offset2">
+        <h1>
+            <a href="https://kernelgo.org/vfio-mdev.html">
+                VFIO Mediated Devices Introduction
+            </a>
+        </h1>
+    </header>
+</div>
+
+<div class="row-fluid">
+        <div class="span8 offset2 article-content">
+            
+            <h2>0. VFIO Mdev Introduction</h2>
+<p>VFIO框架解决了设备直通的问题，使得用户态可以直接使用设备的DMA能力。
+VFIO使用IOMMU页表来对设备访问进行保护，将用户态对设备的访问限定在一个安全的域内。
+利用这个框架，我们可以将GPU、网卡适配器、一些计算加速器（例如：AI芯片，FPGA加速器）直接呈现给虚拟机。</p>
+<p>VFIO直通的缺点是单个PCIe设备只能直通给一台虚拟机,这样设备的利用率较低.
+为了能够提升设备资源的利用率就出现了SRIOV（Single Root I/O Virtualization）技术。
+SRIOV技术就像孙悟空一样，从本体是上拔出一根猴毛一吹，生成了多个分身，每个分身都有独自的战斗力。
+SRIOV技术将设备的本体称为PF（Physical Function），可以从PF上生成多个VF（Virtual Function）,
+多个VF之间使用PCIe ACS(Access Control Services)进行隔离，确保互相之间不会访问到对方的数据以确保安全。</p>
+<p>那么对于一些不具备SR_IOV能力的设备，如何来做到同时向多个用户态进程提供服务呢？
+Nvidia提出了基于VFIO的<a href="https://www.kernel.org/doc/Documentation/vfio-mediated-device.txt">VFIO Mdev框架</a>来解决这个问题。
+<strong>在mdev模型的核心在于mdev会对硬件设备的状态进行抽象，将硬件设备的“状态”保存在mdev device数据结构中，
+设备驱动层面要求实现一个调度器，将多个mdev设备在硬件设备上进行调度（分时复用），
+从而实现把一个物理硬件设备分享给多个虚拟机实例进行使用。</strong></p>
+<h2>1. VFIO mdev框架Overview</h2>
+<p>下图是vfio mdev框架的示意图，这个框架对外提供了一组管理接口，其中包括：</p>
+<ul>
+<li>创建和销毁一个mdev</li>
+<li>从mdev bus driver上添加和删除一个mdev设备</li>
+<li>从IOMMU group上增加和删除一个mdev设备</li>
+</ul>
+<p><img alt="mdev_arch" src="../images/mdev_arch.svg"></p>
+<p>从框架来看Top Level是mdev bus driver，是为mdev虚拟的总线类型驱动，
+这里我们可以绑定到vfio上，于是就有了vfio mdev，不过目前好像就只设计了vfio mdev。
+可以通过调用<code>mdev_register_driver</code>向mdev bus添加<code>vfio_device_ops</code>的驱动。
+下面的一层是和物理设备相关的接口，可以调用<code>mdev_register_device</code>来注册某一个物理设备到mdev上，
+<code>mdev_register_device</code>传入了<code>mdev_parent_ops</code>参数，
+<code>mdev_parent_ops</code>是跟物理设备相关的驱动集合，例如它可以是nvidia的GPU设备驱动(nvidia.ko)的callback，
+可以是Intel集成显卡(i915.ko)的callback，还可以是s390设备驱动(ccw_device.ko)的callback。</p>
+<p>mdev在vfio的基础上通过增加一个mdev bus，然后在这个bus下挂载mdev设备，
+通过mdev的抽象，将和物理设备相关的驱动实现细节做了剥离，不同的厂商利用mdev框架去
+实现自家设备的vendor driver hook（可以是开源的，可以是闭源的）。
+Nvidia就是利用这个mdev框架去设计了Nvidia vGPU设备驱动，将自己的驱动实现细节做了闭源，这是Nvidia常用的套路。</p>
+<h2>2. VFIO mdev框架代码分析</h2>
+<p>从代码框架来看，vfio mdev首先提供了2个关键的注册接口，<code>mdev_register_driver</code>和<code>mdev_register_device</code>。</p>
+<p><strong>先看mdev bus driver</strong>，它提供了一个<code>mdev_register_driver</code>接口api来注册一个新的mdev driver，
+在<code>vfio_mdev_init</code>的时候注册了<code>mdev_driver</code>类型的<code>vfio_mdev_driver</code>。</p>
+<div class="highlight"><pre><span></span><code><span class="k">struct</span><span class="w"> </span><span class="nc">bus_type</span><span class="w"> </span><span class="n">mdev_bus_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">name</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;mdev&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">probe</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="n">mdev_probe</span><span class="p">,</span><span class="w">     </span><span class="c1">//设备加载</span>
+<span class="w">        </span><span class="p">.</span><span class="n">remove</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="n">mdev_remove</span><span class="p">,</span><span class="w">    </span><span class="c1">//设备卸载</span>
+<span class="p">};</span><span class="w"></span>
+<span class="n">EXPORT_SYMBOL_GPL</span><span class="p">(</span><span class="n">mdev_bus_type</span><span class="p">);</span><span class="w"></span>
+
+<span class="p">(</span><span class="n">mdev</span><span class="p">.</span><span class="n">ko</span><span class="p">)</span><span class="w"> </span><span class="n">mdev_init</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">mdev_bus_register</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">bus_register</span><span class="p">(</span><span class="o">&amp;</span><span class="n">mdev_bus_type</span><span class="p">);</span><span class="w">  </span><span class="c1">//将mdev_bus注册到系统上</span>
+
+<span class="k">struct</span><span class="w"> </span><span class="nc">mdev_driver</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">name</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="kt">int</span><span class="w">  </span><span class="p">(</span><span class="o">*</span><span class="n">probe</span><span class="p">)(</span><span class="k">struct</span><span class="w"> </span><span class="nc">device</span><span class="w"> </span><span class="o">*</span><span class="n">dev</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="kt">void</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">remove</span><span class="p">)(</span><span class="k">struct</span><span class="w"> </span><span class="nc">device</span><span class="w"> </span><span class="o">*</span><span class="n">dev</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="k">struct</span><span class="w"> </span><span class="nc">device_driver</span><span class="w"> </span><span class="n">driver</span><span class="p">;</span><span class="w">          </span><span class="c1">//定义结构体的时候，加上struct device_driver driver就表示driver类似</span>
+<span class="p">};</span><span class="w"></span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">mdev_register_driver</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">mdev_driver</span><span class="w"> </span><span class="o">*</span><span class="n">drv</span><span class="p">,</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">module</span><span class="w"> </span><span class="o">*</span><span class="n">owner</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="cm">/* initialize common driver fields */</span><span class="w"></span>
+<span class="w">        </span><span class="n">drv</span><span class="o">-&gt;</span><span class="n">driver</span><span class="p">.</span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">drv</span><span class="o">-&gt;</span><span class="n">name</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="n">drv</span><span class="o">-&gt;</span><span class="n">driver</span><span class="p">.</span><span class="n">bus</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&amp;</span><span class="n">mdev_bus_type</span><span class="p">;</span><span class="w">    </span><span class="c1">//driver的bus指定为mdev_bus</span>
+<span class="w">        </span><span class="n">drv</span><span class="o">-&gt;</span><span class="n">driver</span><span class="p">.</span><span class="n">owner</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">owner</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">        </span><span class="cm">/* register with core */</span><span class="w"></span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">driver_register</span><span class="p">(</span><span class="o">&amp;</span><span class="n">drv</span><span class="o">-&gt;</span><span class="n">driver</span><span class="p">);</span><span class="w"> </span><span class="c1">//注册设备驱动</span>
+<span class="p">}</span><span class="w"></span>
+<span class="n">EXPORT_SYMBOL</span><span class="p">(</span><span class="n">mdev_register_driver</span><span class="p">);</span><span class="w"></span>
+
+<span class="k">static</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">mdev_driver</span><span class="w"> </span><span class="n">vfio_mdev_driver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;vfio_mdev&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">probe</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="n">vfio_mdev_probe</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">remove</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vfio_mdev_remove</span><span class="p">,</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+
+<span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">__init</span><span class="w"> </span><span class="nf">vfio_mdev_init</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">mdev_register_driver</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vfio_mdev_driver</span><span class="p">,</span><span class="w"> </span><span class="n">THIS_MODULE</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>当mdev设备在加载的时候，mdev bus driver负责将设备绑定到指定的iommu group上，具体流程是：</p>
+<p>mdev create -&gt; mdev_probe -&gt; mdev_attach_iommu, drv-&gt;probe(dev) -&gt; vfio_mdev_probe -&gt; vfio_add_group_dev</p>
+<p><code>mdev_probe</code>的时候会创建一个iommu group，然后将设备添加到这个iommu group，
+再调用<code>vfio_mdev_probe</code>将设备添加到一个vfio group当中。</p>
+<p><strong>再看下mdev device driver</strong>，这里提供了<code>mdev_register_device</code> api来注册一个新的物理设备驱动（Physical Device Driver Interface），注意这儿有个概念叫做<code>parent_device</code>，其实指的就是一个特定的物理设备，而mdev device则是物理设备的一个“实例”。</p>
+<div class="highlight"><pre><span></span><code><span class="k">struct</span><span class="w"> </span><span class="nc">mdev_parent_ops</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="k">struct</span><span class="w"> </span><span class="nc">module</span><span class="w">   </span><span class="o">*</span><span class="n">owner</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="k">const</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">attribute_group</span><span class="w"> </span><span class="o">**</span><span class="n">dev_attr_groups</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="k">const</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">attribute_group</span><span class="w"> </span><span class="o">**</span><span class="n">mdev_attr_groups</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="k">struct</span><span class="w"> </span><span class="nc">attribute_group</span><span class="w"> </span><span class="o">**</span><span class="n">supported_type_groups</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">        </span><span class="kt">int</span><span class="w">     </span><span class="p">(</span><span class="o">*</span><span class="n">create</span><span class="p">)(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kobject</span><span class="w"> </span><span class="o">*</span><span class="n">kobj</span><span class="p">,</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">mdev_device</span><span class="w"> </span><span class="o">*</span><span class="n">mdev</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="kt">int</span><span class="w">     </span><span class="p">(</span><span class="o">*</span><span class="n">remove</span><span class="p">)(</span><span class="k">struct</span><span class="w"> </span><span class="nc">mdev_device</span><span class="w"> </span><span class="o">*</span><span class="n">mdev</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="kt">int</span><span class="w">     </span><span class="p">(</span><span class="o">*</span><span class="n">open</span><span class="p">)(</span><span class="k">struct</span><span class="w"> </span><span class="nc">mdev_device</span><span class="w"> </span><span class="o">*</span><span class="n">mdev</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="kt">void</span><span class="w">    </span><span class="p">(</span><span class="o">*</span><span class="n">release</span><span class="p">)(</span><span class="k">struct</span><span class="w"> </span><span class="nc">mdev_device</span><span class="w"> </span><span class="o">*</span><span class="n">mdev</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="kt">ssize_t</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">read</span><span class="p">)(</span><span class="k">struct</span><span class="w"> </span><span class="nc">mdev_device</span><span class="w"> </span><span class="o">*</span><span class="n">mdev</span><span class="p">,</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="n">__user</span><span class="w"> </span><span class="o">*</span><span class="n">buf</span><span class="p">,</span><span class="w"></span>
+<span class="w">                        </span><span class="kt">size_t</span><span class="w"> </span><span class="n">count</span><span class="p">,</span><span class="w"> </span><span class="n">loff_t</span><span class="w"> </span><span class="o">*</span><span class="n">ppos</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="kt">ssize_t</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">write</span><span class="p">)(</span><span class="k">struct</span><span class="w"> </span><span class="nc">mdev_device</span><span class="w"> </span><span class="o">*</span><span class="n">mdev</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="n">__user</span><span class="w"> </span><span class="o">*</span><span class="n">buf</span><span class="p">,</span><span class="w"></span>
+<span class="w">                        </span><span class="kt">size_t</span><span class="w"> </span><span class="n">count</span><span class="p">,</span><span class="w"> </span><span class="n">loff_t</span><span class="w"> </span><span class="o">*</span><span class="n">ppos</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="kt">long</span><span class="w">    </span><span class="p">(</span><span class="o">*</span><span class="n">ioctl</span><span class="p">)(</span><span class="k">struct</span><span class="w"> </span><span class="nc">mdev_device</span><span class="w"> </span><span class="o">*</span><span class="n">mdev</span><span class="p">,</span><span class="w"> </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">cmd</span><span class="p">,</span><span class="w"></span>
+<span class="w">                        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">arg</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="kt">int</span><span class="w">     </span><span class="p">(</span><span class="o">*</span><span class="n">mmap</span><span class="p">)(</span><span class="k">struct</span><span class="w"> </span><span class="nc">mdev_device</span><span class="w"> </span><span class="o">*</span><span class="n">mdev</span><span class="p">,</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">vm_area_struct</span><span class="w"> </span><span class="o">*</span><span class="n">vma</span><span class="p">);</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+</code></pre></div>
+
+<p><code>mdev_register_device</code>所做的事情是创建一个<code>parent device</code>并对其进行初始化
+(很奇怪，取名为<code>mdev_register_parent_device</code>似乎更合适啊）。
+<code>mdev</code> <code>parent</code>设备创建的时候，会在sysfs路径<code>/sys/class/mdev_bus/</code>下面创建一堆目录结构，
+用户态通过sysfs接口可以完成mdev设备创建，删除，查询等操作。</p>
+<div class="highlight"><pre><span></span><code><span class="cm">/*</span>
+<span class="cm"> * mdev_register_device : Register a device</span>
+<span class="cm"> * @dev: device structure representing parent device.</span>
+<span class="cm"> * @ops: Parent device operation structure to be registered.</span>
+<span class="cm"> *</span>
+<span class="cm"> * Add device to list of registered parent devices.</span>
+<span class="cm"> * Returns a negative value on error, otherwise 0.</span>
+<span class="cm"> */</span><span class="w"></span>
+<span class="kt">int</span><span class="w"> </span><span class="nf">mdev_register_device</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">device</span><span class="w"> </span><span class="o">*</span><span class="n">dev</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">mdev_parent_ops</span><span class="w"> </span><span class="o">*</span><span class="n">ops</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="k">struct</span><span class="w"> </span><span class="nc">mdev_parent</span><span class="w"> </span><span class="o">*</span><span class="n">parent</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="c1">// 创建 mdev_parent设备</span>
+<span class="w">        </span><span class="n">parent</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">kzalloc</span><span class="p">(</span><span class="k">sizeof</span><span class="p">(</span><span class="o">*</span><span class="n">parent</span><span class="p">),</span><span class="w"> </span><span class="n">GFP_KERNEL</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="c1">// 初始化mdev parent设备</span>
+<span class="w">        </span><span class="n">kref_init</span><span class="p">(</span><span class="o">&amp;</span><span class="n">parent</span><span class="o">-&gt;</span><span class="n">ref</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="n">init_rwsem</span><span class="p">(</span><span class="o">&amp;</span><span class="n">parent</span><span class="o">-&gt;</span><span class="n">unreg_sem</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">        </span><span class="n">parent</span><span class="o">-&gt;</span><span class="n">dev</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">dev</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="n">parent</span><span class="o">-&gt;</span><span class="n">ops</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ops</span><span class="p">;</span><span class="w">      </span><span class="c1">// 给mdev_parent_ops赋值</span>
+
+<span class="w">        </span><span class="c1">// 创建sysfs接口</span>
+<span class="w">        </span><span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">parent_create_sysfs_files</span><span class="p">(</span><span class="n">parent</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w"> </span>
+
+<span class="k">struct</span><span class="w"> </span><span class="nc">mdev_parent_ops</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="k">struct</span><span class="w"> </span><span class="nc">module</span><span class="w">   </span><span class="o">*</span><span class="n">owner</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="k">const</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">attribute_group</span><span class="w"> </span><span class="o">**</span><span class="n">dev_attr_groups</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="k">const</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">attribute_group</span><span class="w"> </span><span class="o">**</span><span class="n">mdev_attr_groups</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="k">struct</span><span class="w"> </span><span class="nc">attribute_group</span><span class="w"> </span><span class="o">**</span><span class="n">supported_type_groups</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">        </span><span class="kt">int</span><span class="w">     </span><span class="p">(</span><span class="o">*</span><span class="n">create</span><span class="p">)(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kobject</span><span class="w"> </span><span class="o">*</span><span class="n">kobj</span><span class="p">,</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">mdev_device</span><span class="w"> </span><span class="o">*</span><span class="n">mdev</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="kt">int</span><span class="w">     </span><span class="p">(</span><span class="o">*</span><span class="n">remove</span><span class="p">)(</span><span class="k">struct</span><span class="w"> </span><span class="nc">mdev_device</span><span class="w"> </span><span class="o">*</span><span class="n">mdev</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="kt">int</span><span class="w">     </span><span class="p">(</span><span class="o">*</span><span class="n">open</span><span class="p">)(</span><span class="k">struct</span><span class="w"> </span><span class="nc">mdev_device</span><span class="w"> </span><span class="o">*</span><span class="n">mdev</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="kt">void</span><span class="w">    </span><span class="p">(</span><span class="o">*</span><span class="n">release</span><span class="p">)(</span><span class="k">struct</span><span class="w"> </span><span class="nc">mdev_device</span><span class="w"> </span><span class="o">*</span><span class="n">mdev</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="kt">ssize_t</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">read</span><span class="p">)(</span><span class="k">struct</span><span class="w"> </span><span class="nc">mdev_device</span><span class="w"> </span><span class="o">*</span><span class="n">mdev</span><span class="p">,</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="n">__user</span><span class="w"> </span><span class="o">*</span><span class="n">buf</span><span class="p">,</span><span class="w"></span>
+<span class="w">                        </span><span class="kt">size_t</span><span class="w"> </span><span class="n">count</span><span class="p">,</span><span class="w"> </span><span class="n">loff_t</span><span class="w"> </span><span class="o">*</span><span class="n">ppos</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="kt">ssize_t</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">write</span><span class="p">)(</span><span class="k">struct</span><span class="w"> </span><span class="nc">mdev_device</span><span class="w"> </span><span class="o">*</span><span class="n">mdev</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="n">__user</span><span class="w"> </span><span class="o">*</span><span class="n">buf</span><span class="p">,</span><span class="w"></span>
+<span class="w">                        </span><span class="kt">size_t</span><span class="w"> </span><span class="n">count</span><span class="p">,</span><span class="w"> </span><span class="n">loff_t</span><span class="w"> </span><span class="o">*</span><span class="n">ppos</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="kt">long</span><span class="w">    </span><span class="p">(</span><span class="o">*</span><span class="n">ioctl</span><span class="p">)(</span><span class="k">struct</span><span class="w"> </span><span class="nc">mdev_device</span><span class="w"> </span><span class="o">*</span><span class="n">mdev</span><span class="p">,</span><span class="w"> </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">cmd</span><span class="p">,</span><span class="w"></span>
+<span class="w">                        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">arg</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="kt">int</span><span class="w">     </span><span class="p">(</span><span class="o">*</span><span class="n">mmap</span><span class="p">)(</span><span class="k">struct</span><span class="w"> </span><span class="nc">mdev_device</span><span class="w"> </span><span class="o">*</span><span class="n">mdev</span><span class="p">,</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">vm_area_struct</span><span class="w"> </span><span class="o">*</span><span class="n">vma</span><span class="p">);</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+</code></pre></div>
+
+<p><code>mdev_parent_ops</code>定义了一些属性，这些属性给QEMU/Libvirt等管理接口提供了一些查询和配置单个mdev设备实例的接口，
+例如：<code>dev_attr_groups</code>,<code>mdev_attr_groups</code>和<code>supported_config</code>等。</p>
+<ul>
+<li>dev_attr_groups: attributes of the parent device</li>
+<li>mdev_attr_groups: attributes of the mediated device</li>
+<li>supported_config: attributes to define supported configuration</li>
+</ul>
+<p><img alt="mdev" src="../images/vfio_mdev.svg"></p>
+<p>Nvidia vGPU方案中使用mdev框架对GPU进行分时复用，可以将一个GPU实例化成多个mdev vGPU设备，
+然后将不同的vGPU直通给不同的虚拟机，提升了GPU的使用效率，降低了GPU实例的成本。
+同时，mdev的作者为mdev框架提供了一些示例程序，阅读一个示例程序对我们理解mdev的工作原理有一定的帮助。</p>
+<h2>3. mdev based hardware virtio offloading</h2>
+<p><a href="https://patchwork.freedesktop.org/series/66987/">https://patchwork.freedesktop.org/series/66987/</a></p>
+<p>这个是最近Jason Wang在搞的一个东东，目的是为了搞一个vDPA的技术方案，
+这个方案还是有点意思。我们知道virtio半虚拟化通过前后端内存共享的方式，减少了IO过程中的数据拷贝流程，
+提升了模拟设备的性能。vDPA的核心思想是Qemu模拟vDPA设备的控制面，<strong>将设备的数据面直接卸载到硬件上</strong>，
+因为我们可以直接将virtio virtqueue里面的io请求地址提供给硬件，让硬件直接通过DMA从virtqueue里面做IO请求，是不是很赞？
+这个vDPA方案要求硬件支持virtqueue作为数据面，目前只有少量新硬件支持。</p>
+<h2>4. Refs</h2>
+<ol>
+<li><a href="https://www.linux-kvm.org/images/5/59/02x03-Neo_Jia_and_Kirti_Wankhede-vGPU_on_KVM-A_VFIO_based_Framework.pdf">VGPU ON KVM VFIO BASED MEDIATED DEVICE FRAMEWORK</a></li>
+<li><a href="https://www.kernel.org/doc/Documentation/vfio-mediated-device.txt">Virtual Function I/O (VFIO) Mediated device</a></li>
+<li><a href="https://www.dpdk.org/wp-content/uploads/sites/35/2018/06/Mediated-Devices-Better-Userland-IO.pdf">Mediated Device For Ethernet</a></li>
+<li><a href="http://on-demand.gputechconf.com/gtc-cn/2018/pdf/CH8903.pdf">持续助力数据中心虚拟化：KVM里的虚拟GPU</a></li>
+<li><a href="https://patchwork.kernel.org/cover/10820805/">Add migration support for VFIO device</a></li>
+</ol>
+
+
+             
+ 
+                <p id="post-share-links">
+    Share on:
+      <a href="https://twitter.com/intent/tweet?text=VFIO%20Mediated%20Devices%20Introduction&url=https%3A//kernelgo.org/vfio-mdev.html&hashtags=vfio-mdev" target="_blank" rel="nofollow noopener noreferrer" title="Share on Twitter">Twitter</a>
+ ❄       <a href="https://www.facebook.com/sharer/sharer.php?u=https%3A//kernelgo.org/vfio-mdev.html" target="_blank" rel="nofollow noopener noreferrer" title="Share on Facebook">Facebook</a>
+ ❄       <a href="mailto:?subject=VFIO%20Mediated%20Devices%20Introduction&amp;body=https%3A//kernelgo.org/vfio-mdev.html" target="_blank" rel="nofollow noopener noreferrer" title="Share via Email">Email</a>
+
+            
+            
+
+
+
+
+
+
+
+<section>
+    <h6 style="display:none;">Comments</h6>
+    <p id="comment-message"> </p>
+
+    <div class="accordion" id="accordion2">
+        <div class="accordion-group">
+            <div class="accordion-heading">
+                <a class="accordion-toggle disqus-comment-count comment-count collapsed"
+                   data-toggle="collapse"
+                   data-parent="#accordion2"
+                   data-disqus-identifier="https://kernelgo.org/vfio-mdev.html"
+                   href="https://kernelgo.org/vfio-mdev.html#comment_thread"
+                   id="comment-accordion-toggle">
+                    Comments
+                </a>
+            </div>
+            <div id="comment_thread" class="accordion-body collapse">
+                <div class="accordion-inner">
+                    <div class="comments">
+                        <div id="disqus_thread"></div>
+                        <script>
+    var disqus_shortname = 'kernelgo';
+    (function () {
+        var s = document.createElement('script'); s.async = true;
+        s.type = 'text/javascript';
+        s.src = '//' + disqus_shortname + '.disqus.com/count.js';
+        (document.getElementsByTagName('HEAD')[0] || document.getElementsByTagName('BODY')[0]).appendChild(s);
+    }());
+
+    var disqus_identifier = 'https://kernelgo.org/vfio-mdev.html';
+    var disqus_url = 'https://kernelgo.org/vfio-mdev.html';
+
+    (function() {
+        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    })();
+</script>
+
+<noscript>Please enable JavaScript to view the <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+            <hr/>
+            <aside>
+            <nav>
+            <ul class="articles-timeline">
+                <li class="previous-article">« <a href="https://kernelgo.org/x86_apicv.html" title="Previous: Discuss On X86 APIC Virtualization">Discuss On X86 APIC Virtualization</a></li>
+                <li class="next-article"><a href="https://kernelgo.org/live-migration-with-passthroughed-device.html" title="Next: Live Migration with Passthroughed Device (Draft)">Live Migration with Passthroughed Device (Draft)</a> »</li>
+            </ul>
+            </nav>
+            </aside>
+        </div>
+        <section id="article-sidebar" class="span2">
+            <h4>Published</h4>
+            <time itemprop="dateCreated" datetime="2019-10-31T23:00:00+08:00">Thu 31 October 2019</time>
+            <h4>Category</h4>
+            <a class="category-link" href="https://kernelgo.org/categories.html#virtualization-ref">virtualization</a>
+            <h4>Tags</h4>
+            <ul class="list-of-tags tags-in-article">
+                <li><a href="https://kernelgo.org/tags.html#vfio-mdev-ref">vfio mdev
+                    <span class="superscript">1</span>
+</a></li>
+            </ul>
+<h4>Contact</h4>
+<div id="sidebar-social-link">
+    <a href="https://github.com/fangying" title="" target="_blank" rel="nofollow noopener noreferrer">
+        <svg xmlns="http://www.w3.org/2000/svg" aria-label="GitHub" role="img" viewBox="0 0 512 512"><rect width="512" height="512" rx="15%" fill="#1B1817"/><path fill="#fff" d="M335 499c14 0 12 17 12 17H165s-2-17 12-17c13 0 16-6 16-12l-1-50c-71 16-86-28-86-28-12-30-28-37-28-37-24-16 1-16 1-16 26 2 40 26 40 26 22 39 59 28 74 22 2-17 9-28 16-35-57-6-116-28-116-126 0-28 10-51 26-69-3-6-11-32 3-67 0 0 21-7 70 26 42-12 86-12 128 0 49-33 70-26 70-26 14 35 6 61 3 67 16 18 26 41 26 69 0 98-60 120-117 126 10 8 18 24 18 48l-1 70c0 6 3 12 16 12z"/></svg>
+    </a>
+</div>
+            
+
+
+
+
+
+            
+
+
+
+
+
+        </section>
+</div>
+</article>
+<!-- Root element of PhotoSwipe. Must have class pswp. -->
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    <!-- Background of PhotoSwipe.
+         It's a separate element as animating opacity is faster than rgba(). -->
+    <div class="pswp__bg"></div>
+
+    <!-- Slides wrapper with overflow:hidden. -->
+    <div class="pswp__scroll-wrap">
+
+        <!-- Container that holds slides.
+            PhotoSwipe keeps only 3 of them in the DOM to save memory.
+            Don't modify these 3 pswp__item elements, data is added later on. -->
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        <!-- Default (PhotoSwipeUI_Default) interface on top of sliding area. Can be changed. -->
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                <!--  Controls are self-explanatory. Order can be changed. -->
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                <!-- Preloader demo https://codepen.io/dimsemenov/pen/yyBWoR -->
+                <!-- element will get class pswp__preloader--active when preloader is running -->
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                      <div class="pswp__preloader__cut">
+                        <div class="pswp__preloader__donut"></div>
+                      </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>                    </div>
+                    <div class="span1"></div>
+                </div>
+            </div>
+        </div>
+<footer>
+    <div>
+        <span xmlns:dct="http://purl.org/dc/terms/" property="dct:title"> kernelgo"</span> by <a xmlns:cc="http://creativecommons.org/ns#" href="https://kernelgo.org" property="cc:attributionName" rel="cc:attributionURL">Yori Fang</a> is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/3.0/deed.en_US">Creative Commons Attribution-ShareAlike 3.0 Unported License</a>.
+    </div>
+
+
+
+
+    <div id="fpowered">
+        Powered by: <a href="http://getpelican.com/" title="Pelican Home Page" target="_blank" rel="nofollow noopener noreferrer">Pelican</a>
+        Theme: <a href="https://elegant.oncrashreboot.com/" title="Theme Elegant Home Page" target="_blank" rel="nofollow noopener noreferrer">Elegant</a>
+    </div>
+</footer>            <script src="//code.jquery.com/jquery.min.js"></script>
+        <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/js/bootstrap.min.js"></script>
+        <script src="https://kernelgo.org/theme/js/elegant.prod.9e9d5ce754.js"></script>
+        <script>
+            function validateForm(query)
+            {
+                return (query.length > 0);
+            }
+        </script>
+
+    <script>
+    (function () {
+        if (window.location.hash.match(/^#comment-\d+$/)) {
+            $('#comment_thread').collapse('show');
+        }
+    })();
+    window.onhashchange=function(){
+        if (window.location.hash.match(/^#comment-\d+$/))
+            window.location.reload(true);
+    }
+    $('#comment_thread').on('shown', function () {
+        var link = document.getElementById('comment-accordion-toggle');
+        var old_innerHTML = link.innerHTML;
+        $(link).fadeOut(200, function() {
+            $(this).text('Click here to hide comments').fadeIn(200);
+        });
+        $('#comment_thread').on('hidden', function () {
+            $(link).fadeOut(200, function() {
+                $(this).text(old_innerHTML).fadeIn(200);
+            });
+        })
+    })
+</script>
+
+    </body>
+    <!-- Theme: Elegant built for Pelican
+        License : MIT -->
+</html>

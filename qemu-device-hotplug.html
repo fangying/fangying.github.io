@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://kernelgo.org/theme/css/style.min.css?fc5adb95">
+
+        <link rel="dns-prefetch" href="//fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin>
+
+        <meta name="author" content="Yori Fang" />
+
+        <meta name="description" content="在虚拟化场景下Guest的设备由软件进行模拟，所以可以比较方便地实现设备热插、热拔， 在不影响虚拟机正常运行的情况下，动态调整设备数目可以 …
+" />
+        <meta property="og:type" content="article" />
+        <meta name="twitter:card" content="summary">
+
+<meta name="keywords" content="Memory Hotplug, virtualization, " />
+
+<meta property="og:title" content="Memory Hotplug &amp; CPU Hotplug "/>
+<meta property="og:url" content="https://kernelgo.org/qemu-device-hotplug.html" />
+<meta property="og:description" content="在虚拟化场景下Guest的设备由软件进行模拟，所以可以比较方便地实现设备热插、热拔， 在不影响虚拟机正常运行的情况下，动态调整设备数目可以 …" />
+<meta property="og:site_name" content="kernelgo" />
+<meta property="og:article:author" content="Yori Fang" />
+<meta property="og:article:published_time" content="2020-04-26T23:00:00+08:00" />
+<meta name="twitter:title" content="Memory Hotplug &amp; CPU Hotplug ">
+<meta name="twitter:description" content="在虚拟化场景下Guest的设备由软件进行模拟，所以可以比较方便地实现设备热插、热拔， 在不影响虚拟机正常运行的情况下，动态调整设备数目可以 …">
+
+        <title>Memory Hotplug &amp; CPU Hotplug  · kernelgo
+</title>
+<script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+     (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+     m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+     })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+    ga('create', 'UA-107392039-1', 'auto');
+    ga('send', 'pageview');
+</script>
+
+
+    </head>
+    <body>
+        <div id="content">
+            <div class="navbar navbar-static-top">
+                <div class="navbar-inner">
+                    <div class="container-fluid">
+                        <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                        </a>
+                        <a class="brand" href="https://kernelgo.org/"><span class=site-name>kernelgo</span></a>
+                        <div class="nav-collapse collapse">
+                            <ul class="nav pull-right top-menu">
+                                <li >
+                                    <a href=
+                                       https://kernelgo.org
+                                    >Home</a>
+                                </li>
+                                <li ><a href="https://kernelgo.org/pages/about.html">About</a></li>
+                                <li ><a href="https://kernelgo.org/categories.html">Categories</a></li>
+                                <li ><a href="https://kernelgo.org/tags.html">Tags</a></li>
+                                <li ><a href="https://kernelgo.org/archives.html">Archives</a></li>
+                                <li><form class="navbar-search" action="https://kernelgo.org/search.html" onsubmit="return validateForm(this.elements['q'].value);"> <input type="text" class="search-query" placeholder="Search" name="q" id="tipue_search_input"></form></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="container-fluid">
+                <div class="row-fluid">
+                    <div class="span1"></div>
+                    <div class="span10">
+<article itemscope>
+<div class="row-fluid">
+    <header class="page-header span10 offset2">
+        <h1>
+            <a href="https://kernelgo.org/qemu-device-hotplug.html">
+                Memory Hotplug & CPU Hotplug
+            </a>
+        </h1>
+    </header>
+</div>
+
+<div class="row-fluid">
+        <div class="span8 offset2 article-content">
+            
+            <p>在虚拟化场景下Guest的设备由软件进行模拟，所以可以比较方便地实现设备热插、热拔，
+在不影响虚拟机正常运行的情况下，动态调整设备数目可以达到在线调整Guest算力资源的目的。
+x86 platform上已经支持了Memory和CPU的hotplug/hotunplug等高级特性，aarch64现在也已经跟上。
+这篇文章整理一下最近openEuler上合入的Memory和CPU hotplug特性。</p>
+<h2>1. Memory Hotplug 特性</h2>
+<p>QEMU 4.2版本给我们带来了期待已久的Memory Hotplug特性，相关实现patch可以patchworks上获取到：</p>
+<p><a href="https://patchwork.kernel.org/cover/11150345/">https://patchwork.kernel.org/cover/11150345/</a></p>
+<p>在ARM64平台上没有PIO空间（PIO是x86独有的），为了支持memory hotplug event signaling，
+于是使用了GED(Generic Event Device)设备来完成事件通知机制。
+有点好奇什么是GED设备？翻阅了ACPI Spec才知道，
+GED是ACPI 6.1规范在Hardware Reduced模式下定义的一个事件通知设备，
+ARM64上的内存热插使用这个设备通知Guest。
+备注：这有个疑问是，为啥不像x86上一样用ACPI GPE（General-Purpose Event）来做这个事情呢?</p>
+<p><code>generic_event_device.c</code>中定义了GED设备类型，为了支持hotplug这个设备
+实现了两个qom interface，<code>TYPE_HOTPLUG_HANDLER</code>和<code>TYPE_ACPI_DEVICE_IF</code>。
+前者定义了hotplug相关的hook，后者定义了acpi相关的hook，体现了OOB设计的思想。</p>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">TypeInfo</span><span class="w"> </span><span class="n">acpi_ged_info</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="p">.</span><span class="n">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="n">TYPE_ACPI_GED</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">.</span><span class="n">parent</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="n">TYPE_SYS_BUS_DEVICE</span><span class="p">,</span><span class="w">   </span><span class="c1">// 挂载到sysbus</span>
+<span class="w">    </span><span class="p">.</span><span class="n">instance_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">AcpiGedState</span><span class="p">),</span><span class="w">  </span><span class="c1">// 设备状态</span>
+<span class="w">    </span><span class="p">.</span><span class="n">instance_init</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="n">acpi_ged_initfn</span><span class="p">,</span><span class="w">      </span><span class="c1">// 设备实例化函数</span>
+<span class="w">    </span><span class="p">.</span><span class="n">class_init</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="n">acpi_ged_class_init</span><span class="p">,</span><span class="w">   </span><span class="c1">// 类初始化函数</span>
+<span class="w">    </span><span class="p">.</span><span class="n">interfaces</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">InterfaceInfo</span><span class="p">[])</span><span class="w"> </span><span class="p">{</span><span class="w">       </span><span class="c1">// 实现接口列表</span>
+<span class="w">        </span><span class="p">{</span><span class="w"> </span><span class="n">TYPE_HOTPLUG_HANDLER</span><span class="w"> </span><span class="p">},</span><span class="w"></span>
+<span class="w">        </span><span class="p">{</span><span class="w"> </span><span class="n">TYPE_ACPI_DEVICE_IF</span><span class="w"> </span><span class="p">},</span><span class="w"></span>
+<span class="w">        </span><span class="p">{</span><span class="w"> </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+</code></pre></div>
+
+<p>实现了2个相关interface之后，需要为Memory Hotplug定义自己的hook函数（但实际上只需实现一部分接口）。
+所以，这里对应的实现是<code>acpi_ged_device_plug_cb</code>和<code>acpi_ged_send_event</code>。</p>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">acpi_ged_class_init</span><span class="p">(</span><span class="n">ObjectClass</span><span class="w"> </span><span class="o">*</span><span class="n">class</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">data</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="n">DeviceClass</span><span class="w"> </span><span class="o">*</span><span class="n">dc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">DEVICE_CLASS</span><span class="p">(</span><span class="n">class</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">HotplugHandlerClass</span><span class="w"> </span><span class="o">*</span><span class="n">hc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">HOTPLUG_HANDLER_CLASS</span><span class="p">(</span><span class="n">class</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">AcpiDeviceIfClass</span><span class="w"> </span><span class="o">*</span><span class="n">adevc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ACPI_DEVICE_IF_CLASS</span><span class="p">(</span><span class="n">class</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">    </span><span class="n">dc</span><span class="o">-&gt;</span><span class="n">desc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;ACPI Generic Event Device&quot;</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="n">device_class_set_props</span><span class="p">(</span><span class="n">dc</span><span class="p">,</span><span class="w"> </span><span class="n">acpi_ged_properties</span><span class="p">);</span><span class="w"> </span><span class="c1">// 定义了properties</span>
+<span class="w">    </span><span class="n">dc</span><span class="o">-&gt;</span><span class="n">vmsd</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&amp;</span><span class="n">vmstate_acpi_ged</span><span class="p">;</span><span class="w">       </span><span class="c1">// 热迁移状态保存和恢复</span>
+
+<span class="w">    </span><span class="n">hc</span><span class="o">-&gt;</span><span class="n">plug</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">acpi_ged_device_plug_cb</span><span class="p">;</span><span class="w"> </span><span class="c1">// hotplug callback 回调</span>
+
+<span class="w">    </span><span class="n">adevc</span><span class="o">-&gt;</span><span class="n">send_event</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">acpi_ged_send_event</span><span class="p">;</span><span class="w"> </span><span class="c1">// hotplug event事件注入</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>GED设备状态里面维护了6个成员：</p>
+<ul>
+<li><code>parent_obj</code>用来将设备挂载到Sysbus下</li>
+<li><code>memhp_state</code>用来描述MemoryHotplug状态</li>
+<li><code>container_memhp</code>这个MR Container MMIO区域，长度24字节</li>
+<li><code>ged_state</code>用来描述GED状态</li>
+<li><code>ged_event_bitmap</code>事件bitmap</li>
+<li><code>irq</code>设备有一个GPIO中断，给谁用的？</li>
+</ul>
+<div class="highlight"><pre><span></span><code><span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">AcpiGedState</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="n">SysBusDevice</span><span class="w"> </span><span class="n">parent_obj</span><span class="p">;</span><span class="w">        </span><span class="c1">// 挂载到sysbus下</span>
+<span class="w">    </span><span class="n">MemHotplugState</span><span class="w"> </span><span class="n">memhp_state</span><span class="p">;</span><span class="w">    </span><span class="c1">// MemoryHotplug状态</span>
+<span class="w">    </span><span class="n">MemoryRegion</span><span class="w"> </span><span class="n">container_memhp</span><span class="p">;</span><span class="w">   </span><span class="c1">// MR</span>
+<span class="w">    </span><span class="n">GEDState</span><span class="w"> </span><span class="n">ged_state</span><span class="p">;</span><span class="w">             </span><span class="c1">// GED状态</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">ged_event_bitmap</span><span class="p">;</span><span class="w">      </span><span class="c1">// event bitmap</span>
+<span class="w">    </span><span class="n">qemu_irq</span><span class="w"> </span><span class="n">irq</span><span class="p">;</span><span class="w">                   </span><span class="c1">// irq</span>
+<span class="p">}</span><span class="w"> </span><span class="n">AcpiGedState</span><span class="p">;</span><span class="w"></span>
+</code></pre></div>
+
+<p>这个GED设备存在的唯一意义就是帮助完成Memory Hotplug。
+有必要了解一下这个GED设备，根据
+<a href="https://uefi.org/sites/default/files/resources/ACPI_6_3_final_Jan30.pdf">ACPI Spec Chapter 5.6.9 Interrupt-signaled ACPI events</a>章节，
+GED设备使用_CRS（Current Resource Setting）描述中断，使用_EVT对象来映射ACPI事件。
+例如：下面的ASL中定义了3个中断及其回调函数</p>
+<div class="highlight"><pre><span></span><code><span class="n">Device</span><span class="w"> </span><span class="p">(</span>\<span class="n">_SB</span><span class="o">.</span><span class="n">GED1</span><span class="p">)</span><span class="w"> </span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="n">Name</span><span class="p">(</span><span class="n">HID</span><span class="p">,</span><span class="err">”</span><span class="n">ACPI0013</span><span class="err">”</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="n">Name</span><span class="p">(</span><span class="n">_CRS</span><span class="p">,</span><span class="w"> </span><span class="n">ResourceTemplate</span><span class="w"> </span><span class="p">()</span><span class="w"> </span>
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="n">Interrupt</span><span class="p">(</span><span class="n">ResourceConsumer</span><span class="p">,</span><span class="w"> </span><span class="n">Level</span><span class="p">,</span><span class="w"> </span><span class="n">ActiveHigh</span><span class="p">,</span><span class="w"> </span><span class="n">Exclusive</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="mi">41</span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="n">Interrupt</span><span class="p">(</span><span class="n">ResourceConsumer</span><span class="p">,</span><span class="w"> </span><span class="n">Edge</span><span class="p">,</span><span class="w"> </span><span class="n">ActiveHigh</span><span class="p">,</span><span class="w"> </span><span class="n">Shared</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="mi">42</span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="n">Interrupt</span><span class="p">(</span><span class="n">ResourceConsumer</span><span class="p">,</span><span class="w"> </span><span class="n">Level</span><span class="p">,</span><span class="w"> </span><span class="n">ActiveHigh</span><span class="p">,</span><span class="w"> </span><span class="n">ExclusiveAndWake</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="mi">43</span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="n">Method</span><span class="w"> </span><span class="p">(</span><span class="n">_EVT</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="o">//</span><span class="w"> </span><span class="n">Handle</span><span class="w"> </span><span class="n">all</span><span class="w"> </span><span class="n">ACPI</span><span class="w"> </span><span class="n">Events</span><span class="w"> </span><span class="n">signaled</span><span class="w"> </span><span class="n">by</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">Generic</span><span class="w"> </span><span class="n">Event</span><span class="w"> </span><span class="n">Device</span><span class="p">(</span><span class="n">GED1</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="n">Switch</span><span class="w"> </span><span class="p">(</span><span class="n">Arg0</span><span class="p">)</span><span class="w"> </span><span class="o">//</span><span class="w"> </span><span class="n">Arg0</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">GSIV</span><span class="w"> </span><span class="n">of</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">interrupt</span><span class="w"></span>
+<span class="w">        </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="n">Case</span><span class="w"> </span><span class="p">(</span><span class="mi">41</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="o">//</span><span class="w"> </span><span class="n">interrupt</span><span class="w"> </span><span class="mi">41</span><span class="w"> </span>
+<span class="w">                </span><span class="n">Store</span><span class="p">(</span><span class="n">One</span><span class="p">,</span><span class="w"> </span><span class="n">ISTS</span><span class="p">)</span><span class="w"> </span><span class="o">//</span><span class="w"> </span><span class="n">clear</span><span class="w"> </span><span class="n">interrupt</span><span class="w"> </span><span class="n">status</span><span class="w"> </span><span class="n">register</span><span class="w"> </span><span class="n">at</span><span class="w"> </span><span class="n">device</span><span class="w"> </span><span class="n">X</span><span class="w"> </span>
+<span class="w">                                </span><span class="o">//</span><span class="w"> </span><span class="n">which</span><span class="w"> </span><span class="k">is</span><span class="w"> </span><span class="n">mapped</span><span class="w"> </span><span class="n">via</span><span class="w"> </span><span class="n">an</span><span class="w"> </span><span class="n">operation</span><span class="w"> </span><span class="n">region</span><span class="w"> </span>
+<span class="w">                </span><span class="n">Notify</span><span class="w"> </span><span class="p">(</span>\<span class="n">_SB</span><span class="o">.</span><span class="n">DEVX</span><span class="p">,</span><span class="w"> </span><span class="mh">0x0</span><span class="p">)</span><span class="w"> </span><span class="o">//</span><span class="w"> </span><span class="n">insertion</span><span class="w"> </span><span class="n">request</span><span class="w"> </span>
+<span class="w">            </span><span class="p">}</span><span class="w"> </span>
+<span class="w">            </span><span class="n">Case</span><span class="w"> </span><span class="p">(</span><span class="mi">42</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="o">//</span><span class="w"> </span><span class="n">interrupt</span><span class="w"> </span><span class="mi">42</span><span class="w"> </span>
+<span class="w">                </span><span class="n">Notify</span><span class="w"> </span><span class="p">(</span>\<span class="n">_SB</span><span class="o">.</span><span class="n">DEVX</span><span class="p">,</span><span class="w"> </span><span class="mh">0x3</span><span class="p">)</span><span class="w"> </span><span class="o">//</span><span class="w"> </span><span class="n">ejection</span><span class="w"> </span><span class="n">request</span><span class="w"> </span>
+<span class="w">            </span><span class="p">}</span><span class="w"></span>
+<span class="w">            </span><span class="n">Case</span><span class="w"> </span><span class="p">(</span><span class="mi">43</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="o">//</span><span class="w"> </span><span class="n">interrupt</span><span class="w"> </span><span class="mi">43</span><span class="w"> </span>
+<span class="w">                </span><span class="n">Store</span><span class="p">(</span><span class="n">One</span><span class="p">,</span><span class="w"> </span><span class="n">ISTS</span><span class="p">)</span><span class="w"> </span><span class="o">//</span><span class="w"> </span><span class="n">clear</span><span class="w"> </span><span class="n">interrupt</span><span class="w"> </span><span class="n">status</span><span class="w"> </span><span class="n">register</span><span class="w"> </span><span class="n">at</span><span class="w"> </span><span class="n">device</span><span class="w"> </span><span class="n">X</span><span class="w"> </span>
+<span class="w">                                 </span><span class="o">//</span><span class="w"> </span><span class="n">which</span><span class="w"> </span><span class="k">is</span><span class="w"> </span><span class="n">mapped</span><span class="w"> </span><span class="n">via</span><span class="w"> </span><span class="n">an</span><span class="w"> </span><span class="n">operation</span><span class="w"> </span><span class="n">region</span><span class="w"> </span>
+<span class="w">                </span><span class="n">Notify</span><span class="w"> </span><span class="p">(</span>\<span class="n">_SB</span><span class="o">.</span><span class="n">DEVX</span><span class="p">,</span><span class="w"> </span><span class="mh">0x2</span><span class="p">)</span><span class="w"> </span><span class="o">//</span><span class="w"> </span><span class="n">wake</span><span class="w"> </span><span class="n">event</span><span class="w"></span>
+<span class="w">            </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="o">//</span><span class="n">End</span><span class="w"> </span><span class="n">of</span><span class="w"> </span><span class="n">Method</span><span class="w"> </span>
+<span class="p">}</span><span class="w"> </span><span class="o">//</span><span class="n">End</span><span class="w"> </span><span class="n">of</span><span class="w"> </span><span class="n">GED1</span><span class="w"> </span><span class="n">Scope</span><span class="w"></span>
+</code></pre></div>
+
+<p>Memory Hotplug实现的重点部分是ACPI表的那一部分。
+为了支持Memory Hotplug需要提前做的事情有2个：</p>
+<ul>
+<li>ARM64上virt主板初始化的时候要创建GED设备</li>
+<li>主板创建完成之后开始构建GED ACPI表，如果配置了numa要构建srat表</li>
+</ul>
+<div class="highlight"><pre><span></span><code><span class="n">machvirt_init</span><span class="w"></span>
+<span class="w">    </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">vms</span><span class="o">-&gt;</span><span class="n">acpi_dev</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">create_acpi_ged</span><span class="p">(</span><span class="n">vms</span><span class="p">)</span><span class="w"> </span><span class="c1">// 创建ged设备</span>
+
+<span class="n">virt_machine_done</span><span class="w">   </span>
+<span class="w">    </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">virt_acpi_setup</span><span class="w"></span>
+<span class="w">        </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">virt_acpi_build</span><span class="w"></span>
+<span class="w">            </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">build_dsdt</span><span class="w"></span>
+<span class="w">                </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">build_ged_aml</span><span class="w">    </span><span class="c1">// build GED ACPI table</span>
+<span class="w">                </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">build_memory_hotplug_aml</span><span class="w"> </span><span class="c1">// build DIMM hotplug ACPI table</span>
+<span class="w">            </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">build_srat</span><span class="w">   </span><span class="c1">// numa节点&gt;0的时候要呈现SRAT</span>
+</code></pre></div>
+
+<h3>1.1 创建ged设备</h3>
+<p>GED设备创建的时候做哪些事情？</p>
+<ul>
+<li>创建ged设备</li>
+<li>设置了属性<code>ged-event</code>当前只支持了2个事件：powerdown事件和hotplug事件</li>
+<li>设置了ged设备和dimm设备的mmio基地址</li>
+<li>连接了ged设备的GPIO</li>
+</ul>
+<p>设备属性<code>ged-event</code>是32bit的，理论上可以支持很多事件。
+而且可以看到，设备的ACPI和PCDIMM基地址是提前分配好的（静态的）。</p>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kr">inline</span><span class="w"> </span><span class="n">DeviceState</span><span class="w"> </span><span class="o">*</span><span class="nf">create_acpi_ged</span><span class="p">(</span><span class="n">VirtMachineState</span><span class="w"> </span><span class="o">*</span><span class="n">vms</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="n">DeviceState</span><span class="w"> </span><span class="o">*</span><span class="n">dev</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="n">MachineState</span><span class="w"> </span><span class="o">*</span><span class="n">ms</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">MACHINE</span><span class="p">(</span><span class="n">vms</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">irq</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vms</span><span class="o">-&gt;</span><span class="n">irqmap</span><span class="p">[</span><span class="n">VIRT_ACPI_GED</span><span class="p">];</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">event</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ACPI_GED_PWR_DOWN_EVT</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">ms</span><span class="o">-&gt;</span><span class="n">ram_slots</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="n">event</span><span class="w"> </span><span class="o">|=</span><span class="w"> </span><span class="n">ACPI_GED_MEM_HOTPLUG_EVT</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="n">dev</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">qdev_create</span><span class="p">(</span><span class="nb">NULL</span><span class="p">,</span><span class="w"> </span><span class="n">TYPE_ACPI_GED</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">qdev_prop_set_uint32</span><span class="p">(</span><span class="n">dev</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;ged-event&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">event</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">    </span><span class="n">sysbus_mmio_map</span><span class="p">(</span><span class="n">SYS_BUS_DEVICE</span><span class="p">(</span><span class="n">dev</span><span class="p">),</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">vms</span><span class="o">-&gt;</span><span class="n">memmap</span><span class="p">[</span><span class="n">VIRT_ACPI_GED</span><span class="p">].</span><span class="n">base</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">sysbus_mmio_map</span><span class="p">(</span><span class="n">SYS_BUS_DEVICE</span><span class="p">(</span><span class="n">dev</span><span class="p">),</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="n">vms</span><span class="o">-&gt;</span><span class="n">memmap</span><span class="p">[</span><span class="n">VIRT_PCDIMM_ACPI</span><span class="p">].</span><span class="n">base</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">sysbus_connect_irq</span><span class="p">(</span><span class="n">SYS_BUS_DEVICE</span><span class="p">(</span><span class="n">dev</span><span class="p">),</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">qdev_get_gpio_in</span><span class="p">(</span><span class="n">vms</span><span class="o">-&gt;</span><span class="n">gic</span><span class="p">,</span><span class="w"> </span><span class="n">irq</span><span class="p">));</span><span class="w"></span>
+
+<span class="w">    </span><span class="n">qdev_init_nofail</span><span class="p">(</span><span class="n">dev</span><span class="p">);</span><span class="w">  </span><span class="c1">// 设备实例化，调用realize函数</span>
+
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">dev</span><span class="p">;</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>这里隐含了的是，ged设备在实例化的时候<code>acpi_ged_initfn</code>里调用了<code>acpi_memory_hotplug_init</code>。
+此时，会为DIMM设备创建好一个名为<code>acpi-mem-hotplug</code>的MemoryRegion，
+作为一段MMIO呈现给Guest OS，Guest可以读写这个MR来查询DIMM slot状态，
+并支持Memory Hot-unplug这个高级特性。</p>
+<h3>1.2 构建ged的acpi表</h3>
+<p>ged设备的ACPI信息方在DSDT(Differentiated System Description Table)表中，
+在函数<code>build_ged_aml</code>来构建AML信息：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">build_ged_aml</span><span class="p">(</span><span class="n">Aml</span><span class="w"> </span><span class="o">*</span><span class="n">table</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">name</span><span class="p">,</span><span class="w"> </span><span class="n">HotplugHandler</span><span class="w"> </span><span class="o">*</span><span class="n">hotplug_dev</span><span class="p">,</span><span class="w"></span>
+<span class="w">                   </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">ged_irq</span><span class="p">,</span><span class="w"> </span><span class="n">AmlRegionSpace</span><span class="w"> </span><span class="n">rs</span><span class="p">,</span><span class="w"> </span><span class="n">hwaddr</span><span class="w"> </span><span class="n">ged_base</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="n">AcpiGedState</span><span class="w"> </span><span class="o">*</span><span class="n">s</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ACPI_GED</span><span class="p">(</span><span class="n">hotplug_dev</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">Aml</span><span class="w"> </span><span class="o">*</span><span class="n">crs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">aml_resource_template</span><span class="p">();</span><span class="w">     </span><span class="c1">// 创建_CRS，描述中断信息</span>
+<span class="w">    </span><span class="n">Aml</span><span class="w"> </span><span class="o">*</span><span class="n">evt</span><span class="p">,</span><span class="w"> </span><span class="o">*</span><span class="n">field</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="n">Aml</span><span class="w"> </span><span class="o">*</span><span class="n">dev</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">aml_device</span><span class="p">(</span><span class="s">&quot;%s&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">name</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">Aml</span><span class="w"> </span><span class="o">*</span><span class="n">evt_sel</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">aml_local</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">Aml</span><span class="w"> </span><span class="o">*</span><span class="n">esel</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">aml_name</span><span class="p">(</span><span class="n">AML_GED_EVT_SEL</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/* _CRS interrupt */</span><span class="w">  </span><span class="c1">// 定义了一个_CRS中断，编号irqmap[VIRT_ACPI_GED] + ARM_SPI_BASE</span>
+<span class="w">    </span><span class="n">aml_append</span><span class="p">(</span><span class="n">crs</span><span class="p">,</span><span class="w"> </span><span class="n">aml_interrupt</span><span class="p">(</span><span class="n">AML_CONSUMER</span><span class="p">,</span><span class="w"> </span><span class="n">AML_EDGE</span><span class="p">,</span><span class="w"> </span><span class="n">AML_ACTIVE_HIGH</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                  </span><span class="n">AML_EXCLUSIVE</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ged_irq</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">));</span><span class="w"></span>
+
+<span class="w">    </span><span class="n">aml_append</span><span class="p">(</span><span class="n">dev</span><span class="p">,</span><span class="w"> </span><span class="n">aml_name_decl</span><span class="p">(</span><span class="s">&quot;_HID&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">aml_string</span><span class="p">(</span><span class="s">&quot;ACPI0013&quot;</span><span class="p">)));</span><span class="w"></span>
+<span class="w">    </span><span class="n">aml_append</span><span class="p">(</span><span class="n">dev</span><span class="p">,</span><span class="w"> </span><span class="n">aml_name_decl</span><span class="p">(</span><span class="s">&quot;_UID&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">aml_string</span><span class="p">(</span><span class="n">GED_DEVICE</span><span class="p">)));</span><span class="w"></span>
+<span class="w">    </span><span class="n">aml_append</span><span class="p">(</span><span class="n">dev</span><span class="p">,</span><span class="w"> </span><span class="n">aml_name_decl</span><span class="p">(</span><span class="s">&quot;_CRS&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">crs</span><span class="p">));</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/* Append IO region */</span><span class="w">      </span><span class="c1">// 添加EVT_REG和EVT_SEL寄存器</span>
+<span class="w">    </span><span class="n">aml_append</span><span class="p">(</span><span class="n">dev</span><span class="p">,</span><span class="w"> </span><span class="n">aml_operation_region</span><span class="p">(</span><span class="n">AML_GED_EVT_REG</span><span class="p">,</span><span class="w"> </span><span class="n">rs</span><span class="p">,</span><span class="w"></span>
+<span class="w">               </span><span class="n">aml_int</span><span class="p">(</span><span class="n">ged_base</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">ACPI_GED_EVT_SEL_OFFSET</span><span class="p">),</span><span class="w"></span>
+<span class="w">               </span><span class="n">ACPI_GED_EVT_SEL_LEN</span><span class="p">));</span><span class="w"></span>
+<span class="w">    </span><span class="n">field</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">aml_field</span><span class="p">(</span><span class="n">AML_GED_EVT_REG</span><span class="p">,</span><span class="w"> </span><span class="n">AML_DWORD_ACC</span><span class="p">,</span><span class="w"> </span><span class="n">AML_NOLOCK</span><span class="p">,</span><span class="w"></span>
+<span class="w">                      </span><span class="n">AML_WRITE_AS_ZEROS</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">aml_append</span><span class="p">(</span><span class="n">field</span><span class="p">,</span><span class="w"> </span><span class="n">aml_named_field</span><span class="p">(</span><span class="n">AML_GED_EVT_SEL</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                      </span><span class="n">ACPI_GED_EVT_SEL_LEN</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">BITS_PER_BYTE</span><span class="p">));</span><span class="w"></span>
+<span class="w">    </span><span class="n">aml_append</span><span class="p">(</span><span class="n">dev</span><span class="p">,</span><span class="w"> </span><span class="n">field</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/*</span>
+<span class="cm">     * For each GED event we:</span>
+<span class="cm">     * - Add a conditional block for each event, inside a loop.</span>
+<span class="cm">     * - Call a method for each supported GED event type.</span>
+<span class="cm">     *</span>
+<span class="cm">     * The resulting ASL code looks like:</span>
+<span class="cm">     *</span>
+<span class="cm">     * Local0 = ESEL</span>
+<span class="cm">     * If ((Local0 &amp; One) == One)</span>
+<span class="cm">     * {</span>
+<span class="cm">     *     MethodEvent0()</span>
+<span class="cm">     * }</span>
+<span class="cm">     *</span>
+<span class="cm">     * If ((Local0 &amp; 0x2) == 0x2)</span>
+<span class="cm">     * {</span>
+<span class="cm">     *     MethodEvent1()</span>
+<span class="cm">     * }</span>
+<span class="cm">     * ...</span>
+<span class="cm">     */</span><span class="w"></span>
+<span class="w">    </span><span class="n">evt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">aml_method</span><span class="p">(</span><span class="s">&quot;_EVT&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="n">AML_SERIALIZED</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="n">Aml</span><span class="w"> </span><span class="o">*</span><span class="n">if_ctx</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">i</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">ged_events</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ctpop32</span><span class="p">(</span><span class="n">s</span><span class="o">-&gt;</span><span class="n">ged_event_bitmap</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">        </span><span class="cm">/* Local0 = ESEL */</span><span class="w"></span>
+<span class="w">        </span><span class="n">aml_append</span><span class="p">(</span><span class="n">evt</span><span class="p">,</span><span class="w"> </span><span class="n">aml_store</span><span class="p">(</span><span class="n">esel</span><span class="p">,</span><span class="w"> </span><span class="n">evt_sel</span><span class="p">));</span><span class="w"></span>
+
+<span class="w">        </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">ARRAY_SIZE</span><span class="p">(</span><span class="n">ged_supported_events</span><span class="p">)</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">ged_events</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">event</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">s</span><span class="o">-&gt;</span><span class="n">ged_event_bitmap</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">ged_supported_events</span><span class="p">[</span><span class="n">i</span><span class="p">];</span><span class="w"></span>
+
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">event</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">                </span><span class="k">continue</span><span class="p">;</span><span class="w"></span>
+<span class="w">            </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">            </span><span class="n">if_ctx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">aml_if</span><span class="p">(</span><span class="n">aml_equal</span><span class="p">(</span><span class="n">aml_and</span><span class="p">(</span><span class="n">evt_sel</span><span class="p">,</span><span class="w"> </span><span class="n">aml_int</span><span class="p">(</span><span class="n">event</span><span class="p">),</span><span class="w"> </span><span class="nb">NULL</span><span class="p">),</span><span class="w"></span>
+<span class="w">                                      </span><span class="n">aml_int</span><span class="p">(</span><span class="n">event</span><span class="p">)));</span><span class="w"></span>
+<span class="w">            </span><span class="k">switch</span><span class="w"> </span><span class="p">(</span><span class="n">event</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="k">case</span><span class="w"> </span><span class="nl">ACPI_GED_MEM_HOTPLUG_EVT</span><span class="p">:</span><span class="w">  </span><span class="c1">// 调用Memory Slot扫描函数</span>
+<span class="w">                </span><span class="n">aml_append</span><span class="p">(</span><span class="n">if_ctx</span><span class="p">,</span><span class="w"> </span><span class="n">aml_call0</span><span class="p">(</span><span class="n">MEMORY_DEVICES_CONTAINER</span><span class="w"> </span><span class="s">&quot;.&quot;</span><span class="w"></span>
+<span class="w">                                             </span><span class="n">MEMORY_SLOT_SCAN_METHOD</span><span class="p">));</span><span class="w"></span>
+<span class="w">                </span><span class="k">break</span><span class="p">;</span><span class="w"></span>
+<span class="w">            </span><span class="k">case</span><span class="w"> </span><span class="nl">ACPI_GED_PWR_DOWN_EVT</span><span class="p">:</span><span class="w"></span>
+<span class="w">                </span><span class="n">aml_append</span><span class="p">(</span><span class="n">if_ctx</span><span class="p">,</span><span class="w">          </span><span class="c1">// 调用回调函数，似乎是用来关机</span>
+<span class="w">                           </span><span class="n">aml_notify</span><span class="p">(</span><span class="n">aml_name</span><span class="p">(</span><span class="n">ACPI_POWER_BUTTON_DEVICE</span><span class="p">),</span><span class="w"></span>
+<span class="w">                                      </span><span class="n">aml_int</span><span class="p">(</span><span class="mh">0x80</span><span class="p">)));</span><span class="w"></span>
+<span class="w">                </span><span class="k">break</span><span class="p">;</span><span class="w"></span>
+<span class="w">            </span><span class="k">default</span><span class="o">:</span><span class="w"></span>
+<span class="w">                </span><span class="cm">/*</span>
+<span class="cm">                 * Please make sure all the events in ged_supported_events[]</span>
+<span class="cm">                 * are handled above.</span>
+<span class="cm">                 */</span><span class="w"></span>
+<span class="w">                </span><span class="n">g_assert_not_reached</span><span class="p">();</span><span class="w"></span>
+<span class="w">            </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">            </span><span class="n">aml_append</span><span class="p">(</span><span class="n">evt</span><span class="p">,</span><span class="w"> </span><span class="n">if_ctx</span><span class="p">);</span><span class="w"></span>
+<span class="w">            </span><span class="n">ged_events</span><span class="o">--</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">ged_events</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="n">error_report</span><span class="p">(</span><span class="s">&quot;Unsupported events specified&quot;</span><span class="p">);</span><span class="w"></span>
+<span class="w">            </span><span class="n">abort</span><span class="p">();</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/* Append _EVT method */</span><span class="w"></span>
+<span class="w">    </span><span class="n">aml_append</span><span class="p">(</span><span class="n">dev</span><span class="p">,</span><span class="w"> </span><span class="n">evt</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">    </span><span class="n">aml_append</span><span class="p">(</span><span class="n">table</span><span class="p">,</span><span class="w"> </span><span class="n">dev</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>除此之外，还要构建DIMM支持Hotplug的ACPI表，它的实现函数是<code>build_memory_hotplug_aml</code>。
+在这个表里面存放了当前主板上内存的插槽信息<code>max_slot_num</code>，
+插槽状态信息，和插槽扫描函数(<code>MEMORY_SLOT_SCAN_METHOD</code>)等关键信息。
+Guest在boot的时候会去解析这些表的信息，当事件到来时就调用对应的函数来处理
+Memory Hotplug/unplug事件。</p>
+<p>当配置了Guest Numa的时候，还要去呈现SRAT（System Resource Affinity Table）表。
+这个过程是在<code>build_srat</code>中实现，目的是为了呈现资源亲和性。</p>
+<h3>1.3 Linux arm64 内核支持memory hotplug</h3>
+<p>QEMU 4.1支持arm64 memory hotplug之后当然也需要Linux kernel进行支持，
+相关的内核patch可以在patchwork上获取到（看pw历史记录有助于了解patch review的过程）：</p>
+<p><a href="https://patchwork.kernel.org/patch/10724455/">https://patchwork.kernel.org/patch/10724455/</a></p>
+<p>对应的内核git commit是:</p>
+<p><a href="https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=4ab215061554ae2a4b78744a5dd3b3c6639f16a7">https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=4ab215061554ae2a4b78744a5dd3b3c6639f16a7</a></p>
+<p>不得不说的是，有点气人，尽管没几行代码但这个patch我看不懂！！！ </p>
+<h3>1.4 测试arm64虚拟机的Memory Hotplug功能</h3>
+<p>Launch qemu虚拟机进程，初始配置8G内存2个numa node，最大支持内存512G内存。</p>
+<div class="highlight"><pre><span></span><code><span class="o">/</span><span class="n">usr</span><span class="o">/</span><span class="n">bin</span><span class="o">/</span><span class="n">qemu</span><span class="o">-</span><span class="n">system</span><span class="o">-</span><span class="n">aarch64</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">M</span><span class="w"> </span><span class="n">virt</span><span class="p">,</span><span class="n">usb</span><span class="o">=</span><span class="n">off</span><span class="p">,</span><span class="n">accel</span><span class="o">=</span><span class="n">kvm</span><span class="p">,</span><span class="n">gic</span><span class="o">-</span><span class="n">version</span><span class="o">=</span><span class="mi">3</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">cpu</span><span class="w"> </span><span class="n">host</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">smp</span><span class="w"> </span><span class="n">sockets</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span><span class="n">cores</span><span class="o">=</span><span class="mi">4</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">m</span><span class="w"> </span><span class="n">size</span><span class="o">=</span><span class="mi">8</span><span class="n">G</span><span class="p">,</span><span class="n">slots</span><span class="o">=</span><span class="mi">128</span><span class="p">,</span><span class="n">maxmem</span><span class="o">=</span><span class="mi">512</span><span class="n">G</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">numa</span><span class="w"> </span><span class="n">node</span><span class="p">,</span><span class="n">nodeid</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span><span class="n">cpus</span><span class="o">=</span><span class="mi">0</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="n">mem</span><span class="o">=</span><span class="mi">4</span><span class="n">G</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">numa</span><span class="w"> </span><span class="n">node</span><span class="p">,</span><span class="n">nodeid</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span><span class="n">cpus</span><span class="o">=</span><span class="mi">2</span><span class="o">-</span><span class="mi">3</span><span class="p">,</span><span class="n">mem</span><span class="o">=</span><span class="mi">4</span><span class="n">G</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">chardev</span><span class="w"> </span><span class="n">socket</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">qmp</span><span class="p">,</span><span class="n">path</span><span class="o">=/</span><span class="k">var</span><span class="o">/</span><span class="n">run</span><span class="o">/</span><span class="n">qemu</span><span class="o">-</span><span class="n">qmp</span><span class="o">.</span><span class="n">qmp</span><span class="p">,</span><span class="n">server</span><span class="p">,</span><span class="n">nowait</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">mon</span><span class="w"> </span><span class="n">chardev</span><span class="o">=</span><span class="n">qmp</span><span class="p">,</span><span class="n">mode</span><span class="o">=</span><span class="n">control</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">nodefaults</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">drive</span><span class="w"> </span><span class="n">file</span><span class="o">=/</span><span class="n">usr</span><span class="o">/</span><span class="n">share</span><span class="o">/</span><span class="n">edk2</span><span class="o">/</span><span class="n">aarch64</span><span class="o">/</span><span class="n">QEMU_EFI</span><span class="o">-</span><span class="n">pflash</span><span class="o">.</span><span class="n">raw</span><span class="p">,</span><span class="k">if</span><span class="o">=</span><span class="n">pflash</span><span class="p">,</span><span class="n">format</span><span class="o">=</span><span class="n">raw</span><span class="p">,</span><span class="n">unit</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span><span class="n">readonly</span><span class="o">=</span><span class="n">on</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">drive</span><span class="w"> </span><span class="n">file</span><span class="o">=/</span><span class="k">var</span><span class="o">/</span><span class="n">lib</span><span class="o">/</span><span class="n">libvirt</span><span class="o">/</span><span class="n">qemu</span><span class="o">/</span><span class="n">nvram</span><span class="o">/</span><span class="n">fangying_openeuler_VARS</span><span class="o">.</span><span class="n">fd</span><span class="p">,</span><span class="k">if</span><span class="o">=</span><span class="n">pflash</span><span class="p">,</span><span class="n">format</span><span class="o">=</span><span class="n">raw</span><span class="p">,</span><span class="n">unit</span><span class="o">=</span><span class="mi">1</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">pcie</span><span class="o">-</span><span class="n">root</span><span class="o">-</span><span class="n">port</span><span class="p">,</span><span class="n">port</span><span class="o">=</span><span class="mh">0x8</span><span class="p">,</span><span class="n">chassis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">pci</span><span class="o">.</span><span class="mi">1</span><span class="p">,</span><span class="n">bus</span><span class="o">=</span><span class="n">pcie</span><span class="o">.</span><span class="mi">0</span><span class="p">,</span><span class="n">multifunction</span><span class="o">=</span><span class="n">on</span><span class="p">,</span><span class="n">addr</span><span class="o">=</span><span class="mh">0x1</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">pcie</span><span class="o">-</span><span class="n">root</span><span class="o">-</span><span class="n">port</span><span class="p">,</span><span class="n">port</span><span class="o">=</span><span class="mh">0x9</span><span class="p">,</span><span class="n">chassis</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">pci</span><span class="o">.</span><span class="mi">2</span><span class="p">,</span><span class="n">bus</span><span class="o">=</span><span class="n">pcie</span><span class="o">.</span><span class="mi">0</span><span class="p">,</span><span class="n">addr</span><span class="o">=</span><span class="mh">0x1</span><span class="o">.</span><span class="mh">0x1</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">pcie</span><span class="o">-</span><span class="n">pci</span><span class="o">-</span><span class="n">bridge</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">pci</span><span class="o">.</span><span class="mi">3</span><span class="p">,</span><span class="n">bus</span><span class="o">=</span><span class="n">pci</span><span class="o">.</span><span class="mi">1</span><span class="p">,</span><span class="n">addr</span><span class="o">=</span><span class="mh">0x0</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">pcie</span><span class="o">-</span><span class="n">root</span><span class="o">-</span><span class="n">port</span><span class="p">,</span><span class="n">port</span><span class="o">=</span><span class="mh">0xa</span><span class="p">,</span><span class="n">chassis</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">pci</span><span class="o">.</span><span class="mi">4</span><span class="p">,</span><span class="n">bus</span><span class="o">=</span><span class="n">pcie</span><span class="o">.</span><span class="mi">0</span><span class="p">,</span><span class="n">addr</span><span class="o">=</span><span class="mh">0x1</span><span class="o">.</span><span class="mh">0x2</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">pcie</span><span class="o">-</span><span class="n">root</span><span class="o">-</span><span class="n">port</span><span class="p">,</span><span class="n">port</span><span class="o">=</span><span class="mh">0xb</span><span class="p">,</span><span class="n">chassis</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">pci</span><span class="o">.</span><span class="mi">5</span><span class="p">,</span><span class="n">bus</span><span class="o">=</span><span class="n">pcie</span><span class="o">.</span><span class="mi">0</span><span class="p">,</span><span class="n">addr</span><span class="o">=</span><span class="mh">0x1</span><span class="o">.</span><span class="mh">0x3</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">pcie</span><span class="o">-</span><span class="n">root</span><span class="o">-</span><span class="n">port</span><span class="p">,</span><span class="n">port</span><span class="o">=</span><span class="mh">0xc</span><span class="p">,</span><span class="n">chassis</span><span class="o">=</span><span class="mi">6</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">pci</span><span class="o">.</span><span class="mi">6</span><span class="p">,</span><span class="n">bus</span><span class="o">=</span><span class="n">pcie</span><span class="o">.</span><span class="mi">0</span><span class="p">,</span><span class="n">addr</span><span class="o">=</span><span class="mh">0x1</span><span class="o">.</span><span class="mh">0x4</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">pcie</span><span class="o">-</span><span class="n">root</span><span class="o">-</span><span class="n">port</span><span class="p">,</span><span class="n">port</span><span class="o">=</span><span class="mh">0xd</span><span class="p">,</span><span class="n">chassis</span><span class="o">=</span><span class="mi">7</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">pci</span><span class="o">.</span><span class="mi">7</span><span class="p">,</span><span class="n">bus</span><span class="o">=</span><span class="n">pcie</span><span class="o">.</span><span class="mi">0</span><span class="p">,</span><span class="n">addr</span><span class="o">=</span><span class="mh">0x1</span><span class="o">.</span><span class="mh">0x5</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">pcie</span><span class="o">-</span><span class="n">root</span><span class="o">-</span><span class="n">port</span><span class="p">,</span><span class="n">port</span><span class="o">=</span><span class="mh">0xe</span><span class="p">,</span><span class="n">chassis</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">pci</span><span class="o">.</span><span class="mi">8</span><span class="p">,</span><span class="n">bus</span><span class="o">=</span><span class="n">pcie</span><span class="o">.</span><span class="mi">0</span><span class="p">,</span><span class="n">addr</span><span class="o">=</span><span class="mh">0x1</span><span class="o">.</span><span class="mh">0x6</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">pcie</span><span class="o">-</span><span class="n">root</span><span class="o">-</span><span class="n">port</span><span class="p">,</span><span class="n">port</span><span class="o">=</span><span class="mh">0xf</span><span class="p">,</span><span class="n">chassis</span><span class="o">=</span><span class="mi">9</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">pci</span><span class="o">.</span><span class="mi">9</span><span class="p">,</span><span class="n">bus</span><span class="o">=</span><span class="n">pcie</span><span class="o">.</span><span class="mi">0</span><span class="p">,</span><span class="n">addr</span><span class="o">=</span><span class="mh">0x1</span><span class="o">.</span><span class="mh">0x7</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">virtio</span><span class="o">-</span><span class="n">blk</span><span class="o">-</span><span class="n">pci</span><span class="p">,</span><span class="n">drive</span><span class="o">=</span><span class="n">drive</span><span class="o">-</span><span class="n">virtio0</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">virtio0</span><span class="p">,</span><span class="n">bus</span><span class="o">=</span><span class="n">pci</span><span class="o">.</span><span class="mi">4</span><span class="p">,</span><span class="n">addr</span><span class="o">=</span><span class="mh">0x0</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">drive</span><span class="w"> </span><span class="n">file</span><span class="o">=./</span><span class="n">openeuler</span><span class="o">-</span><span class="n">lts</span><span class="o">.</span><span class="n">qcow2</span><span class="p">,</span><span class="k">if</span><span class="o">=</span><span class="n">none</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">drive</span><span class="o">-</span><span class="n">virtio0</span><span class="p">,</span><span class="n">cache</span><span class="o">=</span><span class="n">none</span><span class="p">,</span><span class="n">aio</span><span class="o">=</span><span class="n">native</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">usb</span><span class="o">-</span><span class="n">ehci</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">usb</span><span class="p">,</span><span class="n">bus</span><span class="o">=</span><span class="n">pci</span><span class="o">.</span><span class="mi">3</span><span class="p">,</span><span class="n">addr</span><span class="o">=</span><span class="mh">0x1</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">usb</span><span class="o">-</span><span class="n">tablet</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">input0</span><span class="p">,</span><span class="n">bus</span><span class="o">=</span><span class="n">usb</span><span class="o">.</span><span class="mi">0</span><span class="p">,</span><span class="n">port</span><span class="o">=</span><span class="mi">1</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">usb</span><span class="o">-</span><span class="n">kbd</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">input1</span><span class="p">,</span><span class="n">bus</span><span class="o">=</span><span class="n">usb</span><span class="o">.</span><span class="mi">0</span><span class="p">,</span><span class="n">port</span><span class="o">=</span><span class="mi">2</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">virtio</span><span class="o">-</span><span class="n">gpu</span><span class="o">-</span><span class="n">pci</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">video0</span><span class="p">,</span><span class="n">bus</span><span class="o">=</span><span class="n">pci</span><span class="o">.</span><span class="mi">3</span><span class="p">,</span><span class="n">addr</span><span class="o">=</span><span class="mh">0x4</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">virtio</span><span class="o">-</span><span class="n">balloon</span><span class="o">-</span><span class="n">pci</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">balloon0</span><span class="p">,</span><span class="n">bus</span><span class="o">=</span><span class="n">pci</span><span class="o">.</span><span class="mi">3</span><span class="p">,</span><span class="n">addr</span><span class="o">=</span><span class="mh">0x3</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">vnc</span><span class="w"> </span><span class="p">:</span><span class="mi">99</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">monitor</span><span class="w"> </span><span class="n">stdio</span><span class="w"></span>
+</code></pre></div>
+
+<p>使用qemu monitor命令执行内存热插，这里为虚拟机添加1G内存：</p>
+<div class="highlight"><pre><span></span><code>  (qemu) object_add memory-backend-ram,id=mem1,size=1G
+  (qemu) device_add pc-dimm,id=dimm1,memdev=mem1
+</code></pre></div>
+
+<p>然后到Guest OS内部去执行<code>free -g</code>或者<code>numactl -H</code>查询一下（注意Guest OS内核版本要支持memhp），
+应该已经生效了，但这个时候内存应该默认还没自动上线。</p>
+<p>手动上线：</p>
+<div class="highlight"><pre><span></span><code>  <span class="k">for</span> i <span class="k">in</span> <span class="sb">`</span>grep -l offline /sys/devices/system/memory/memory*/state<span class="sb">`</span>
+  <span class="k">do</span> 
+      <span class="nb">echo</span> online &gt; <span class="nv">$i</span> 
+  <span class="k">done</span>
+</code></pre></div>
+
+<p>udev设备自动上线。编辑udev rules创建文件
+/etc/udev/rules.d/99-hotplug-memory.rules</p>
+<div class="highlight"><pre><span></span><code># automatically online hot-plugged memory
+ACTION==&quot;add&quot;, SUBSYSTEM==&quot;memory&quot;, ATTR{state}=&quot;online&quot;
+</code></pre></div>
+
+<h2>2. CPU Hotplug 特性</h2>
+<p>QEMU在x86上很早就支持了CPU hotplug，但在aarch64上目前upstream还没有支持。
+值得高兴地是，在openEuler上提前为我们带来了这个特性，
+感谢HUAWEI Hisilicon和openEuler virtualization team的努力！</p>
+<p>CPU Hotplug主要涉及的点有：</p>
+<ol>
+<li>MADT(Multiple APIC Description Table)表构构建</li>
+<li>构建PPTT( Processor Properties Topology Table)表 </li>
+<li>扩展GED，支持CPU Hotplug Event</li>
+</ol>
+<h2>3. Reference</h2>
+<ul>
+<li>
+<ol>
+<li><a href="https://www.kernel.org/doc/html/latest/admin-guide/mm/memory-hotplug.html">Linux Kernel Memory Hotplug</a></li>
+</ol>
+</li>
+</ul>
+
+
+             
+ 
+                <p id="post-share-links">
+    Share on:
+      <a href="https://twitter.com/intent/tweet?text=Memory%20Hotplug%20%26%20CPU%20Hotplug&url=https%3A//kernelgo.org/qemu-device-hotplug.html&hashtags=memory-hotplug" target="_blank" rel="nofollow noopener noreferrer" title="Share on Twitter">Twitter</a>
+ ❄       <a href="https://www.facebook.com/sharer/sharer.php?u=https%3A//kernelgo.org/qemu-device-hotplug.html" target="_blank" rel="nofollow noopener noreferrer" title="Share on Facebook">Facebook</a>
+ ❄       <a href="mailto:?subject=Memory%20Hotplug%20%26%20CPU%20Hotplug&amp;body=https%3A//kernelgo.org/qemu-device-hotplug.html" target="_blank" rel="nofollow noopener noreferrer" title="Share via Email">Email</a>
+
+            
+            
+
+
+
+
+
+
+
+<section>
+    <h6 style="display:none;">Comments</h6>
+    <p id="comment-message"> </p>
+
+    <div class="accordion" id="accordion2">
+        <div class="accordion-group">
+            <div class="accordion-heading">
+                <a class="accordion-toggle disqus-comment-count comment-count collapsed"
+                   data-toggle="collapse"
+                   data-parent="#accordion2"
+                   data-disqus-identifier="https://kernelgo.org/qemu-device-hotplug.html"
+                   href="https://kernelgo.org/qemu-device-hotplug.html#comment_thread"
+                   id="comment-accordion-toggle">
+                    Comments
+                </a>
+            </div>
+            <div id="comment_thread" class="accordion-body collapse">
+                <div class="accordion-inner">
+                    <div class="comments">
+                        <div id="disqus_thread"></div>
+                        <script>
+    var disqus_shortname = 'kernelgo';
+    (function () {
+        var s = document.createElement('script'); s.async = true;
+        s.type = 'text/javascript';
+        s.src = '//' + disqus_shortname + '.disqus.com/count.js';
+        (document.getElementsByTagName('HEAD')[0] || document.getElementsByTagName('BODY')[0]).appendChild(s);
+    }());
+
+    var disqus_identifier = 'https://kernelgo.org/qemu-device-hotplug.html';
+    var disqus_url = 'https://kernelgo.org/qemu-device-hotplug.html';
+
+    (function() {
+        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    })();
+</script>
+
+<noscript>Please enable JavaScript to view the <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+            <hr/>
+            <aside>
+            <nav>
+            <ul class="articles-timeline">
+                <li class="previous-article">« <a href="https://kernelgo.org/qemu-aio-internal.html" title="Previous: A Qemu Hang Problem Revelant to AIO">A Qemu Hang Problem Revelant to AIO</a></li>
+                <li class="next-article"><a href="https://kernelgo.org/memory-model.html" title="Next: Understanding C11/C++11 Memory Model">Understanding C11/C++11 Memory Model</a> »</li>
+            </ul>
+            </nav>
+            </aside>
+        </div>
+        <section id="article-sidebar" class="span2">
+            <h4>Published</h4>
+            <time itemprop="dateCreated" datetime="2020-04-26T23:00:00+08:00">Sun 26 April 2020</time>
+            <h4>Category</h4>
+            <a class="category-link" href="https://kernelgo.org/categories.html#virtualization-ref">virtualization</a>
+            <h4>Tags</h4>
+            <ul class="list-of-tags tags-in-article">
+                <li><a href="https://kernelgo.org/tags.html#memory-hotplug-ref">Memory Hotplug
+                    <span class="superscript">1</span>
+</a></li>
+            </ul>
+<h4>Contact</h4>
+<div id="sidebar-social-link">
+    <a href="https://github.com/fangying" title="" target="_blank" rel="nofollow noopener noreferrer">
+        <svg xmlns="http://www.w3.org/2000/svg" aria-label="GitHub" role="img" viewBox="0 0 512 512"><rect width="512" height="512" rx="15%" fill="#1B1817"/><path fill="#fff" d="M335 499c14 0 12 17 12 17H165s-2-17 12-17c13 0 16-6 16-12l-1-50c-71 16-86-28-86-28-12-30-28-37-28-37-24-16 1-16 1-16 26 2 40 26 40 26 22 39 59 28 74 22 2-17 9-28 16-35-57-6-116-28-116-126 0-28 10-51 26-69-3-6-11-32 3-67 0 0 21-7 70 26 42-12 86-12 128 0 49-33 70-26 70-26 14 35 6 61 3 67 16 18 26 41 26 69 0 98-60 120-117 126 10 8 18 24 18 48l-1 70c0 6 3 12 16 12z"/></svg>
+    </a>
+</div>
+            
+
+
+
+
+
+            
+
+
+
+
+
+        </section>
+</div>
+</article>
+<!-- Root element of PhotoSwipe. Must have class pswp. -->
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    <!-- Background of PhotoSwipe.
+         It's a separate element as animating opacity is faster than rgba(). -->
+    <div class="pswp__bg"></div>
+
+    <!-- Slides wrapper with overflow:hidden. -->
+    <div class="pswp__scroll-wrap">
+
+        <!-- Container that holds slides.
+            PhotoSwipe keeps only 3 of them in the DOM to save memory.
+            Don't modify these 3 pswp__item elements, data is added later on. -->
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        <!-- Default (PhotoSwipeUI_Default) interface on top of sliding area. Can be changed. -->
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                <!--  Controls are self-explanatory. Order can be changed. -->
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                <!-- Preloader demo https://codepen.io/dimsemenov/pen/yyBWoR -->
+                <!-- element will get class pswp__preloader--active when preloader is running -->
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                      <div class="pswp__preloader__cut">
+                        <div class="pswp__preloader__donut"></div>
+                      </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>                    </div>
+                    <div class="span1"></div>
+                </div>
+            </div>
+        </div>
+<footer>
+    <div>
+        <span xmlns:dct="http://purl.org/dc/terms/" property="dct:title"> kernelgo"</span> by <a xmlns:cc="http://creativecommons.org/ns#" href="https://kernelgo.org" property="cc:attributionName" rel="cc:attributionURL">Yori Fang</a> is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/3.0/deed.en_US">Creative Commons Attribution-ShareAlike 3.0 Unported License</a>.
+    </div>
+
+
+
+
+    <div id="fpowered">
+        Powered by: <a href="http://getpelican.com/" title="Pelican Home Page" target="_blank" rel="nofollow noopener noreferrer">Pelican</a>
+        Theme: <a href="https://elegant.oncrashreboot.com/" title="Theme Elegant Home Page" target="_blank" rel="nofollow noopener noreferrer">Elegant</a>
+    </div>
+</footer>            <script src="//code.jquery.com/jquery.min.js"></script>
+        <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/js/bootstrap.min.js"></script>
+        <script src="https://kernelgo.org/theme/js/elegant.prod.9e9d5ce754.js"></script>
+        <script>
+            function validateForm(query)
+            {
+                return (query.length > 0);
+            }
+        </script>
+
+    <script>
+    (function () {
+        if (window.location.hash.match(/^#comment-\d+$/)) {
+            $('#comment_thread').collapse('show');
+        }
+    })();
+    window.onhashchange=function(){
+        if (window.location.hash.match(/^#comment-\d+$/))
+            window.location.reload(true);
+    }
+    $('#comment_thread').on('shown', function () {
+        var link = document.getElementById('comment-accordion-toggle');
+        var old_innerHTML = link.innerHTML;
+        $(link).fadeOut(200, function() {
+            $(this).text('Click here to hide comments').fadeIn(200);
+        });
+        $('#comment_thread').on('hidden', function () {
+            $(link).fadeOut(200, function() {
+                $(this).text(old_innerHTML).fadeIn(200);
+            });
+        })
+    })
+</script>
+
+    </body>
+    <!-- Theme: Elegant built for Pelican
+        License : MIT -->
+</html>

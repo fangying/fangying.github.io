@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://kernelgo.org/theme/css/style.min.css?fc5adb95">
+
+        <link rel="dns-prefetch" href="//fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin>
+
+        <meta name="author" content="Yori Fang" />
+
+        <meta name="description" content="Debug Linux Kernel
+" />
+        <meta property="og:type" content="article" />
+        <meta name="twitter:card" content="summary">
+
+<meta name="keywords" content="linux, linux, " />
+
+<meta property="og:title" content="Debug Linux Kernel Using QEMU and GDB "/>
+<meta property="og:url" content="https://kernelgo.org/kernel-debug-using-qemu.html" />
+<meta property="og:description" content="Debug Linux Kernel" />
+<meta property="og:site_name" content="kernelgo" />
+<meta property="og:article:author" content="Yori Fang" />
+<meta property="og:article:published_time" content="2018-12-23T23:00:00+08:00" />
+<meta property="og:article:modified_time" content="2018-12-23T23:00:00+08:00" />
+<meta name="twitter:title" content="Debug Linux Kernel Using QEMU and GDB ">
+<meta name="twitter:description" content="Debug Linux Kernel">
+
+        <title>Debug Linux Kernel Using QEMU and GDB  · kernelgo
+</title>
+<script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+     (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+     m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+     })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+    ga('create', 'UA-107392039-1', 'auto');
+    ga('send', 'pageview');
+</script>
+
+
+    </head>
+    <body>
+        <div id="content">
+            <div class="navbar navbar-static-top">
+                <div class="navbar-inner">
+                    <div class="container-fluid">
+                        <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                        </a>
+                        <a class="brand" href="https://kernelgo.org/"><span class=site-name>kernelgo</span></a>
+                        <div class="nav-collapse collapse">
+                            <ul class="nav pull-right top-menu">
+                                <li >
+                                    <a href=
+                                       https://kernelgo.org
+                                    >Home</a>
+                                </li>
+                                <li ><a href="https://kernelgo.org/pages/about.html">About</a></li>
+                                <li ><a href="https://kernelgo.org/categories.html">Categories</a></li>
+                                <li ><a href="https://kernelgo.org/tags.html">Tags</a></li>
+                                <li ><a href="https://kernelgo.org/archives.html">Archives</a></li>
+                                <li><form class="navbar-search" action="https://kernelgo.org/search.html" onsubmit="return validateForm(this.elements['q'].value);"> <input type="text" class="search-query" placeholder="Search" name="q" id="tipue_search_input"></form></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="container-fluid">
+                <div class="row-fluid">
+                    <div class="span1"></div>
+                    <div class="span10">
+<article itemscope>
+<div class="row-fluid">
+    <header class="page-header span10 offset2">
+        <h1>
+            <a href="https://kernelgo.org/kernel-debug-using-qemu.html">
+                Debug Linux Kernel Using QEMU and GDB
+            </a>
+        </h1>
+    </header>
+</div>
+
+<div class="row-fluid">
+        <div class="span8 offset2 article-content">
+            
+            <p>有的时候为了研究内核原理或者调试bios的时候，可以利用QEMU和gdb的方式来帮助我们调试问题．
+这种操作利用了QEMU内建的gdb-stub能力．</p>
+<h2>重新编译内核</h2>
+<p>编译的时候开启内核参数CONFIG_DEBUG_INFO和CONFIG_GDB_SCRIPTS再进行编译，
+如果硬件支持CONFIG_FRAME_POINTER也一并开启，但要关闭CONFIG_DEBUG_INFO_REDUCED。</p>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span> /home/fang/Code/opensrc/linux
+make modules -j<span class="sb">`</span>nproc<span class="sb">`</span>
+make -j<span class="sb">`</span>nproc<span class="sb">`</span> 
+</code></pre></div>
+
+<h2>调试内核</h2>
+<p>用下的命令行拉起QEMU，这里可以从自己的OS上选取一个initramfs传给QEMU或者直接挂载一个rootfs镜像，
+记得配上<code>nokaslr</code>以免内核段基地址被随机映射．
+这里<code>-S</code>参数可以让QEMU启动后CPU先Pause住不运行，
+<code>-s</code>参数是<code>-gdb tcp::1234</code>的简写，意思是让QEMU侧的gdb server侦听在1234端口等待调试．</p>
+<div class="highlight"><pre><span></span><code>/data/vm/qemu/x86_64-softmmu/qemu-system-x86_64 <span class="se">\</span>
+    -machine pc,accel<span class="o">=</span>kvm <span class="se">\</span>
+    -cpu host <span class="se">\</span>
+    -smp <span class="m">4</span> <span class="se">\</span>
+    -m 4096M <span class="se">\</span>
+    -nodefaults <span class="se">\</span>
+    -nographic <span class="se">\</span>
+    -drive <span class="nv">id</span><span class="o">=</span>test,file<span class="o">=</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span>/fedora33.raw,format<span class="o">=</span>raw,if<span class="o">=</span>none <span class="se">\</span>
+    -device virtio-blk-pci,drive<span class="o">=</span><span class="nb">test</span> <span class="se">\</span>
+    -netdev tap,id<span class="o">=</span>tap,ifname<span class="o">=</span>virbr0-tap,script<span class="o">=</span>no,downscript<span class="o">=</span>no <span class="se">\</span>
+    -device virtio-net-pci,netdev<span class="o">=</span>tap <span class="se">\</span>
+    -kernel /home/fang/Code/opensrc/linux/vmlinux <span class="se">\</span>
+    -append <span class="s2">&quot;nokaslr earlyprintk=ttyS0 console=ttyS0 tsc=realiable root=/dev/vda rw&quot;</span> <span class="se">\</span>
+    -serial stdio -S -s
+</code></pre></div>
+
+<p>用上面的qemu脚本拉起虚拟机，关键是最后的<code>-S -s</code>参数的含义是让qemu运行内建的gdbserver并监听在本地的1234
+端口。<strong>注意</strong>：测试发现高版本的qemu内建的gdbserver好像有兼容性问题，我用qemu-6.0发现无法调试内核，
+但是回退到qemu-4.0可以调试内核。下载qemu自己编译一个合适的版本：</p>
+<div class="highlight"><pre><span></span><code>git clone https://github.com/qemu/qemu.git
+cd qemu
+git checkout v4.0.0
+./configure --enable-kvm --target-list=x86_64-softmmu --disable-werror
+make -j
+# 目标文件是：
+x86_64-softmmu/qemu-system-x86_64
+</code></pre></div>
+
+<p>如果运行后，gdb可能会报错<code>Remote 'g' packet reply is too long:</code>，
+这个时候的解决办法是打上一个补丁然后重新编译gdb.</p>
+<p>问题处在static void process_g_packet (struct regcache *regcache)函数，6113行，屏蔽对buf_len的判断．</p>
+<p>如果gdb版本低(7.x)打这个补丁:</p>
+<div class="highlight"><pre><span></span><code>    <span class="k">if</span> <span class="o">(</span>buf_len &gt; <span class="m">2</span> * rsa-&gt;sizeof_g_packet<span class="o">)</span>
+    error <span class="o">(</span>_<span class="o">(</span><span class="s2">&quot;Remote &#39;g&#39; packet reply is too long: %s&quot;</span><span class="o">)</span>, rs-&gt;buf<span class="o">)</span><span class="p">;</span>
+改为:
+    <span class="k">if</span> <span class="o">(</span>buf_len &gt; <span class="m">2</span> * rsa-&gt;sizeof_g_packet<span class="o">)</span> <span class="o">{</span>
+        rsa-&gt;sizeof_g_packet <span class="o">=</span> buf_len<span class="p">;</span>
+        <span class="k">for</span> <span class="o">(</span><span class="nv">i</span> <span class="o">=</span> <span class="m">0</span><span class="p">;</span> i &lt; gdbarch_num_regs <span class="o">(</span>gdbarch<span class="o">)</span><span class="p">;</span> i++<span class="o">)</span>
+        <span class="o">{</span>
+            <span class="k">if</span> <span class="o">(</span>rsa-&gt;regs<span class="o">[</span>i<span class="o">]</span>.pnum <span class="o">==</span> -1<span class="o">)</span>
+                <span class="k">continue</span><span class="p">;</span>
+            <span class="k">if</span> <span class="o">(</span>rsa-&gt;regs<span class="o">[</span>i<span class="o">]</span>.offset &gt;<span class="o">=</span> rsa-&gt;sizeof_g_packet<span class="o">)</span>
+                rsa-&gt;regs<span class="o">[</span>i<span class="o">]</span>.in_g_packet <span class="o">=</span> <span class="m">0</span><span class="p">;</span>
+            <span class="k">else</span>
+                rsa-&gt;regs<span class="o">[</span>i<span class="o">]</span>.in_g_packet <span class="o">=</span> <span class="m">1</span><span class="p">;</span>
+        <span class="o">}</span>
+    <span class="o">}</span>
+</code></pre></div>
+
+<p>如果gdb版本高(8.x)打这个补丁:</p>
+<div class="highlight"><pre><span></span><code>    <span class="k">if</span> <span class="o">(</span>buf_len &gt; <span class="m">2</span> * rsa-&gt;sizeof_g_packet<span class="o">)</span>
+    error <span class="o">(</span>_<span class="o">(</span><span class="s2">&quot;Remote &#39;g&#39; packet reply is too long: %s&quot;</span><span class="o">)</span>, rs-&gt;buf<span class="o">)</span><span class="p">;</span>
+改为:
+    /* Further sanity checks, with knowledge of the architecture.  */
+    <span class="k">if</span> <span class="o">(</span>buf_len &gt; <span class="m">2</span> * rsa-&gt;sizeof_g_packet<span class="o">)</span> <span class="o">{</span>
+        rsa-&gt;sizeof_g_packet <span class="o">=</span> buf_len <span class="p">;</span>
+        <span class="k">for</span> <span class="o">(</span><span class="nv">i</span> <span class="o">=</span> <span class="m">0</span><span class="p">;</span> i &lt; gdbarch_num_regs <span class="o">(</span>gdbarch<span class="o">)</span><span class="p">;</span> i++<span class="o">)</span> <span class="o">{</span>
+            <span class="k">if</span> <span class="o">(</span>rsa-&gt;regs<span class="o">[</span>i<span class="o">]</span>.pnum <span class="o">==</span> -1<span class="o">)</span>
+                <span class="k">continue</span><span class="p">;</span>
+            <span class="k">if</span> <span class="o">(</span>rsa-&gt;regs<span class="o">[</span>i<span class="o">]</span>.offset &gt;<span class="o">=</span> rsa-&gt;sizeof_g_packet<span class="o">)</span>
+                rsa-&gt;regs<span class="o">[</span>i<span class="o">]</span>.in_g_packet <span class="o">=</span> <span class="m">0</span><span class="p">;</span>
+            <span class="k">else</span>
+                rsa-&gt;regs<span class="o">[</span>i<span class="o">]</span>.in_g_packet <span class="o">=</span> <span class="m">1</span><span class="p">;</span>
+        <span class="o">}</span>
+    <span class="o">}</span>
+</code></pre></div>
+
+<p>编辑~/.gdbinit文件，让gdb自动加载vmlinux-gdb.py文件，</p>
+<div class="highlight"><pre><span></span><code><span class="n">add</span><span class="o">-</span><span class="n">auto</span><span class="o">-</span><span class="nb">load</span><span class="o">-</span><span class="n">safe</span><span class="o">-</span><span class="n">path</span><span class="w"> </span><span class="o">/</span><span class="n">path</span><span class="o">/</span><span class="n">to</span><span class="o">/</span><span class="n">linux</span><span class="o">-</span><span class="n">build</span><span class="w"></span>
+</code></pre></div>
+
+<p>开始愉快地调试内核了:</p>
+<div class="highlight"><pre><span></span><code>$ <span class="nb">cd</span> linux
+$ gdb vmlinux
+$ lx-symbols
+$ 
+<span class="o">(</span>gdb<span class="o">)</span> target remote :1234
+Remote debugging using :1234
+0x000000000000fff0 <span class="k">in</span> cpu_hw_events <span class="o">()</span>
+<span class="o">(</span>gdb<span class="o">)</span> hb start_kernel
+Hardware assisted breakpoint <span class="m">1</span> at 0xffffffff827dabb2: file init/main.c, line <span class="m">538</span>.
+<span class="o">(</span>gdb<span class="o">)</span> c
+Continuing.
+
+Thread <span class="m">1</span> hit Breakpoint <span class="m">1</span>, start_kernel <span class="o">()</span> at init/main.c:538
+<span class="m">538</span> <span class="o">{</span>
+<span class="o">(</span>gdb<span class="o">)</span> l
+<span class="m">533</span> <span class="o">{</span>
+<span class="m">534</span>     rest_init<span class="o">()</span><span class="p">;</span>
+<span class="m">535</span> <span class="o">}</span>
+<span class="m">536</span> 
+<span class="m">537</span> asmlinkage __visible void __init start_kernel<span class="o">(</span>void<span class="o">)</span>
+<span class="m">538</span> <span class="o">{</span>
+<span class="m">539</span>     char *command_line<span class="p">;</span>
+<span class="m">540</span>     char *after_dashes<span class="p">;</span>
+<span class="m">541</span> 
+<span class="m">542</span>     set_task_stack_end_magic<span class="o">(</span><span class="p">&amp;</span>init_task<span class="o">)</span><span class="p">;</span>
+<span class="o">(</span>gdb<span class="o">)</span> 
+</code></pre></div>
+
+<p>另外可以使用mkinitrd（mkinitramfs）命令来生成initramfs.img文件，例如：</p>
+<div class="highlight"><pre><span></span><code>sudo mkinitrd -v initramfs.img 5.0.0-rc4+
+</code></pre></div>
+
+<p>第一个参数是initramfs的输出文件名，第二个参数是内核版本号。
+然后我们可以直接boot这个内核：</p>
+<div class="highlight"><pre><span></span><code>x86_64-softmmu/qemu-system-x86_64 \
+    -kernel /mnt/code/linux/arch/x86/boot/bzImage \
+    -nographic \
+    -append &quot;console=ttyS0 nokalsr&quot; \
+    -enable-kvm \
+    -cpu host \
+    -initrd initramfs.img \
+    -m 1024
+</code></pre></div>
+
+<h2>参考文献</h2>
+<p>1.<a href="http://nickdesaulniers.github.io/blog/2018/10/24/booting-a-custom-linux-kernel-in-qemu-and-debugging-it-with-gdb/">linux kernel debug with qemu</a></p>
+<p>2.<a href="https://01.org/linuxgraphics/gfx-docs/drm/dev-tools/gdb-kernel-debugging.html">Debugging kernel and modules via gdb</a></p>
+
+
+             
+ 
+                <p id="post-share-links">
+    Share on:
+      <a href="https://twitter.com/intent/tweet?text=Debug%20Linux%20Kernel%20Using%20QEMU%20and%20GDB&url=https%3A//kernelgo.org/kernel-debug-using-qemu.html&hashtags=linux" target="_blank" rel="nofollow noopener noreferrer" title="Share on Twitter">Twitter</a>
+ ❄       <a href="https://www.facebook.com/sharer/sharer.php?u=https%3A//kernelgo.org/kernel-debug-using-qemu.html" target="_blank" rel="nofollow noopener noreferrer" title="Share on Facebook">Facebook</a>
+ ❄       <a href="mailto:?subject=Debug%20Linux%20Kernel%20Using%20QEMU%20and%20GDB&amp;body=https%3A//kernelgo.org/kernel-debug-using-qemu.html" target="_blank" rel="nofollow noopener noreferrer" title="Share via Email">Email</a>
+
+            
+            
+
+
+
+
+
+
+
+<section>
+    <h6 style="display:none;">Comments</h6>
+    <p id="comment-message"> </p>
+
+    <div class="accordion" id="accordion2">
+        <div class="accordion-group">
+            <div class="accordion-heading">
+                <a class="accordion-toggle disqus-comment-count comment-count collapsed"
+                   data-toggle="collapse"
+                   data-parent="#accordion2"
+                   data-disqus-identifier="https://kernelgo.org/kernel-debug-using-qemu.html"
+                   href="https://kernelgo.org/kernel-debug-using-qemu.html#comment_thread"
+                   id="comment-accordion-toggle">
+                    Comments
+                </a>
+            </div>
+            <div id="comment_thread" class="accordion-body collapse">
+                <div class="accordion-inner">
+                    <div class="comments">
+                        <div id="disqus_thread"></div>
+                        <script>
+    var disqus_shortname = 'kernelgo';
+    (function () {
+        var s = document.createElement('script'); s.async = true;
+        s.type = 'text/javascript';
+        s.src = '//' + disqus_shortname + '.disqus.com/count.js';
+        (document.getElementsByTagName('HEAD')[0] || document.getElementsByTagName('BODY')[0]).appendChild(s);
+    }());
+
+    var disqus_identifier = 'https://kernelgo.org/kernel-debug-using-qemu.html';
+    var disqus_url = 'https://kernelgo.org/kernel-debug-using-qemu.html';
+
+    (function() {
+        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    })();
+</script>
+
+<noscript>Please enable JavaScript to view the <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+            <hr/>
+<section>
+    <h2>Related Posts</h2>
+<ul class="related-posts-list">
+<li><a href="https://kernelgo.org/kprobe.html" title="kprobe kretprobe example">kprobe kretprobe example</a></li>
+</ul>
+<hr />
+</section>
+            <aside>
+            <nav>
+            <ul class="articles-timeline">
+                <li class="previous-article">« <a href="https://kernelgo.org/linux-tips.html" title="Previous: Tips on Linux">Tips on Linux</a></li>
+                <li class="next-article"><a href="https://kernelgo.org/vtd_interrupt_remapping_code_analysis.html" title="Next: VT-d Interrupt Remapping Code Analysis">VT-d Interrupt Remapping Code Analysis</a> »</li>
+            </ul>
+            </nav>
+            </aside>
+        </div>
+        <section id="article-sidebar" class="span2">
+            <h4>Published</h4>
+            <time itemprop="dateCreated" datetime="2018-12-23T23:00:00+08:00">Sun 23 December 2018</time>
+
+            <h4>Category</h4>
+            <a class="category-link" href="https://kernelgo.org/categories.html#linux-ref">linux</a>
+            <h4>Tags</h4>
+            <ul class="list-of-tags tags-in-article">
+                <li><a href="https://kernelgo.org/tags.html#linux-ref">linux
+                    <span class="superscript">2</span>
+</a></li>
+            </ul>
+<h4>Contact</h4>
+<div id="sidebar-social-link">
+    <a href="https://github.com/fangying" title="" target="_blank" rel="nofollow noopener noreferrer">
+        <svg xmlns="http://www.w3.org/2000/svg" aria-label="GitHub" role="img" viewBox="0 0 512 512"><rect width="512" height="512" rx="15%" fill="#1B1817"/><path fill="#fff" d="M335 499c14 0 12 17 12 17H165s-2-17 12-17c13 0 16-6 16-12l-1-50c-71 16-86-28-86-28-12-30-28-37-28-37-24-16 1-16 1-16 26 2 40 26 40 26 22 39 59 28 74 22 2-17 9-28 16-35-57-6-116-28-116-126 0-28 10-51 26-69-3-6-11-32 3-67 0 0 21-7 70 26 42-12 86-12 128 0 49-33 70-26 70-26 14 35 6 61 3 67 16 18 26 41 26 69 0 98-60 120-117 126 10 8 18 24 18 48l-1 70c0 6 3 12 16 12z"/></svg>
+    </a>
+</div>
+            
+
+
+
+
+
+            
+
+
+
+
+
+        </section>
+</div>
+</article>
+<!-- Root element of PhotoSwipe. Must have class pswp. -->
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    <!-- Background of PhotoSwipe.
+         It's a separate element as animating opacity is faster than rgba(). -->
+    <div class="pswp__bg"></div>
+
+    <!-- Slides wrapper with overflow:hidden. -->
+    <div class="pswp__scroll-wrap">
+
+        <!-- Container that holds slides.
+            PhotoSwipe keeps only 3 of them in the DOM to save memory.
+            Don't modify these 3 pswp__item elements, data is added later on. -->
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        <!-- Default (PhotoSwipeUI_Default) interface on top of sliding area. Can be changed. -->
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                <!--  Controls are self-explanatory. Order can be changed. -->
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                <!-- Preloader demo https://codepen.io/dimsemenov/pen/yyBWoR -->
+                <!-- element will get class pswp__preloader--active when preloader is running -->
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                      <div class="pswp__preloader__cut">
+                        <div class="pswp__preloader__donut"></div>
+                      </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>                    </div>
+                    <div class="span1"></div>
+                </div>
+            </div>
+        </div>
+<footer>
+    <div>
+        <span xmlns:dct="http://purl.org/dc/terms/" property="dct:title"> kernelgo"</span> by <a xmlns:cc="http://creativecommons.org/ns#" href="https://kernelgo.org" property="cc:attributionName" rel="cc:attributionURL">Yori Fang</a> is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/3.0/deed.en_US">Creative Commons Attribution-ShareAlike 3.0 Unported License</a>.
+    </div>
+
+
+
+
+    <div id="fpowered">
+        Powered by: <a href="http://getpelican.com/" title="Pelican Home Page" target="_blank" rel="nofollow noopener noreferrer">Pelican</a>
+        Theme: <a href="https://elegant.oncrashreboot.com/" title="Theme Elegant Home Page" target="_blank" rel="nofollow noopener noreferrer">Elegant</a>
+    </div>
+</footer>            <script src="//code.jquery.com/jquery.min.js"></script>
+        <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/js/bootstrap.min.js"></script>
+        <script src="https://kernelgo.org/theme/js/elegant.prod.9e9d5ce754.js"></script>
+        <script>
+            function validateForm(query)
+            {
+                return (query.length > 0);
+            }
+        </script>
+
+    <script>
+    (function () {
+        if (window.location.hash.match(/^#comment-\d+$/)) {
+            $('#comment_thread').collapse('show');
+        }
+    })();
+    window.onhashchange=function(){
+        if (window.location.hash.match(/^#comment-\d+$/))
+            window.location.reload(true);
+    }
+    $('#comment_thread').on('shown', function () {
+        var link = document.getElementById('comment-accordion-toggle');
+        var old_innerHTML = link.innerHTML;
+        $(link).fadeOut(200, function() {
+            $(this).text('Click here to hide comments').fadeIn(200);
+        });
+        $('#comment_thread').on('hidden', function () {
+            $(link).fadeOut(200, function() {
+                $(this).text(old_innerHTML).fadeIn(200);
+            });
+        })
+    })
+</script>
+
+    </body>
+    <!-- Theme: Elegant built for Pelican
+        License : MIT -->
+</html>

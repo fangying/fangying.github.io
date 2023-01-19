@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://kernelgo.org/theme/css/style.min.css?fc5adb95">
+
+        <link rel="dns-prefetch" href="//fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin>
+
+        <meta name="author" content="Yori Fang" />
+
+        <meta name="description" content="ARMv8 Virtualization Architecture
+" />
+        <meta property="og:type" content="article" />
+        <meta name="twitter:card" content="summary">
+
+<meta name="keywords" content="ARMv8 virtualization, virtualization, " />
+
+<meta property="og:title" content="ARMv8 Virtualization Overview "/>
+<meta property="og:url" content="https://kernelgo.org/armv8-virt-guide.html" />
+<meta property="og:description" content="ARMv8 Virtualization Architecture" />
+<meta property="og:site_name" content="kernelgo" />
+<meta property="og:article:author" content="Yori Fang" />
+<meta property="og:article:published_time" content="2019-07-25T23:00:00+08:00" />
+<meta property="og:article:modified_time" content="2019-07-25T23:00:00+08:00" />
+<meta name="twitter:title" content="ARMv8 Virtualization Overview ">
+<meta name="twitter:description" content="ARMv8 Virtualization Architecture">
+
+        <title>ARMv8 Virtualization Overview  · kernelgo
+</title>
+<script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+     (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+     m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+     })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+    ga('create', 'UA-107392039-1', 'auto');
+    ga('send', 'pageview');
+</script>
+
+
+    </head>
+    <body>
+        <div id="content">
+            <div class="navbar navbar-static-top">
+                <div class="navbar-inner">
+                    <div class="container-fluid">
+                        <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                        </a>
+                        <a class="brand" href="https://kernelgo.org/"><span class=site-name>kernelgo</span></a>
+                        <div class="nav-collapse collapse">
+                            <ul class="nav pull-right top-menu">
+                                <li >
+                                    <a href=
+                                       https://kernelgo.org
+                                    >Home</a>
+                                </li>
+                                <li ><a href="https://kernelgo.org/pages/about.html">About</a></li>
+                                <li ><a href="https://kernelgo.org/categories.html">Categories</a></li>
+                                <li ><a href="https://kernelgo.org/tags.html">Tags</a></li>
+                                <li ><a href="https://kernelgo.org/archives.html">Archives</a></li>
+                                <li><form class="navbar-search" action="https://kernelgo.org/search.html" onsubmit="return validateForm(this.elements['q'].value);"> <input type="text" class="search-query" placeholder="Search" name="q" id="tipue_search_input"></form></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="container-fluid">
+                <div class="row-fluid">
+                    <div class="span1"></div>
+                    <div class="span10">
+<article itemscope>
+<div class="row-fluid">
+    <header class="page-header span10 offset2">
+        <h1>
+            <a href="https://kernelgo.org/armv8-virt-guide.html">
+                ARMv8 Virtualization Overview
+            </a>
+        </h1>
+    </header>
+</div>
+
+<div class="row-fluid">
+        <div class="span8 offset2 article-content">
+            
+            <h3>摘要：</h3>
+<p>ARM处理器在移动领域已经大放异彩占据了绝对优势，但在服务器领域当前主要还是X86的天下。
+为了能够和X86在服务器领域展开竞争，ARM也逐渐对虚拟化扩展有了较为完善的支持。
+本文的目的是介绍一下ARMv8 AArch64处理器的虚拟化扩展中的一些相关知识点，
+将主要从ARM体系结构、内存虚拟化、中断虚拟化、I/O虚拟化等几个方面做一些概括总结。
+本文将尽可能的在特性层面和X86做一些对比以加深我们对于ARM Virtualizaiton Extension的映像。</p>
+<h3>0. ARMv8 System Architecture</h3>
+<p>在进入正题之前先回顾一下ARMv8体系结构的一些基本概念。</p>
+<p>ARMv8支持两种执行状态：AArch64和AArch32。</p>
+<p>AArch64 64-bit执行状态：</p>
+<ul>
+<li>提供31个64bit的通用处理器，其中X30是Procedure link register</li>
+<li>提供一个64bit的程序寄存器PC，堆栈指针(SPs)和Exception link registers（ELRs）</li>
+<li>提供了32个128bit的寄存器以支持SIMD矢量和标量浮点运算</li>
+<li>定义了4个Exception Level （EL0-EL3）</li>
+<li>支持64bit虚拟机地址(virtual address)</li>
+<li>定义了一些PSTATE eletems来存储PE的状态</li>
+<li>过后ELn缀来表示不同Exception Level下可以操作的系统寄存器</li>
+</ul>
+<p>AArch32 32-bit执行状态：</p>
+<ul>
+<li>提供了13个32bit通用寄存器，1个32bit的PC，SP和Link Register（LR）</li>
+<li>为Hyper Mode下的异常返回值提供给了一个单一的ELR</li>
+<li>提供32个64bit的寄存器来支持SIMD矢量和标量浮点运算支持</li>
+<li>提供了2个指令集，A32和T32,</li>
+<li>支持ARMv7-A Exception Mode，基于PE modes并且可以对应到ARMv8的Exception model中</li>
+<li>使用32bit的虚拟地址</li>
+<li>使用一个单一的CPSR来保存PE的状态</li>
+</ul>
+<p>ARM 内存模型：</p>
+<ul>
+<li>非对齐的内存访问将产生一个异常</li>
+<li>限制应用程序访问指定的内存区域</li>
+<li>程序执行中的虚拟地址将被翻译成物理地址</li>
+<li>内存访问顺序受控</li>
+<li>控制cache和地址翻译的结构</li>
+<li>多个PE之间共享内存的访问同步</li>
+</ul>
+<p>ARM 内存管理（<a href="https://static.docs.arm.com/100940/0100/armv8_a_address%20translation_100940_0100_en.pdf">参考ARM Address Translation</a>）：</p>
+<ul>
+<li>ARMv8-A架构支持的最大物理内存地址宽度是48bit，支持4KB、16KB、或者64KB的页面大小</li>
+<li>使用虚拟内存管理机制，VA的最高有效位（MSB）为0时MMU使用TTBR0的转换表来翻译，VA的最高有效位为1时MMU使用TTBR1的转换表来翻译</li>
+<li>EL2和EL3有TTBR0，但是没有TTBR1，这意味着EL2和EL3下只能使用0x0~0x0000FFFF_FFFFFFFF范围的虚拟地址空间</li>
+</ul>
+<div class="highlight"><pre><span></span><code><span class="nb">-------------------------------------------------------------------------</span><span class="c"></span>
+<span class="c">AArch64 Linux memory layout with 4KB pages </span><span class="nb">+</span><span class="c"> 4 levels::</span>
+<span class="c">  Start         End         Size        Use</span>
+<span class="c">  0000000000000000  0000ffffffffffff     256TB      user</span>
+<span class="c">  ffff000000000000  ffffffffffffffff     256TB      kernel</span>
+<span class="nb">-------------------------------------------------------------------------</span><span class="c"></span>
+</code></pre></div>
+
+<p><img alt="ARM Address Translation" src="../images/arm_address_translation.png"></p>
+<p>OK，假装我们现在的ARMv8-A已经有了一个初步的了解，下面再从几个大的维度去看下ARMv8对虚拟化是怎么支持的。</p>
+<h3>1. ARMv8 Virtualization Extension Overview</h3>
+<p>ARM为了支持虚拟化扩展在CPU的运行级别上引入了Exception Level的概念，AArch64对应的Exception Level视图如下图：</p>
+<p><img alt="ARM Exception Level" src="../images/aarch64_exception_levels_2.svg"></p>
+<ul>
+<li>EL0：用户态程序的运行级别，Guest内部的App也运行在这个级别</li>
+<li>EL1：内核的运行级别，Guest的内核也运行在这个级别</li>
+<li>EL2：Hypervisor的运行级别，Guest在运行的过程中会触发特权指令后陷入到EL2级别，将控制权交给Hypervisor</li>
+<li>EL3：Monitor Mode，CPU在Secure World和 Normal World直接切换的时候会先进入EL3，然后发生World切换</li>
+</ul>
+<p>注：当CPU的Virtualization Extension被disable的时候，软件就运行在EL0和EL1上，这时候EL1有权限访问所有的硬件。</p>
+<p>与ARMv8不同的是，在X86为支持CPU虚拟化引入了Root Mode和None-Root Mode的概念和一套特殊的VMX指令集，
+其中非根模式是Guest CPU的执行环境，根模式是Host CPU的执行环境。
+根模式、非根模式与CPU的特权级别是两个完全独立的概念，二者完全正交，
+也就是说非根模式下支持和根模式下一样的用户态（Ring 3）、内核态（Ring 0）特权级。
+而这和ARM是不同的，ARM CPU是依靠在不同的EL之间切换来支持虚拟化模式切换。
+但二者都有一个相同点:那就是ARM和X86在虚拟化模式下如果执行了敏感指令会分别退出到EL2和Root Mode之间。
+同时，X86上为了更好地支持Root/Non-root Mode在内存中实现了一个叫做VMCS的数据结构，
+用来保存和恢复Root/None-root模式切换过程中的寄存器信息，VMX指令集则专门用来操作VMCS数据结构。
+但在RISC-style的ARM处理器上，则没有类似的实现，而是让Hypervisor软件自己来决定哪些信息需要保存和恢复，
+这在一定程度上带来了一些灵活性[<a href="http://www.cs.columbia.edu/~cdall/pubs/isca2016-dall.pdf">Ref1</a>]。</p>
+<h3>2. Memory Virtualization</h3>
+<p>在ARMv8-A上，每个tarnslation regime可能包括1个stage，也可能包括2个sate。
+每个Exception Level都有自己的地址翻译机制，使用不同的页表基地址寄存器，地址翻译可以细分到stage，
+大部分的EL包括一个stage的地址翻译过程， Non-Secure EL1&amp;0包括了2个stage的地址翻译过程。
+每个stage都有自己独立的一系列Translation tables，每个stage都能独立的enable或者disable。
+每个stage都是将输入地址（IA）翻译成输出地址（OA）[<a href="http://www.wowotech.net/memory_management/arm64-memory-addressing.html">Ref2</a>]。</p>
+<p>所以在虚拟化场景下，ARM和X86上的方案是类似的，都是采用两阶段地址翻译实现GPA -&gt; HPA的地址翻译过程。
+虚拟机运行在None-secure EL1&amp;0，当虚拟机内的进程访问GVA的时候MMU会将GVA翻译成IPA（intermediate physical address，中间物理地址：GPA），
+这就是所谓的stage 1地址翻译。然后MMU会再次将IPA翻译成HPA，这就是所谓的stage 2地址翻译。</p>
+<p><img alt="Two State Translation" src="../images/arm_mmu_trans.png"></p>
+<p>在不同的Eexception Level下有不同的Address Space，那么如何去控制不同地址空间的翻译呢？</p>
+<p>ARMv8-A上有一个TCR（Translation Control Register）寄存器来控制地址翻译。
+例如：对于EL1&amp;0来说，由于在该运行模式下VA存在2个独立的映射空间（User Space和Kernel Space），
+所以需要两套页表来完成地址翻译，这2个页表的及地址分别放在TTBR0_EL1和TTBR1_EL1中。</p>
+<p>对于每一个地址翻译阶段:</p>
+<ul>
+<li>有一个system control register bit来使能该阶段的地址翻译</li>
+<li>有一个system control register bit来决定翻译的时候使用的大小端策略</li>
+<li>有一个TCR寄存器来控制整个阶段的地址翻译过程</li>
+<li>如果某个地址翻译阶段支持将VA映射到两个subranges，那么该阶段的地址翻译需要为每个VA subrange提供不同的TTBR寄存器</li>
+</ul>
+<p>内存虚拟化也没有太多可以说道，理解了原理之后就可以去梳理KVM相关代码，相关代码实现主要在arch/arm/mm/mmu.c里面。</p>
+<h3>3. I/O Virtualization</h3>
+<p>设备直通的目的是能够让虚拟机直接访问到物理设备，从而提升IO性能。
+在X86上使用VT-d技术就能够实现设备直通，这一切都得益于VFIO驱动和Intel IOMMU的加持。
+那么在ARMv8-A上为了支持设备直通，又有哪些不同和改进呢？</p>
+<p>同X86上一样，ARM上的设备直通关键也是要解决DMA重映射和直通设备中断投递的问题。
+但和X86上不一样的是，ARMv8-A上使用的是SMMU v3.1来处理设备的DMA重映射，
+中断则是使用GICv3中断控制器来完成的，SMMUv3和GICv3在设计的时候考虑了更多跟虚拟化相关的实现，
+针对虚拟化场景有一定的改进和优化。</p>
+<p>先看下SMMUv3.1的在ARMv8-A中的使用情况以及它为ARM设备直通上做了哪些改进[<a href="https://static.docs.arm.com/ihi0070/b/SMMUv3_architecture_specification_IHI0070B.pdf">Ref3</a>]。
+SMMUv3规定必须实现的特性有：</p>
+<ul>
+<li>SMMU支持2阶段地址翻译，这和内存虚拟化场景下MMU支持2阶段地址翻译类似，
+第一阶段的地址翻译被用做进程（software entity）之间的隔离或者OS内的DMA隔离，
+第二阶段的地址翻译被用来做DMA重映射，即将Guest发起的DMA映射到Guest的地址空间内。</li>
+<li>支持16bit的ASIDs</li>
+<li>支持16bit的VMIDs</li>
+<li>支持SMMU页表共享，允许软件选择一个已经创建好的共享SMMU页表或者创建一个私有的SMMU页表</li>
+<li>支持49bit虚拟地址 (matching ARMv8-A’s 2×48-bit translation table input sizes)，SMMUv3.1支持52bit VA，IPA，PA</li>
+</ul>
+<p>SMMUv3支持的可选特性有：</p>
+<ul>
+<li>Stage1和Stage2同时支持AArch32(LPAE: Large Page Address Extension)和AArch64地址翻译表格式（兼容性考虑）</li>
+<li>支持Secure Stream （安全的DMA流传输）</li>
+<li>支持SMMU TLB Invalidation广播</li>
+<li>支持HTTU(Hardware Translation Table Update)硬件自动刷新页表的Access/Dirty标志位</li>
+<li>支持PCIE ATS和PRI（PRI特性非常厉害，后面单独介绍）</li>
+<li>支持16K或者64K页表粒度</li>
+</ul>
+<p>我们知道，一个平台上可以有多个SMMU设备，每个SMMU设备下面可能连接着多个Endpoint，
+多个设备互相之间可能不会复用同一个页表，需要加以区分，SMMU用StreamID来做这个区分，
+通过StreamID去索引Stream Table中的STE（Stream Table Entry）。
+同样x86上也有类似的区分机制，不同的是x86是使用Request ID来区分的，Request ID默认是PCI设备分配到的BDF号。
+不过看SMMUv3 Spec，又有说明：对于PCI设备StreamID就是PCI设备的RequestID，
+好吧，两个名词其实表示同一个东西，只是一个是从SMMU的角度去看就成为StreamID，从PCIe的角度去看就称之为RequestID。
+同时，一个设备可能被多个进程使用，多个进程有多个页表，设备需要对其进行区分，SMMU使用SubstreamID来对其进行表示。
+SubstreamID的概念和PCIe PASID是等效的，这只不过又是在ARM上的另外一种称呼而已。
+SubstreamID最大支持20bit和PCIe PASID的最大宽度是一致的。</p>
+<p>STE里面都有啥呢？Spec里面有说明：</p>
+<ul>
+<li>STE里面包含一个指向stage2地址翻译表的指针，并且同时还包含一个指向CD（Context Descriptor）的指针</li>
+<li>CD是一个特定格式的数据结构，包含了指向stage1地址翻译表的基地址指针</li>
+</ul>
+<p>理论上，多个设备可以关联到一个虚拟机上，所以多个STE可以共享一个stage2的翻译表。
+类似的，多个设备(stream)可以共享一个stage1的配置，因此多个STE可以共享同一个CD。</p>
+<p>Stream Table是存在内存中的一张表，在SMMU设备初始化的时候由驱动程序创建好。
+Stream Table支持2种格式，Linear Stream Table 和 2-level Stream Table，
+Linear Stream Table就是将整个Stream Table在内存中线性展开为一个数组，优点是索引方便快捷，缺点是当平台上外设较少的时候浪费连续的内存空间。
+2-level Stream Table则是将Stream Table拆成2级去索引，优点是更加节省内存。</p>
+<p><img alt="2-level Stream Table" src="../images/arm_strtab.png"></p>
+<p>在使能SMMU两阶段地址翻译的情况下，stage1负责将设备DMA请求发出的VA翻译为IPA并作为stage2的输入，
+stage2则利用stage1输出的IPA再次进行翻译得到PA，从而DMA请求正确地访问到Guest的要操作的地址空间上。</p>
+<p>在stage1地址翻译阶段：硬件先通过StreamID索引到STE，然后用SubstreamID索引到CD，
+CD里面包含了stage1地址翻译（把进程的GVA/IOVA翻译成IPA）过程中需要的页表基地址信息、per-stream的配置信息以及ASID。
+在stage1翻译的过程中，多个CD对应着多个stage1的地址翻译，通过Substream去确定对应的stage1地址翻译页表。
+所以，Stage1地址翻译其实是一个（RequestID, PASID） =&gt; GPA的映射查找过程。
+注意：只有在使能了stage1地址翻译的情况下，SubstreamID才有意义，否则该DMA请求会被丢弃。</p>
+<p>在stage2地址翻译阶段：STE里面包含了stage2地址翻译的页表基地址（IPA-&gt;HPA）和VMID信息。
+如果多个设备被直通给同一个虚拟机，那么意味着他们共享同一个stage2地址翻译页表[<a href="https://static.docs.arm.com/ihi0070/b/SMMUv3_architecture_specification_IHI0070B.pdf">Ref4</a>]。</p>
+<p><img alt="arm_smmu_2stage_translation.png" src="../images/arm_smmu_2stage_translation.png"></p>
+<p>值得注意的是：CD中包含一个ASID，STE中包含了VMID，CD和VMID存在的目的是作为地址翻译过程中的TLB Tag，用来加速地址翻译的过程。</p>
+<p>系统软件通过Command Queue和Event Queue来和SMMU打交道，这2个Queue都是循环队列。
+系统软件将Command放到队列中SMMU从队列中读取命令来执行，同时设备在进行DMA传输或者配置发生错误的时候会上报事件，
+这些事件就存放在Event Queue当中，系统软件要及时从Event Queue中读取事件以防止队列溢出。</p>
+<p><img alt="arm smmu all" src="../images/arm_smmu_all.PNG"></p>
+<p>SMMU支持两阶段地址翻译的目的只有1个，那就是为了支持虚拟化场景下的SVM特性（Shared Virtual Memory）。
+SVM特性允许虚拟机内的进程都能够独立的访问直通给虚拟机的直通设备,在进程自己的地址空间内向设备发起DMA。
+SVM使得虚拟机里面的每个进程都能够独立使用某个直通设备，这能够降低应用编程的复杂度，并提升安全性。</p>
+<p>为了实现虚拟化场景下的SVM，QEMU需要模拟一个vSMMU（或者叫vIOMMU）的设备。
+虚拟机内部进程要访问直通设备的时候，会调用Guest驱动创建PASID Table（虚拟化场景下这个表在Guest内部），
+在这个场景下PASID将作为虚拟机内进程地址空间的一个标志，设备在发起DMA请求的时候会带上PASID Prefix，这样SMMU就知道如何区分了。
+创建PASID Table的时候会访问vSMMU，这样Guest就将PASID Table的地址（GPA）传给了QEMU，
+然后QEMU再通过VFIO的IOCTL调用（VFIO_DEVICE_BIND_TASK）将表的信息传给SMMU，
+这样SMMU就获得了Guest内部进程的PASID Table的shadow信息，它就知道该如何建立Stage1地址翻译表了。</p>
+<p>所以，在两阶段地址翻译场景下，Guest内部DMA请求的处理步骤</p>
+<div class="highlight"><pre><span></span><code><span class="n">Step1</span><span class="o">:</span><span class="w">  </span><span class="n">Guest驱动发起DMA请求</span><span class="err">，这个</span><span class="n">DMA请求包含GVA</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">PASID</span><span class="w"> </span><span class="n">Prefix</span><span class="w"></span>
+<span class="n">Step2</span><span class="err">：</span><span class="w"> </span><span class="n">DMA请求到达SMMU</span><span class="err">，</span><span class="n">SMMU提取DMA请求中的RequestID就知道这个请求是哪个设备发来的</span><span class="err">，然后去</span><span class="n">StreamTable索引对应的STE</span><span class="w"></span>
+<span class="n">Step3</span><span class="o">:</span><span class="w">  </span><span class="err">从对应的</span><span class="n">STE表中查找到对应的CD</span><span class="err">，然后用</span><span class="n">PASID到CD中进行索引找到对应的S1</span><span class="w"> </span><span class="n">Page</span><span class="w"> </span><span class="n">Table</span><span class="w"></span>
+<span class="n">Step4</span><span class="err">：</span><span class="w"> </span><span class="n">IOMMU进行S1</span><span class="w"> </span><span class="n">Page</span><span class="w"> </span><span class="n">Table</span><span class="w"> </span><span class="n">Walk</span><span class="err">，将</span><span class="n">GVA翻译成GPA</span><span class="err">（</span><span class="n">IPA</span><span class="err">）并作为</span><span class="n">S2的输入</span><span class="w"></span>
+<span class="n">Step5</span><span class="err">：</span><span class="w"> </span><span class="n">IOMMU执行S2</span><span class="w"> </span><span class="n">Page</span><span class="w"> </span><span class="n">Table</span><span class="w"> </span><span class="n">Walk</span><span class="err">，将</span><span class="n">GPA翻译成HPA</span><span class="err">，</span><span class="n">done</span><span class="err">！</span><span class="w"></span>
+</code></pre></div>
+
+<p>纵观SMMUv3，从设计上来和Intel IOMMU的设计和功能基本类似，毕竟这里没有太多可以创新的地方。
+但ARM SMMUv3有2个比较有意思的改进点：
+一个是支持Page Request Interface（PRI），PRI是对ATS的进一步改进。当设备支持PRI特性的时候，
+设备发送DMA请求的时候可以缺页IOPF(IO Page Fault)，这就意味着直通虚拟机可以不需要进行内存预占，
+DMA缺页的时候SMMU会向CPU发送一个缺页请求，CPU建立好页表之后对SMMU进行回复，SMMU这时候再将内容写到DMA Buffer中。
+另外一个改进就是，DMA写内存之后产生脏页可以由硬件自动更新Access/Dirty Bit，
+这样就对直通设备热迁移比较友好，但这个功能是需要厂商选择性支持的，
+而且在这种场景下如何解决SMMU和MMU的Cache一致性是最大的挑战。</p>
+<h3>4. Interrupt Virtualization</h3>
+<p>ARM的中断系统和x86区别比较大，x86用的是IOAPIC/LAPIC中断系统，ARM则使用的是GIC中断控制器，
+并且随着ARM的演进陆续出现了GICv2,GICv3,GICv4等不同版本，
+看了GICv3手册感觉着玩儿设计得有点复杂，并不像x86上那样结构清晰。</p>
+<p><img alt="ARM GIC" src="../images/arm_gic_history.PNG"></p>
+<p>GICv1和GICv2最大只支持8个PE，这放在现在显然不够用了。
+所以，GICv3对这里进行改进，提出了<em>affinity routing</em>机制以支持更多的PE。</p>
+<p>GICv3定义了以下中断类型[<a href="https://static.docs.arm.com/dai0492/b/GICv3_Software_Overview_Official_Release_B.pdf">Ref5</a>]：
+ARM上的中断类型：</p>
+<ul>
+<li>LPI(Locality-specific Peripheral Interrupt) LPI始终是基于消息的中断，边缘触发、经过ITS路由，它们的配置保存在表中而不是寄存器，比如PCIe的MSI/MSI-x中断，GITS_TRANSLATER控制中断</li>
+<li>SGI (Software Generated Interrupt) 软件触发的中断，软件可以通过写GICD_SGIR寄存器来触发一个中断事件，一般用于核间通信（对应x86 IPI中断）</li>
+<li>PPI(Private Peripheral Interrupt)  私有外设中断，这是每个核心私有的中断，PPI太冗长会送达到指定的CPU上，边缘触发或者电平触发、有Active转态，应用场景有CPU本地时钟，类似于x86上的LAPIC Timer Interrupt</li>
+<li>SPI(Shared Peripheral Interrupt)  公用的外部设备中断，也定义为共享中断，边缘触发或者电平触发、有Active转态，可以多个CPU或者说Core处理，不限定特定的CPU，SPI支持Message格式（GICv3），GICD_SETSPI_NSR设置中断，GICD_CLRSPI_NSR清除中断</li>
+</ul>
+<p>ARM上的中断又可以分为两类：
+一类中断要通过Distributor分发的，例如SPI中断。
+另一类中断不通过Distributor的，例如LPI中断，直接经过ITS翻译后投递给某个Redistributor。</p>
+<table>
+<thead>
+<tr>
+<th>INTID</th>
+<th>Interrupt Type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0-15</td>
+<td>SGI</td>
+<td>Banked per PE</td>
+</tr>
+<tr>
+<td>16-31</td>
+<td>PPI</td>
+<td>Banked per PE</td>
+</tr>
+<tr>
+<td>32-1019</td>
+<td>SPI</td>
+<td></td>
+</tr>
+<tr>
+<td>1020-1023</td>
+<td>Special Interrupt Number</td>
+<td>Used to signal special cases</td>
+</tr>
+<tr>
+<td>1024-8191</td>
+<td>Reserved</td>
+<td></td>
+</tr>
+<tr>
+<td>8192-</td>
+<td>LPI</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>ARM上又搞出来一个<em>Affinity Routing</em>的概念，GICv3使用<em>Affinity Routing</em>来标志一个特定的PE或者是一组特定的PE，
+有点类似于x86上的APICID/X2APIC ID机制。ARM使用4个8bit的域来表示affinity，格式如：</p>
+<div class="highlight"><pre><span></span><code>            &lt;affinity level 3&gt;.&lt;affinity level 2&gt;.&lt;affinity level 1&gt;.&lt;affinity level 0&gt;
+</code></pre></div>
+
+<p>例如，现在有个ARM Big.Little架构的移动处理器SOC，拥有2个Cluster，小核心拥有4个Cortex-A53大核心拥有2个A72，那么可以表示为：</p>
+<div class="highlight"><pre><span></span><code><span class="mf">0.0.0.</span><span class="err">[</span><span class="mf">0</span><span class="p">:</span><span class="mf">3</span><span class="err">]</span><span class="w"> </span><span class="n">Cores</span><span class="w"> </span><span class="mf">0</span><span class="w"> </span><span class="kr">to</span><span class="w"> </span><span class="mf">3</span><span class="w"> </span><span class="n">of</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="n">Cortex</span><span class="o">-</span><span class="n">A53</span><span class="w"> </span><span class="n">processor</span><span class="w"></span>
+<span class="mf">0.0.1.</span><span class="err">[</span><span class="mf">0</span><span class="p">:</span><span class="mf">1</span><span class="err">]</span><span class="w"> </span><span class="n">Cores</span><span class="w"> </span><span class="mf">0</span><span class="w"> </span><span class="kr">to</span><span class="w"> </span><span class="mf">1</span><span class="w"> </span><span class="n">of</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="n">Cortex</span><span class="o">-</span><span class="n">A72</span><span class="w"> </span><span class="n">processor</span><span class="w"></span>
+</code></pre></div>
+
+<p>GICv3的设计上和x86的IOAPIC/LAPIC架构差异甚远，GICv3的设计架构如下图所示：</p>
+<p><img alt="GICv3 Arch" src="../images/arm_gicv3_arch.PNG"></p>
+<p>GICv3中断控制器由Distributor，Redistributor和CPU Interface三个部分组成。
+Distributor负责SPI中断管理并将中断发送给Redistributor，Redistributor管理PPI，SGI，LPI中断，并将中断投递给CPU Interface，
+CPU Interface负责将中断注入到Core里面（CPU Interface本身就在Core内部）。</p>
+<p>Distributor的主要功能有：</p>
+<ul>
+<li>中断优先级管理和中断分发</li>
+<li>启用和禁用SPI</li>
+<li>为每个SPI设置设置中断优先级</li>
+<li>为每个SPI设置路由信息</li>
+<li>设置每个SPI的中断触发属性：边沿触发或者电平触发</li>
+<li>生成消息格式的SPI中断</li>
+<li>控制SPI中断的active状态和pending状态</li>
+</ul>
+<p>每个PE都对应有一个Redistributor与之相连，Distributor的寄存器是memory-mapped，
+并且它的配置是全局生效的，直接影响所有的PE。Redistributor的主要功能有：</p>
+<ul>
+<li>使能和禁用SGI和PPI</li>
+<li>设置SGI和PPI的中断优先级</li>
+<li>设置PPI的触发属性：电平触发或者边沿触发</li>
+<li>为每个SGI和PPI分配中断组</li>
+<li>控制SGI和PPI的状态</li>
+<li>控制LPI中断相关数据结构的基地址</li>
+<li>对PE的电源管理的支持</li>
+</ul>
+<p>每个Redistributor都和一个CPU Interface相连， 在GICv3中CPU Interface的寄存器是是通过System registers(ICC_*ELn)来访问的。
+在使用这些寄存器之前软件必须使能系统寄存器，CPU Interface的主要功能：</p>
+<ul>
+<li>控制和使能CPU的中断处理。如果中断disable了，即使Distributor分发了一个中断事件到CPU Interface也会被Core屏蔽掉。</li>
+<li>应答中断</li>
+<li>进行中断优先级检测和中断deassert</li>
+<li>为PE设置一个中断优先级mask标志，可以选择屏蔽中断</li>
+<li>为PE定义抢占策略</li>
+<li>为PE断定当前pending中断的最高优先级（优先级仲裁）</li>
+</ul>
+<p>GICv3中为了处理LPI中断，专门引入了ITS（Interrupt Translation Service）组件。
+外设想发送LPI中断时（比如PCI设备的MSI中断），就去写ITS的寄存器GITS_TRANSLATER，这个写操作就会触发一个LPI中断。
+ITS接收到LPI中断后，对其进行解析然后发送给对应的redistributor，然后再由redistributor发送给CPU Interface。
+那么这个写操作里面包含了哪些内容呢？主要是2个关键域。</p>
+<ul>
+<li>EventID：这个是写入到GITS_TRANSLATER的值，EventID定义了外设要触发的中断号，EventID可以和INTID一样，或者经过ITS翻译后得到一个INTID</li>
+<li>DeviceID：这个是外设的标志，实现是自定义的，例如可以使用AXI的user信号传递。</li>
+</ul>
+<p>ITS使用3种类型的表来完成LPI的翻译和路由：</p>
+<ul>
+<li>Device Table： 将DeviceID映射到Interrupt Translation Table中</li>
+<li>Interrupt Translation Table：包含了EventID到INTID映射关系之间和DeviceID相关的信息，同时也包含了INTID Collection</li>
+<li>Collection Table：将collections映射到Redistributor上</li>
+</ul>
+<p><img alt="GICv3 ITS" src="../images/gicv3_its.PNG"></p>
+<p>整个流程大概是：</p>
+<div class="highlight"><pre><span></span><code>Step1： 外设写GITS_TRANSLATER，ITS使用DeviceID从Device Table中索引出这个外设该使用哪个Interrupt Translation Table
+Step2： 使用EventID去选中的Interrupt Translation Table中索引出INTID和对应的Collection ID
+Step3： 使用Collection ID从Collection Table中选择对应的Collection和路由信息
+Step4： 把中断送给目标Redistributor
+</code></pre></div>
+
+<p>看来看去总觉得GICv3中断控制器设计比较复杂，不如x86上那样结构清晰，目前只是理了个大概，要深入理解再到代码级熟悉还得花不少时间。
+上面说了这么多，还是在将GICv3控制器的逻辑，具体QEMU/KVM上是怎么实现的还得去看代码，为了提升中断的性能，
+GICv3的模拟是直接放到KVM里面实现的。比如说virtio设备的MSI中断，那肯定类型上是LPI中断，QEMU模拟的时候机制上还是使用irqfd方式来实现的，
+前面也有从代码角度去分析过，后面再单独从代码层级去分析具体的实现方案。</p>
+<h3>5. Overview</h3>
+<p>ARM体系结构和x86存在不少差异，其中差异最大的还是中断控制器这块，这里需要投入事件好好分析一下．
+内存虚拟化和I/O虚拟化这块二者可能细节上有些不同，但背后的原理还是近似的．
+例如：SMMUv3在设计上和Intel IOMMU都支持了二次地址翻译，但SMMU有针对性的改进点．
+后面继续努力，慢慢入门学习ARM虚拟化的知识体系．</p>
+<h3>6. References</h3>
+<ol>
+<li><a href="https://developer.arm.com/documentation/ddi0487/latest">ARMv8 Architecture Reference Manual</a></li>
+<li><a href="https://static.docs.arm.com/100940/0100/armv8_a_address%20translation_100940_0100_en.pdf">ARMv8-A Address Translation Version 1.0</a></li>
+<li><a href="http://www.wowotech.net/memory_management/arm64-memory-addressing.html">ARM64 Address Translation</a></li>
+<li><a href="https://static.docs.arm.com/ihi0070/b/SMMUv3_architecture_specification_IHI0070B.pdf">SMMU architecture version 3.0 and version 3.1</a></li>
+<li><a href="https://static.docs.arm.com/dai0492/b/GICv3_Software_Overview_Official_Release_B.pdf">GICv3 Software Overview Official Release</a></li>
+<li><a href="https://blog.linuxplumbersconf.org/2017/ocw/system/presentations/4812/original/plumbers17-smmu-svm.pdf">SVM on ARM SMMUv3</a></li>
+<li><a href="https://lwn.net/Articles/747230/">SVM and PASID</a></li>
+</ol>
+
+
+             
+ 
+                <p id="post-share-links">
+    Share on:
+      <a href="https://twitter.com/intent/tweet?text=ARMv8%20Virtualization%20Overview&url=https%3A//kernelgo.org/armv8-virt-guide.html&hashtags=armv8-virtualization" target="_blank" rel="nofollow noopener noreferrer" title="Share on Twitter">Twitter</a>
+ ❄       <a href="https://www.facebook.com/sharer/sharer.php?u=https%3A//kernelgo.org/armv8-virt-guide.html" target="_blank" rel="nofollow noopener noreferrer" title="Share on Facebook">Facebook</a>
+ ❄       <a href="mailto:?subject=ARMv8%20Virtualization%20Overview&amp;body=https%3A//kernelgo.org/armv8-virt-guide.html" target="_blank" rel="nofollow noopener noreferrer" title="Share via Email">Email</a>
+
+            
+            
+
+
+
+
+
+
+
+<section>
+    <h6 style="display:none;">Comments</h6>
+    <p id="comment-message"> </p>
+
+    <div class="accordion" id="accordion2">
+        <div class="accordion-group">
+            <div class="accordion-heading">
+                <a class="accordion-toggle disqus-comment-count comment-count collapsed"
+                   data-toggle="collapse"
+                   data-parent="#accordion2"
+                   data-disqus-identifier="https://kernelgo.org/armv8-virt-guide.html"
+                   href="https://kernelgo.org/armv8-virt-guide.html#comment_thread"
+                   id="comment-accordion-toggle">
+                    Comments
+                </a>
+            </div>
+            <div id="comment_thread" class="accordion-body collapse">
+                <div class="accordion-inner">
+                    <div class="comments">
+                        <div id="disqus_thread"></div>
+                        <script>
+    var disqus_shortname = 'kernelgo';
+    (function () {
+        var s = document.createElement('script'); s.async = true;
+        s.type = 'text/javascript';
+        s.src = '//' + disqus_shortname + '.disqus.com/count.js';
+        (document.getElementsByTagName('HEAD')[0] || document.getElementsByTagName('BODY')[0]).appendChild(s);
+    }());
+
+    var disqus_identifier = 'https://kernelgo.org/armv8-virt-guide.html';
+    var disqus_url = 'https://kernelgo.org/armv8-virt-guide.html';
+
+    (function() {
+        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    })();
+</script>
+
+<noscript>Please enable JavaScript to view the <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+            <hr/>
+            <aside>
+            <nav>
+            <ul class="articles-timeline">
+                <li class="previous-article">« <a href="https://kernelgo.org/microVM.html" title="Previous: Lightweight Micro Virtual Machines">Lightweight Micro Virtual Machines</a></li>
+                <li class="next-article"><a href="https://kernelgo.org/virtio-overview.html" title="Next: Virtio Spec Overview">Virtio Spec Overview</a> »</li>
+            </ul>
+            </nav>
+            </aside>
+        </div>
+        <section id="article-sidebar" class="span2">
+            <h4>Published</h4>
+            <time itemprop="dateCreated" datetime="2019-07-25T23:00:00+08:00">Thu 25 July 2019</time>
+
+            <h4>Category</h4>
+            <a class="category-link" href="https://kernelgo.org/categories.html#virtualization-ref">virtualization</a>
+            <h4>Tags</h4>
+            <ul class="list-of-tags tags-in-article">
+                <li><a href="https://kernelgo.org/tags.html#armv8-virtualization-ref">ARMv8 virtualization
+                    <span class="superscript">1</span>
+</a></li>
+            </ul>
+<h4>Contact</h4>
+<div id="sidebar-social-link">
+    <a href="https://github.com/fangying" title="" target="_blank" rel="nofollow noopener noreferrer">
+        <svg xmlns="http://www.w3.org/2000/svg" aria-label="GitHub" role="img" viewBox="0 0 512 512"><rect width="512" height="512" rx="15%" fill="#1B1817"/><path fill="#fff" d="M335 499c14 0 12 17 12 17H165s-2-17 12-17c13 0 16-6 16-12l-1-50c-71 16-86-28-86-28-12-30-28-37-28-37-24-16 1-16 1-16 26 2 40 26 40 26 22 39 59 28 74 22 2-17 9-28 16-35-57-6-116-28-116-126 0-28 10-51 26-69-3-6-11-32 3-67 0 0 21-7 70 26 42-12 86-12 128 0 49-33 70-26 70-26 14 35 6 61 3 67 16 18 26 41 26 69 0 98-60 120-117 126 10 8 18 24 18 48l-1 70c0 6 3 12 16 12z"/></svg>
+    </a>
+</div>
+            
+
+
+
+
+
+            
+
+
+
+
+
+        </section>
+</div>
+</article>
+<!-- Root element of PhotoSwipe. Must have class pswp. -->
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    <!-- Background of PhotoSwipe.
+         It's a separate element as animating opacity is faster than rgba(). -->
+    <div class="pswp__bg"></div>
+
+    <!-- Slides wrapper with overflow:hidden. -->
+    <div class="pswp__scroll-wrap">
+
+        <!-- Container that holds slides.
+            PhotoSwipe keeps only 3 of them in the DOM to save memory.
+            Don't modify these 3 pswp__item elements, data is added later on. -->
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        <!-- Default (PhotoSwipeUI_Default) interface on top of sliding area. Can be changed. -->
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                <!--  Controls are self-explanatory. Order can be changed. -->
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                <!-- Preloader demo https://codepen.io/dimsemenov/pen/yyBWoR -->
+                <!-- element will get class pswp__preloader--active when preloader is running -->
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                      <div class="pswp__preloader__cut">
+                        <div class="pswp__preloader__donut"></div>
+                      </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>                    </div>
+                    <div class="span1"></div>
+                </div>
+            </div>
+        </div>
+<footer>
+    <div>
+        <span xmlns:dct="http://purl.org/dc/terms/" property="dct:title"> kernelgo"</span> by <a xmlns:cc="http://creativecommons.org/ns#" href="https://kernelgo.org" property="cc:attributionName" rel="cc:attributionURL">Yori Fang</a> is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/3.0/deed.en_US">Creative Commons Attribution-ShareAlike 3.0 Unported License</a>.
+    </div>
+
+
+
+
+    <div id="fpowered">
+        Powered by: <a href="http://getpelican.com/" title="Pelican Home Page" target="_blank" rel="nofollow noopener noreferrer">Pelican</a>
+        Theme: <a href="https://elegant.oncrashreboot.com/" title="Theme Elegant Home Page" target="_blank" rel="nofollow noopener noreferrer">Elegant</a>
+    </div>
+</footer>            <script src="//code.jquery.com/jquery.min.js"></script>
+        <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/js/bootstrap.min.js"></script>
+        <script src="https://kernelgo.org/theme/js/elegant.prod.9e9d5ce754.js"></script>
+        <script>
+            function validateForm(query)
+            {
+                return (query.length > 0);
+            }
+        </script>
+
+    <script>
+    (function () {
+        if (window.location.hash.match(/^#comment-\d+$/)) {
+            $('#comment_thread').collapse('show');
+        }
+    })();
+    window.onhashchange=function(){
+        if (window.location.hash.match(/^#comment-\d+$/))
+            window.location.reload(true);
+    }
+    $('#comment_thread').on('shown', function () {
+        var link = document.getElementById('comment-accordion-toggle');
+        var old_innerHTML = link.innerHTML;
+        $(link).fadeOut(200, function() {
+            $(this).text('Click here to hide comments').fadeIn(200);
+        });
+        $('#comment_thread').on('hidden', function () {
+            $(link).fadeOut(200, function() {
+                $(this).text(old_innerHTML).fadeIn(200);
+            });
+        })
+    })
+</script>
+
+    </body>
+    <!-- Theme: Elegant built for Pelican
+        License : MIT -->
+</html>

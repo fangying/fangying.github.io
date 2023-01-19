@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://kernelgo.org/theme/css/style.min.css?fc5adb95">
+
+        <link rel="dns-prefetch" href="//fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin>
+
+        <meta name="author" content="Yori Fang" />
+
+        <meta name="description" content="ELF
+" />
+        <meta property="og:type" content="article" />
+        <meta name="twitter:card" content="summary">
+
+<meta name="keywords" content="elf, linux, " />
+
+<meta property="og:title" content="Understanding the ELF format "/>
+<meta property="og:url" content="https://kernelgo.org/drafts/understanding-elf.html" />
+<meta property="og:description" content="ELF" />
+<meta property="og:site_name" content="kernelgo" />
+<meta property="og:article:author" content="Yori Fang" />
+<meta property="og:article:published_time" content="2021-02-08T23:00:00+08:00" />
+<meta name="twitter:title" content="Understanding the ELF format ">
+<meta name="twitter:description" content="ELF">
+
+        <title>Understanding the ELF format  · kernelgo
+</title>
+<script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+     (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+     m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+     })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+    ga('create', 'UA-107392039-1', 'auto');
+    ga('send', 'pageview');
+</script>
+
+
+    </head>
+    <body>
+        <div id="content">
+            <div class="navbar navbar-static-top">
+                <div class="navbar-inner">
+                    <div class="container-fluid">
+                        <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                        </a>
+                        <a class="brand" href="https://kernelgo.org/"><span class=site-name>kernelgo</span></a>
+                        <div class="nav-collapse collapse">
+                            <ul class="nav pull-right top-menu">
+                                <li >
+                                    <a href=
+                                       https://kernelgo.org
+                                    >Home</a>
+                                </li>
+                                <li ><a href="https://kernelgo.org/pages/about.html">About</a></li>
+                                <li ><a href="https://kernelgo.org/categories.html">Categories</a></li>
+                                <li ><a href="https://kernelgo.org/tags.html">Tags</a></li>
+                                <li ><a href="https://kernelgo.org/archives.html">Archives</a></li>
+                                <li><form class="navbar-search" action="https://kernelgo.org/search.html" onsubmit="return validateForm(this.elements['q'].value);"> <input type="text" class="search-query" placeholder="Search" name="q" id="tipue_search_input"></form></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="container-fluid">
+                <div class="row-fluid">
+                    <div class="span1"></div>
+                    <div class="span10">
+<article itemscope>
+<div class="row-fluid">
+    <header class="page-header span10 offset2">
+        <h1>
+            <a href="https://kernelgo.org/drafts/understanding-elf.html">
+                Understanding the ELF format
+            </a>
+        </h1>
+    </header>
+</div>
+
+<div class="row-fluid">
+        <div class="span8 offset2 article-content">
+            
+            <p>在Unix Like的操作系统上，我们编译程序的源代码后通常会生成一个ELF格式的二进制文件。
+ELF文件被操作系统加载后就可以运行，那么你是否好奇在编译、装载和执行背后的逻辑？
+本文我们就来一起探索一下ELF文件格式，并了解一下它是如何被操作系统加载和执行的。</p>
+<p>这里我们以C语言为例，我们知道源代码在操作系统上运行起来要经历<strong>编译</strong>、<strong>装载</strong>和<strong>执行</strong>这3个步骤。
+为了提升程序员的基本修养，我们有必要对这个知识点进行学习。在学习之前准备了几个问题来探讨。</p>
+<ol>
+<li>c语言编译的基本流程是怎样的？</li>
+<li>什么是ELF文件，它的组成结构是怎么样的？</li>
+<li>程序链接的时候都做了什么?</li>
+<li>什么是符号重定向，为什么需要符号重定向？</li>
+<li>链接时重定位和运行时重定位的区别是什么？</li>
+<li>什么是GOT/PLT表，为什么需要它？</li>
+<li>进程是如何被装载并从哪儿开始执行的？</li>
+</ol>
+<h2>1. 代码编译</h2>
+<p><img alt="comiple load and execute" src="../images/c-language-compilation.png">
+源代码的编译主要经历预处理、编译、汇编和链接这4个阶段。预处理主要是对C语言中的一些宏定义进行展开，
+编译是将源代码编译成汇编代码，汇编是将汇编代码编译成目标文件，链接则是将一堆目标程序链接成一个可执行程序，
+这个可执行程序就是我们说的ELF(Executable and Linkable Format)格式。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">ELF 文件类型</th>
+<th style="text-align: left;">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">Relocatable File</td>
+<td style="text-align: left;">包含代码和数据，可以用来链接成可执行文件或者静态库文件和动态库文件</td>
+</tr>
+<tr>
+<td style="text-align: left;">Executable File</td>
+<td style="text-align: left;">可以被直接执行的程序</td>
+</tr>
+<tr>
+<td style="text-align: left;">Shared Ojbect File</td>
+<td style="text-align: left;">包含代码和数据，一种是静态链接库一种是动态链接库</td>
+</tr>
+<tr>
+<td style="text-align: left;">Core Dump File</td>
+<td style="text-align: left;">核心转储文件，进程意外终止时的信息转储文件</td>
+</tr>
+<tr>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+</tr>
+</tbody>
+</table>
+<p><img alt="elf format" src="../images/elf-format.png"></p>
+<p>ELF文件的头部是一个ELF header的数据结构，用来描述整个ELF文件的组成信息。
+其中最为重要的是program header table和section header table，
+分别存放了<strong>程序表</strong>和<strong>段表</strong>在ELF里面的位置和大小信息。
+由于每个section header的大小是固定的，而它们的名称属性不可能一样长，
+所以需要一个专门的string section来保存它们的名称属性，
+而用来描述这个string section的section header在section表中的位置就由e_shstrndx来确认（e_shoff+ e_shentsize* e_shstrndx），
+以达到快速查询的目的。</p>
+<h3>2.链接</h3>
+<p>源文件经过编译后生成多个独立的目标文件，那么怎么把这些目标文件组合起来拼到一起组成一个完成的可执行程序呢？
+答案就是链接！链接的作用其实就是把各个目标文件之间相互引用的部分处理好，
+把这些目标文件“粘合”成一个可执行程序。</p>
+<p>链接器(linker)对目标文件进行链接，生成可执行程序的时候一般包含2个步骤：</p>
+<ul>
+<li><strong>地址空间分配</strong>： 扫描输入目标文件，获取各段长度，属性和位置信息，并将所有输入目标文件中的符号定义（Symbol Defination）和
+  符号引用（Symbol Reference）收集起来，统一放到全局符号表中。</li>
+<li><strong>符号解析(Symbol Resolution)和重定位(Relocation)</strong>：读取输入段中的重定位信息并进行符号解析与重定位，修正代码地址。</li>
+</ul>
+<p>地址空间分配很好理解，这个阶段链接器扫描所有的目标文件，将目标文件的相同段合并到一起，
+计算出整个程序占用的空间大小，在虚拟地址空间内分配一段空间来存放程序的各个段信息。
+对于符号解析和重定位而言，可以这么去理解：
+译器在编译的时候，由于不知道变量或者函数的目标地址，所以会将操作指令的目标地址空置，
+然后为目标文件新增一个重定位段，记录符号的重定位信息，等到链接阶段再计算一个最终地址。</p>
+<p>例如，我们有个main.c的程序中使用了另外一个func.c的foo()函数，但是每个源文件都是单独编译的，
+编译器在编译的时候并不知道foo()函数的地址，而是暂时把这些调用foo函数的指令目标地址<em>搁置</em>，
+等待最后链接的时候去将这些指令的目标地址进行<em>修正</em>(fixup)。如果没有链接器，需要程序员自己去把 <br>
+每个foo的调用指令进行手工修正，填入foo函数的正确地址。这样一来当func.c有发生变动的时候，就要被编译器重新编译，
+于是foo函数的地址发生了变化，那么程序员又要将main.c中所有调动foo函数的指令地址更新，
+这简直是个令程序员头秃的噩梦！还好我们有链接器，它会自动帮我们查找foo函数的地址，
+然后将程序中引用foo函数的指令进行<em>自动修正</em>。
+我们把这个经过链接器链接后对变量或者函数的地址进行重新修正的入口称之为<strong>重定位入口</strong>（Relocation Entry），
+这个地址修正的过程称之为<strong>重定位(Relocation)</strong>。</p>
+<p>静态链接和动态链接</p>
+<p>地址无关代码：把指令中需要修改的部分分离出来，跟数据部分放到一起，这样指令部分可以保持不变而数据部分可以在每个进程中有一个独立的副本。
+理论是抽象的，下面举个具体的例子来进行说明。</p>
+<h3>3.装载</h3>
+<h3>4.执行</h3>
+<h3>5.Ref</h3>
+<ol>
+<li>https://www.cnblogs.com/fellow1988/p/6158240.html</li>
+<li>https://blog.csdn.net/npy_lp/article/details/102604380</li>
+<li>https://www.anquanke.com/post/id/183370</li>
+<li>https://luomuxiaoxiao.com/?p=125</li>
+<li>https://zhuanlan.zhihu.com/p/107542184</li>
+</ol>
+
+
+             
+ 
+            
+            
+            
+
+
+
+
+
+
+
+            <hr/>
+        </div>
+        <section id="article-sidebar" class="span2">
+            <h4>Published</h4>
+            <time itemprop="dateCreated" datetime="2021-02-08T23:00:00+08:00">Mon 08 February 2021</time>
+            <h4>Category</h4>
+            <a class="category-link" href="https://kernelgo.org/categories.html#linux-ref">linux</a>
+            <h4>Tags</h4>
+            <ul class="list-of-tags tags-in-article">
+                <li><a href="https://kernelgo.org/tags.html#elf-ref">elf
+</a></li>
+            </ul>
+<h4>Contact</h4>
+<div id="sidebar-social-link">
+    <a href="https://github.com/fangying" title="" target="_blank" rel="nofollow noopener noreferrer">
+        <svg xmlns="http://www.w3.org/2000/svg" aria-label="GitHub" role="img" viewBox="0 0 512 512"><rect width="512" height="512" rx="15%" fill="#1B1817"/><path fill="#fff" d="M335 499c14 0 12 17 12 17H165s-2-17 12-17c13 0 16-6 16-12l-1-50c-71 16-86-28-86-28-12-30-28-37-28-37-24-16 1-16 1-16 26 2 40 26 40 26 22 39 59 28 74 22 2-17 9-28 16-35-57-6-116-28-116-126 0-28 10-51 26-69-3-6-11-32 3-67 0 0 21-7 70 26 42-12 86-12 128 0 49-33 70-26 70-26 14 35 6 61 3 67 16 18 26 41 26 69 0 98-60 120-117 126 10 8 18 24 18 48l-1 70c0 6 3 12 16 12z"/></svg>
+    </a>
+</div>
+            
+
+
+
+
+
+            
+
+
+
+
+
+        </section>
+</div>
+</article>
+<!-- Root element of PhotoSwipe. Must have class pswp. -->
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    <!-- Background of PhotoSwipe.
+         It's a separate element as animating opacity is faster than rgba(). -->
+    <div class="pswp__bg"></div>
+
+    <!-- Slides wrapper with overflow:hidden. -->
+    <div class="pswp__scroll-wrap">
+
+        <!-- Container that holds slides.
+            PhotoSwipe keeps only 3 of them in the DOM to save memory.
+            Don't modify these 3 pswp__item elements, data is added later on. -->
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        <!-- Default (PhotoSwipeUI_Default) interface on top of sliding area. Can be changed. -->
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                <!--  Controls are self-explanatory. Order can be changed. -->
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                <!-- Preloader demo https://codepen.io/dimsemenov/pen/yyBWoR -->
+                <!-- element will get class pswp__preloader--active when preloader is running -->
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                      <div class="pswp__preloader__cut">
+                        <div class="pswp__preloader__donut"></div>
+                      </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>                    </div>
+                    <div class="span1"></div>
+                </div>
+            </div>
+        </div>
+<footer>
+    <div>
+        <span xmlns:dct="http://purl.org/dc/terms/" property="dct:title"> kernelgo"</span> by <a xmlns:cc="http://creativecommons.org/ns#" href="https://kernelgo.org" property="cc:attributionName" rel="cc:attributionURL">Yori Fang</a> is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/3.0/deed.en_US">Creative Commons Attribution-ShareAlike 3.0 Unported License</a>.
+    </div>
+
+
+
+
+    <div id="fpowered">
+        Powered by: <a href="http://getpelican.com/" title="Pelican Home Page" target="_blank" rel="nofollow noopener noreferrer">Pelican</a>
+        Theme: <a href="https://elegant.oncrashreboot.com/" title="Theme Elegant Home Page" target="_blank" rel="nofollow noopener noreferrer">Elegant</a>
+    </div>
+</footer>            <script src="//code.jquery.com/jquery.min.js"></script>
+        <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/js/bootstrap.min.js"></script>
+        <script src="https://kernelgo.org/theme/js/elegant.prod.9e9d5ce754.js"></script>
+        <script>
+            function validateForm(query)
+            {
+                return (query.length > 0);
+            }
+        </script>
+
+    <script>
+    (function () {
+        if (window.location.hash.match(/^#comment-\d+$/)) {
+            $('#comment_thread').collapse('show');
+        }
+    })();
+    window.onhashchange=function(){
+        if (window.location.hash.match(/^#comment-\d+$/))
+            window.location.reload(true);
+    }
+    $('#comment_thread').on('shown', function () {
+        var link = document.getElementById('comment-accordion-toggle');
+        var old_innerHTML = link.innerHTML;
+        $(link).fadeOut(200, function() {
+            $(this).text('Click here to hide comments').fadeIn(200);
+        });
+        $('#comment_thread').on('hidden', function () {
+            $(link).fadeOut(200, function() {
+                $(this).text(old_innerHTML).fadeIn(200);
+            });
+        })
+    })
+</script>
+
+    </body>
+    <!-- Theme: Elegant built for Pelican
+        License : MIT -->
+</html>

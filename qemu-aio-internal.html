@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://kernelgo.org/theme/css/style.min.css?fc5adb95">
+
+        <link rel="dns-prefetch" href="//fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin>
+
+        <meta name="author" content="Yori Fang" />
+
+        <meta name="description" content="Qemu AIO Internal
+" />
+        <meta property="og:type" content="article" />
+        <meta name="twitter:card" content="summary">
+
+<meta name="keywords" content="aio, virtualization, " />
+
+<meta property="og:title" content="A Qemu Hang Problem Revelant to AIO "/>
+<meta property="og:url" content="https://kernelgo.org/qemu-aio-internal.html" />
+<meta property="og:description" content="Qemu AIO Internal" />
+<meta property="og:site_name" content="kernelgo" />
+<meta property="og:article:author" content="Yori Fang" />
+<meta property="og:article:published_time" content="2020-04-03T23:00:00+08:00" />
+<meta property="og:article:modified_time" content="2020-04-03T23:00:00+08:00" />
+<meta name="twitter:title" content="A Qemu Hang Problem Revelant to AIO ">
+<meta name="twitter:description" content="Qemu AIO Internal">
+
+        <title>A Qemu Hang Problem Revelant to AIO  · kernelgo
+</title>
+<script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+     (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+     m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+     })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+    ga('create', 'UA-107392039-1', 'auto');
+    ga('send', 'pageview');
+</script>
+
+
+    </head>
+    <body>
+        <div id="content">
+            <div class="navbar navbar-static-top">
+                <div class="navbar-inner">
+                    <div class="container-fluid">
+                        <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                        </a>
+                        <a class="brand" href="https://kernelgo.org/"><span class=site-name>kernelgo</span></a>
+                        <div class="nav-collapse collapse">
+                            <ul class="nav pull-right top-menu">
+                                <li >
+                                    <a href=
+                                       https://kernelgo.org
+                                    >Home</a>
+                                </li>
+                                <li ><a href="https://kernelgo.org/pages/about.html">About</a></li>
+                                <li ><a href="https://kernelgo.org/categories.html">Categories</a></li>
+                                <li ><a href="https://kernelgo.org/tags.html">Tags</a></li>
+                                <li ><a href="https://kernelgo.org/archives.html">Archives</a></li>
+                                <li><form class="navbar-search" action="https://kernelgo.org/search.html" onsubmit="return validateForm(this.elements['q'].value);"> <input type="text" class="search-query" placeholder="Search" name="q" id="tipue_search_input"></form></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="container-fluid">
+                <div class="row-fluid">
+                    <div class="span1"></div>
+                    <div class="span10">
+<article itemscope>
+<div class="row-fluid">
+    <header class="page-header span10 offset2">
+        <h1>
+            <a href="https://kernelgo.org/qemu-aio-internal.html">
+                A Qemu Hang Problem Revelant to AIO
+            </a>
+        </h1>
+    </header>
+</div>
+
+<div class="row-fluid">
+        <div class="span8 offset2 article-content">
+            
+            <p>最近openEuler在HDC 2020上宣布开源了，采用开源社区的运作模式开发和发布版本。
+openEuler对Huawei鲲鹏系列CPU（基于ARM架构）提供了良好的支持，
+开始陆续被国内私有云厂商开始采用，希望openEuler能够成长起来成OS业界的明星。</p>
+<p>在前期我们的测试环境中发现在使用qemu-img做镜像格式转换的时候偶然会发现
+qemu主线程会出现hung的情况。奇怪的是这个现在只在aarch64平台上出现，
+在x86平台上我们没有复现出来，当时也没太在意但后来被平安科技的技术人员测出来了反馈给我们开始引起了我们的注意。
+通过我们的分析，再加上和社区的讨论发现这个问题其实是
+隐藏在qemu AIO机制中的一个典型smp多线程共享变量直接的同步问题，
+究其根因是一个不同体系结构上内存模型不同从而导致代码行为不一致的问题。
+（注：一开始我们以为是编译器优化导致局部指令被重排了，后来发现并不是）
+通过对这个问题的分析和探讨，可以有助于进一步理解了smp架构上内存模型和其的重要性。
+这里分析和记录一下这个问题。</p>
+<p>问题复现方法很简单，采用下面的测试命令即可：</p>
+<div class="highlight"><pre><span></span><code><span class="nv">COUNT</span><span class="o">=</span><span class="m">0</span>
+<span class="k">while</span> <span class="nb">true</span>
+    <span class="k">do</span> qemu-img convert -f qcow2 origin.qcow2 -O output.qcow2
+    <span class="nv">COUNT</span><span class="o">=</span><span class="k">$(</span>expr <span class="nv">$COUNT</span> + <span class="m">1</span><span class="k">)</span>
+    <span class="nb">echo</span> <span class="s2">&quot;do image convert times = </span><span class="nv">$COUNT</span><span class="s2">&quot;</span>
+<span class="k">done</span>
+</code></pre></div>
+
+<p>我们向qemu社区提交了bugzilla，但qemu社区也没有就这个问题达成一个结论，
+社区讨讨论连接是：</p>
+<p><a href="https://lists.gnu.org/archive/html/qemu-arm/2019-10/msg00051.html">https://lists.gnu.org/archive/html/qemu-arm/2019-10/msg00051.html</a></p>
+<p>使用gdb调试出错现场发现IO请求已经完成（THREAD_DONE），
+但主线程却没有感知到，从而导致主线程一直处poll循环监听pipe事件中(AIO完成事件)，
+造成了主线程hang住的假象，没有办法正常退出了。</p>
+<div class="highlight"><pre><span></span><code><span class="p">(</span><span class="n">gdb</span><span class="p">)</span><span class="w"> </span><span class="n">p</span><span class="w"> </span><span class="o">*</span><span class="p">(</span><span class="n">ThreadPoolElement</span><span class="o">*</span><span class="p">)</span><span class="mh">0xaaab002707e0</span><span class="w"></span>
+<span class="o">$</span><span class="mi">6</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">common</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">aiocb_info</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mh">0xaaaacfd6e250</span><span class="w"> </span><span class="o">&lt;</span><span class="n">thread_pool_aiocb</span><span class="p">)</span><span class="n">info</span><span class="o">&gt;</span><span class="p">,</span><span class="n">bs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mh">0x0</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="n">cb</span><span class="o">=</span><span class="mh">0xaaaacfcd128</span><span class="o">&lt;</span><span class="n">thread_pool_co_cb</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="n">opaqueue</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mh">0xffff90cef828</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="n">refcnt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="n">pool</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mh">0xaaab002a4000</span><span class="p">,</span><span class="w"> </span><span class="k">func</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mh">0xaaaacfc607e4</span><span class="w"> </span><span class="o">&lt;</span><span class="n">aio_worker</span><span class="o">&gt;</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="n">state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">THREAD_DONE</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>要定位这个文问题，必须先分析一下qemu aio机制的执行逻辑。
+qemu aio基于glib2的mainloop事件循环机制，
+mainloop主要分为prepare, polling, check, disptch四个阶段状态，状态机如下图：</p>
+<p><img alt="mainloop" src="images/mainloop-states.gif"></p>
+<p>Step1：首先是prepare阶段，
+当上一次IO处理完成之后，qemu主线程会执行aio_ctx_prepare进入prepare阶段，
+在prepare阶段会先把<em>ctx-&gt;notify_me</em>置1（表示我下面可能要睡眠了，有IO完成了请主动通知我），
+然后通过aio_compute_timeout计算下次poll的超时时间。
+该函数会去检查所有的bottom half（包括定时器和监听的file descriptor）
+综合判断是否有已经下发的IO（通过bh-&gt;flags BH_SCHEDULED的值来确定），是否有定时器事件到来，
+是否有fd状态改变（可读、可写）从而算出一个timeout时间。</p>
+<ul>
+<li>若有需要立刻下发的IO直接返回0，表示下次poll的超时时间为0，即不管eventfd的pipe中是否有事件都会直接退出polling阶段，
+立刻dispatch一次（调用aio_ctx_check和dispatch阶段去下发IO）。</li>
+<li>若有bh被schedule（flags|BH_SCHEDULED）但这是个idle任务则休眠10ms再poll。</li>
+<li>若没有IO需要处理，则返回timeout的值为-1，这时候主线程会一直poll等待eventfd通知到来。</li>
+</ul>
+<p>Step2：prepare后进入poll阶段
+poll阶段会监听glib_pollfds_fill添加的那些fd，一直等到fd状态发生变化（可读、可写）
+或者prepare阶段设定的超时时间到达就进入到check阶段。</p>
+<p>Step3：check阶段调用<code>aio_ctx_check</code>将ctx-&gt;notify_me置成0，
+并清除ctx-&gt;notifier标志，然后遍历整个bh列表如果发现有bh的flags|BH_SCHEDULED返回true，
+或者aio_pending满足、定时器超时满足也返回true，表示可以下发一次IO执行操作了。</p>
+<p>Step4：dispatch阶段给IO worker线程下发IO操作，
+执行具体任务的函数是aio_dispatch。
+这个阶段会调用bh的callback，执行最终的IO操作。</p>
+<p>整个AIO的处理流程大概可以用下面的UML活动图表示：</p>
+<p><img alt="qemu aio" src="images/qemu_aio.svg"></p>
+<p>针对这个问题我们要重点看下<code>ctx_aio_prepare</code>函数和<code>qemu_bh_schedule</code>这两个函数。</p>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="n">gboolean</span><span class="w"></span>
+<span class="nf">aio_ctx_prepare</span><span class="p">(</span><span class="n">GSource</span><span class="w"> </span><span class="o">*</span><span class="n">source</span><span class="p">,</span><span class="w"> </span><span class="n">gint</span><span class="w">    </span><span class="o">*</span><span class="n">timeout</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="n">AioContext</span><span class="w"> </span><span class="o">*</span><span class="n">ctx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">AioContext</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="w"> </span><span class="n">source</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">    </span><span class="n">atomic_or</span><span class="p">(</span><span class="o">&amp;</span><span class="n">ctx</span><span class="o">-&gt;</span><span class="n">notify_me</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/* We assume there is no timeout already supplied */</span><span class="w"></span>
+<span class="w">    </span><span class="o">*</span><span class="n">timeout</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">qemu_timeout_ns_to_ms</span><span class="p">(</span><span class="n">aio_compute_timeout</span><span class="p">(</span><span class="n">ctx</span><span class="p">));</span><span class="w"></span>
+
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">aio_prepare</span><span class="p">(</span><span class="n">ctx</span><span class="p">))</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="o">*</span><span class="n">timeout</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="o">*</span><span class="n">timeout</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="kt">int64_t</span><span class="w"></span>
+<span class="nf">aio_compute_timeout</span><span class="p">(</span><span class="n">AioContext</span><span class="w"> </span><span class="o">*</span><span class="n">ctx</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="n">BHListSlice</span><span class="w"> </span><span class="o">*</span><span class="n">s</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="kt">int64_t</span><span class="w"> </span><span class="n">deadline</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">timeout</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">    </span><span class="n">timeout</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">aio_compute_bh_timeout</span><span class="p">(</span><span class="o">&amp;</span><span class="n">ctx</span><span class="o">-&gt;</span><span class="n">bh_list</span><span class="p">,</span><span class="w"> </span><span class="n">timeout</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">timeout</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="n">QSIMPLEQ_FOREACH</span><span class="p">(</span><span class="n">s</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ctx</span><span class="o">-&gt;</span><span class="n">bh_slice_list</span><span class="p">,</span><span class="w"> </span><span class="n">next</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="n">timeout</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">aio_compute_bh_timeout</span><span class="p">(</span><span class="o">&amp;</span><span class="n">s</span><span class="o">-&gt;</span><span class="n">bh_list</span><span class="p">,</span><span class="w"> </span><span class="n">timeout</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">timeout</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="n">deadline</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">timerlistgroup_deadline_ns</span><span class="p">(</span><span class="o">&amp;</span><span class="n">ctx</span><span class="o">-&gt;</span><span class="n">tlg</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">deadline</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">qemu_soonest_timeout</span><span class="p">(</span><span class="n">timeout</span><span class="p">,</span><span class="w"> </span><span class="n">deadline</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="k">static</span><span class="w"> </span><span class="kt">int64_t</span><span class="w"> </span><span class="nf">aio_compute_bh_timeout</span><span class="p">(</span><span class="n">BHList</span><span class="w"> </span><span class="o">*</span><span class="n">head</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">timeout</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="n">QEMUBH</span><span class="w"> </span><span class="o">*</span><span class="n">bh</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">    </span><span class="n">QSLIST_FOREACH_RCU</span><span class="p">(</span><span class="n">bh</span><span class="p">,</span><span class="w"> </span><span class="n">head</span><span class="p">,</span><span class="w"> </span><span class="n">next</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">((</span><span class="n">bh</span><span class="o">-&gt;</span><span class="n">flags</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="p">(</span><span class="n">BH_SCHEDULED</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">BH_DELETED</span><span class="p">))</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">BH_SCHEDULED</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">bh</span><span class="o">-&gt;</span><span class="n">flags</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">BH_IDLE</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">                </span><span class="cm">/* idle bottom halves will be polled at least</span>
+<span class="cm">                 * every 10ms */</span><span class="w"></span>
+<span class="w">                </span><span class="n">timeout</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">10000000</span><span class="p">;</span><span class="w"></span>
+<span class="w">            </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">                </span><span class="cm">/* non-idle bottom halves will be executed</span>
+<span class="cm">                 * immediately */</span><span class="w"></span>
+<span class="w">                </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+<span class="w">            </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">timeout</span><span class="p">;</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>前面提到prepare阶段调用ctx_aio_prepare来计算下一次polling的超时时间，
+实际调用了aio_compute_timeout计算超时时间，注意：
+这里会先将notify_me置1然后再计算超时时间，而需要额外注意的是notfiy_me是一个共享变量(其实ctx都是共享的)。
+aio_ctx_prepare执行在主线程的上下文，所以这就涉及到共享变量的barrier同步问题。</p>
+<p>附：aio_ctx_prepare的执行callstack为：</p>
+<div class="highlight"><pre><span></span><code><span class="sc">#0</span>  <span class="nv">aio_ctx_prepare</span> <span class="ss">(</span><span class="nv">source</span><span class="o">=</span><span class="mi">0</span><span class="nv">x555555780070</span>, <span class="nb">timeout</span><span class="o">=</span><span class="mi">0</span><span class="nv">x7fffffffdbf4</span><span class="ss">)</span> <span class="nv">at</span> <span class="nv">util</span><span class="o">/</span><span class="nv">async</span>.<span class="nv">c</span>:<span class="mi">250</span>
+<span class="sc">#1</span>  <span class="mi">0</span><span class="nv">x00007ffff7eb6d1a</span> <span class="nv">in</span> <span class="nv">g_main_context_prepare</span> <span class="ss">()</span> <span class="nv">from</span> <span class="o">/</span><span class="nv">lib64</span><span class="o">/</span><span class="nv">libglib</span><span class="o">-</span><span class="mi">2</span>.<span class="mi">0</span>.<span class="nv">so</span>.<span class="mi">0</span>
+<span class="sc">#2</span>  <span class="mi">0</span><span class="nv">x0000555555695d4e</span> <span class="nv">in</span> <span class="nv">glib_pollfds_fill</span> <span class="ss">(</span><span class="nv">cur_timeout</span><span class="o">=</span><span class="mi">0</span><span class="nv">x7fffffffdcc8</span><span class="ss">)</span> <span class="nv">at</span> <span class="nv">util</span><span class="o">/</span><span class="nv">main</span><span class="o">-</span><span class="k">loop</span>.<span class="nv">c</span>:<span class="mi">191</span>
+<span class="sc">#3</span>  <span class="mi">0</span><span class="nv">x0000555555695ec0</span> <span class="nv">in</span> <span class="nv">os_host_main_loop_wait</span> <span class="ss">(</span><span class="nb">timeout</span><span class="o">=-</span><span class="mi">1</span><span class="ss">)</span> <span class="nv">at</span> <span class="nv">util</span><span class="o">/</span><span class="nv">main</span><span class="o">-</span><span class="k">loop</span>.<span class="nv">c</span>:<span class="mi">232</span>
+<span class="sc">#4</span>  <span class="mi">0</span><span class="nv">x000055555569600f</span> <span class="nv">in</span> <span class="nv">main_loop_wait</span> <span class="ss">(</span><span class="nv">nonblocking</span><span class="o">=</span><span class="mi">0</span><span class="ss">)</span> <span class="nv">at</span> <span class="nv">util</span><span class="o">/</span><span class="nv">main</span><span class="o">-</span><span class="k">loop</span>.<span class="nv">c</span>:<span class="mi">518</span>
+<span class="sc">#5</span>  <span class="mi">0</span><span class="nv">x0000555555577e89</span> <span class="nv">in</span> <span class="nv">convert_do_copy</span> <span class="ss">(</span><span class="nv">s</span><span class="o">=</span><span class="mi">0</span><span class="nv">x7fffffffdea0</span><span class="ss">)</span> <span class="nv">at</span> <span class="nv">qemu</span><span class="o">-</span><span class="nv">img</span>.<span class="nv">c</span>:<span class="mi">2043</span>
+<span class="sc">#6</span>  <span class="mi">0</span><span class="nv">x0000555555579332</span> <span class="nv">in</span> <span class="nv">img_convert</span> <span class="ss">(</span><span class="nv">argc</span><span class="o">=</span><span class="mi">7</span>, <span class="nv">argv</span><span class="o">=</span><span class="mi">0</span><span class="nv">x7fffffffe1d0</span><span class="ss">)</span> <span class="nv">at</span> <span class="nv">qemu</span><span class="o">-</span><span class="nv">img</span>.<span class="nv">c</span>:<span class="mi">2555</span>
+<span class="sc">#7</span>  <span class="mi">0</span><span class="nv">x000055555557f3b8</span> <span class="nv">in</span> <span class="nv">main</span> <span class="ss">(</span><span class="nv">argc</span><span class="o">=</span><span class="mi">7</span>, <span class="nv">argv</span><span class="o">=</span><span class="mi">0</span><span class="nv">x7fffffffe1d0</span><span class="ss">)</span> <span class="nv">at</span> <span class="nv">qemu</span><span class="o">-</span><span class="nv">img</span>.<span class="nv">c</span>:<span class="mi">5116</span>
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">qemu_bh_schedule</span><span class="p">(</span><span class="n">QEMUBH</span><span class="w"> </span><span class="o">*</span><span class="n">bh</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="n">aio_bh_enqueue</span><span class="p">(</span><span class="n">bh</span><span class="p">,</span><span class="w"> </span><span class="n">BH_SCHEDULED</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">aio_bh_enqueue</span><span class="p">(</span><span class="n">QEMUBH</span><span class="w"> </span><span class="o">*</span><span class="n">bh</span><span class="p">,</span><span class="w"> </span><span class="kt">unsigned</span><span class="w"> </span><span class="n">new_flags</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="n">AioContext</span><span class="w"> </span><span class="o">*</span><span class="n">ctx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bh</span><span class="o">-&gt;</span><span class="n">ctx</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="kt">unsigned</span><span class="w"> </span><span class="n">old_flags</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/*</span>
+<span class="cm">     * The memory barrier implicit in atomic_fetch_or makes sure that:</span>
+<span class="cm">     * 1. idle &amp; any writes needed by the callback are done before the</span>
+<span class="cm">     *    locations are read in the aio_bh_poll.</span>
+<span class="cm">     * 2. ctx is loaded before the callback has a chance to execute and bh</span>
+<span class="cm">     *    could be freed.</span>
+<span class="cm">     */</span><span class="w"></span>
+<span class="w">    </span><span class="n">old_flags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">atomic_fetch_or</span><span class="p">(</span><span class="o">&amp;</span><span class="n">bh</span><span class="o">-&gt;</span><span class="n">flags</span><span class="p">,</span><span class="w"> </span><span class="n">BH_PENDING</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">new_flags</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="p">(</span><span class="n">old_flags</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">BH_PENDING</span><span class="p">))</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="n">QSLIST_INSERT_HEAD_ATOMIC</span><span class="p">(</span><span class="o">&amp;</span><span class="n">ctx</span><span class="o">-&gt;</span><span class="n">bh_list</span><span class="p">,</span><span class="w"> </span><span class="n">bh</span><span class="p">,</span><span class="w"> </span><span class="n">next</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="n">aio_notify</span><span class="p">(</span><span class="n">ctx</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">aio_notify</span><span class="p">(</span><span class="n">AioContext</span><span class="w"> </span><span class="o">*</span><span class="n">ctx</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="cm">/* Write e.g. bh-&gt;scheduled before reading ctx-&gt;notify_me.  Pairs</span>
+<span class="cm">     * with atomic_or in aio_ctx_prepare or atomic_add in aio_poll.</span>
+<span class="cm">     */</span><span class="w"></span>
+<span class="w">    </span><span class="n">smp_mb</span><span class="p">();</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">ctx</span><span class="o">-&gt;</span><span class="n">notify_me</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="n">event_notifier_set</span><span class="p">(</span><span class="o">&amp;</span><span class="n">ctx</span><span class="o">-&gt;</span><span class="n">notifier</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="n">atomic_mb_set</span><span class="p">(</span><span class="o">&amp;</span><span class="n">ctx</span><span class="o">-&gt;</span><span class="n">notified</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>提示：bh是一个任务推迟执行的机制，IO线程里调用aio_bh_new创建一个bh，然后在要下发IO的时候调用qemu_bh_schedule，
+将BH_SCHEDULE置1告诉下发IO者这个下半部可以执行了。</p>
+<p>下一步分析qemu_bh_schedule流程，熟悉bh机制的都应该知道qemu_bh_schedule是在IO线程上下文。
+其代码中首先通过原子操作xchq将BH_SCHEDULED标志位置为1，
+告诉调度者（这里是主线程）这个bh可以开始下发执行了。
+若之前BH_SCHEDULED为0则调用aio_notify通知主线程，
+而aio_notify()中又会判断ctx-&gt;notify_me是否为0，
+只有当其不为0时候才会写ctx-&gt;event_notifier。
+值得注意的是：
+在这里aio_notify的时候要通过判断notify_me来决定是否
+发送ctx-&gt;event_notifer事件通知给主线程。
+然而这里notify_me是个多线程之间的共享变量，作为判断条件会影响代码的分支执行！</p>
+<div class="highlight"><pre><span></span><code>创建8个协程：
+<span class="c1">#0  qemu_bh_schedule (bh=0x555555793b60) at util/async.c:181</span>
+<span class="m">181</span>         aio_bh_enqueue<span class="o">(</span>bh, BH_SCHEDULED<span class="o">)</span><span class="p">;</span>
+<span class="o">(</span>gdb<span class="o">)</span> bt
+<span class="c1">#0  qemu_bh_schedule (bh=0x555555793b60) at util/async.c:181</span>
+<span class="c1">#1  0x0000555555693b48 in spawn_thread (pool=0x555555780800) at util/thread-pool.c:158</span>
+<span class="c1">#2  0x0000555555693f4c in thread_pool_submit_aio (pool=0x555555780800, func=0x5555555f9a7d &lt;handle_aiocb_rw&gt;, arg=0x7ffff70949d0, </span>
+    <span class="nv">cb</span><span class="o">=</span>0x555555693fc2 &lt;thread_pool_co_cb&gt;, <span class="nv">opaque</span><span class="o">=</span>0x7ffff7094920<span class="o">)</span> at util/thread-pool.c:262
+<span class="c1">#3  0x0000555555694072 in thread_pool_submit_co (pool=0x555555780800, func=0x5555555f9a7d &lt;handle_aiocb_rw&gt;, arg=0x7ffff70949d0)</span>
+    at util/thread-pool.c:288
+<span class="c1">#4  0x00005555555fab23 in raw_thread_pool_submit (bs=0x55555578d3f0, func=0x5555555f9a7d &lt;handle_aiocb_rw&gt;, arg=0x7ffff70949d0)</span>
+    at block/file-posix.c:1894
+<span class="c1">#5  0x00005555555fac23 in raw_co_prw (bs=0x55555578d3f0, offset=0, bytes=104, qiov=0x7ffff7094e00, type=1) at block/file-posix.c:1941</span>
+<span class="c1">#6  0x00005555555fac73 in raw_co_preadv (bs=0x55555578d3f0, offset=0, bytes=104, qiov=0x7ffff7094e00, flags=0) at block/file-posix.c:1948</span>
+<span class="c1">#7  0x00005555556072e9 in bdrv_driver_preadv (bs=0x55555578d3f0, offset=0, bytes=104, qiov=0x7ffff7094e00, qiov_offset=0, flags=0) at block/io.c:1116</span>
+<span class="c1">#8  0x0000555555608181 in bdrv_aligned_preadv (child=0x55555577f900, req=0x7ffff7094bd0, offset=0, bytes=104, align=1, qiov=0x7ffff7094e00, </span>
+    <span class="nv">qiov_offset</span><span class="o">=</span><span class="m">0</span>, <span class="nv">flags</span><span class="o">=</span><span class="m">0</span><span class="o">)</span> at block/io.c:1492
+<span class="c1">#9  0x0000555555608a73 in bdrv_co_preadv_part (child=0x55555577f900, offset=0, bytes=104, qiov=0x7ffff7094e00, qiov_offset=0, flags=0)</span>
+    at block/io.c:1733
+<span class="c1">#10 0x00005555556088ab in bdrv_co_preadv (child=0x55555577f900, offset=0, bytes=104, qiov=0x7ffff7094e00, flags=0) at block/io.c:1691</span>
+<span class="c1">#11 0x0000555555606b8b in bdrv_rw_co_entry (opaque=0x7ffff7094d50) at block/io.c:908</span>
+<span class="c1">#12 0x0000555555606c62 in bdrv_prwv_co (child=0x55555577f900, offset=0, qiov=0x7ffff7094e00, is_write=false, flags=0) at block/io.c:938</span>
+<span class="c1">#13 0x0000555555606f6d in bdrv_preadv (child=0x55555577f900, offset=0, qiov=0x7ffff7094e00) at block/io.c:1001</span>
+<span class="c1">#14 0x0000555555606ffa in bdrv_pread (child=0x55555577f900, offset=0, buf=0x7ffff7094ee0, bytes=104) at block/io.c:1018</span>
+<span class="c1">#15 0x00005555555b752d in qcow2_do_open (bs=0x555555785cb0, options=0x55555578b190, flags=0, errp=0x7fffffffda00) at block/qcow2.c:1258</span>
+<span class="c1">#16 0x00005555555b8d24 in qcow2_open_entry (opaque=0x7fffffffd970) at block/qcow2.c:1796</span>
+<span class="c1">#17 0x00005555556b6599 in coroutine_trampoline (i0=1434005424, i1=21845) at util/coroutine-ucontext.c:115</span>
+</code></pre></div>
+
+<p>结合场景进一步分析：
+qemu-img 进行covert格式转换的时候创建了8个协程来并发处理转换操作，
+协程创建好之后主线程执行<code>main_loop_wait</code>，协程负责处理镜像转换的具体工作（发起AIO请求）。</p>
+<p>结合问题调试发现，通过aio_notify()和aio_compute_timeout()中tracelog，
+我们发现io thread已经完成io请求，且调用了qemu_bh_schedule设置bh-&gt;flags BH_SCHEDULED为1，
+但是主线程好像并没有看到BH_SCHEDULED被置1，或者还有一种情况是主线程在并发执行aio_ctx_prepare
+的时候并没有先将notify_me置1而是直接调用了aio_ctx_compute_timeout此时却计算timeout值为-1，
+导致直接即后续主线程会一直处于poll等待事件的fd从而导致主线程hang住的假象。</p>
+<p>为了验证这个猜测，我们在aio_ctx_prepare里面加了个memory barrier发现问题就没有复现了，
+于是发了一个patch到社区讨论：</p>
+<p><a href="https://lists.gnu.org/archive/html/qemu-devel/2020-04/msg00204.html">https://lists.gnu.org/archive/html/qemu-devel/2020-04/msg00204.html</a></p>
+<p>问题的讨论点聚焦在qemu用共享变量进行线程间通信，问题场景为：</p>
+<div class="highlight"><pre><span></span><code><span class="kr">When</span><span class="w"> </span><span class="n">using</span><span class="w"> </span><span class="n">C11</span><span class="w"> </span><span class="n">atomics</span><span class="p">,</span><span class="w"> </span><span class="n">non</span><span class="o">-</span><span class="n">seqcst</span><span class="w"> </span><span class="n">reads</span><span class="w"> </span><span class="kr">and</span><span class="w"> </span><span class="n">writes</span><span class="w"> </span><span class="n">do</span><span class="w"> </span><span class="kr">not</span><span class="w"> </span><span class="n">participate</span><span class="w"></span>
+<span class="kr">in</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">total</span><span class="w"> </span><span class="n">order</span><span class="w"> </span><span class="kr">of</span><span class="w"> </span><span class="n">seqcst</span><span class="w"> </span><span class="n">operations</span><span class="p">.</span><span class="w">  </span><span class="kr">In</span><span class="w"> </span><span class="n">util</span><span class="o">/</span><span class="n">async</span><span class="p">.</span><span class="n">c</span><span class="w"> </span><span class="kr">and</span><span class="w"> </span><span class="n">util</span><span class="o">/</span><span class="n">aio</span><span class="o">-</span><span class="n">posix</span><span class="p">.</span><span class="n">c</span><span class="p">,</span><span class="w"></span>
+<span class="kr">in</span><span class="w"> </span><span class="n">particular</span><span class="p">,</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="kt">pattern</span><span class="w"> </span><span class="n">that</span><span class="w"> </span><span class="n">we</span><span class="w"> </span><span class="n">use</span><span class="w"></span>
+
+<span class="w">          </span><span class="n">write</span><span class="w"> </span><span class="n">ctx</span><span class="o">-&gt;</span><span class="n">notify_me</span><span class="w">                 </span><span class="n">write</span><span class="w"> </span><span class="n">bh</span><span class="o">-&gt;</span><span class="n">scheduled</span><span class="w"></span>
+<span class="w">          </span><span class="n">read</span><span class="w"> </span><span class="n">bh</span><span class="o">-&gt;</span><span class="n">scheduled</span><span class="w">                   </span><span class="n">read</span><span class="w"> </span><span class="n">ctx</span><span class="o">-&gt;</span><span class="n">notify_me</span><span class="w"></span>
+<span class="w">          </span><span class="nf">if</span><span class="w"> </span><span class="o">!</span><span class="n">bh</span><span class="o">-&gt;</span><span class="n">scheduled</span><span class="p">,</span><span class="w"> </span><span class="n">sleep</span><span class="w">             </span><span class="nf">if</span><span class="w"> </span><span class="n">ctx</span><span class="o">-&gt;</span><span class="n">notify_me</span><span class="p">,</span><span class="w"> </span><span class="kr">notify</span><span class="w"></span>
+
+<span class="n">needs</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="n">use</span><span class="w"> </span><span class="n">seqcst</span><span class="w"> </span><span class="n">operations</span><span class="w"> </span><span class="n">for</span><span class="w"> </span><span class="n">both</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">write</span><span class="w"> </span><span class="kr">and</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">read</span><span class="p">.</span><span class="w">  </span><span class="kr">In</span><span class="w"></span>
+<span class="n">general</span><span class="w"> </span><span class="n">this</span><span class="w"> </span><span class="n">is</span><span class="w"> </span><span class="n">something</span><span class="w"> </span><span class="n">that</span><span class="w"> </span><span class="n">we</span><span class="w"> </span><span class="n">do</span><span class="w"> </span><span class="kr">not</span><span class="w"> </span><span class="n">want</span><span class="p">,</span><span class="w"> </span><span class="n">because</span><span class="w"> </span><span class="n">there</span><span class="w"> </span><span class="n">can</span><span class="w"> </span><span class="n">be</span><span class="w"></span>
+<span class="kr">many</span><span class="w"> </span><span class="n">sources</span><span class="w"> </span><span class="n">that</span><span class="w"> </span><span class="n">are</span><span class="w"> </span><span class="n">polled</span><span class="w"> </span><span class="kr">in</span><span class="w"> </span><span class="n">addition</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="n">bottom</span><span class="w"> </span><span class="n">halves</span><span class="p">.</span><span class="w">  </span><span class="n">The</span><span class="w"></span>
+<span class="n">alternative</span><span class="w"> </span><span class="n">is</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="n">place</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="n">seqcst</span><span class="w"> </span><span class="n">memory</span><span class="w"> </span><span class="n">barrier</span><span class="w"> </span><span class="kr">between</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">write</span><span class="w"></span>
+<span class="kr">and</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">read</span><span class="p">.</span><span class="w">  </span><span class="n">This</span><span class="w"> </span><span class="n">also</span><span class="w"> </span><span class="n">comes</span><span class="w"> </span><span class="n">with</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="n">disadvantage</span><span class="p">,</span><span class="w"> </span><span class="kr">in</span><span class="w"> </span><span class="n">that</span><span class="w"> </span><span class="n">the</span><span class="w"></span>
+<span class="n">memory</span><span class="w"> </span><span class="n">barrier</span><span class="w"> </span><span class="n">is</span><span class="w"> </span><span class="n">implicit</span><span class="w"> </span><span class="n">on</span><span class="w"> </span><span class="n">strongly</span><span class="o">-</span><span class="n">ordered</span><span class="w"> </span><span class="n">architectures</span><span class="w"> </span><span class="kr">and</span><span class="w"></span>
+<span class="n">it</span><span class="w"> </span><span class="n">wastes</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="kr">few</span><span class="w"> </span><span class="n">dozen</span><span class="w"> </span><span class="n">clock</span><span class="w"> </span><span class="n">cycles</span><span class="p">.</span><span class="w"></span>
+</code></pre></div>
+
+<p>根据Paolo Bonzini的回复和总结，这个问题可以简化为一个smp编程场景下
+多线程之间共享变量的一个同步模型：</p>
+<ul>
+<li>aio_ctx_prepare里面：主线程写<code>notify_me</code>，然后又读取bh-&gt;flags | BH_SCHEDULE的值来判是休眠还是处理bh；</li>
+<li>io worker线程写bh-&gt;flags的BH_SCHEDULE标志位，然后又读取<code>notify_me</code>来判断是否唤醒主线程。</li>
+</ul>
+<div class="highlight"><pre><span></span><code><span class="nv">Yes</span>, <span class="nv">that</span><span class="s1">&#39;</span><span class="s">s what I expected too when I wrote that code. :(  But Torvald</span>
+<span class="nv">Riegel</span> <span class="nv">explained</span> <span class="nv">a</span> <span class="k">while</span> <span class="nv">ago</span> <span class="nv">that</span> <span class="nv">seq</span><span class="o">-</span><span class="nv">cst</span> <span class="nv">accesses</span> <span class="nv">are</span> <span class="nv">actually</span> <span class="nv">weaker</span>
+<span class="nv">than</span> <span class="nv">e</span>.<span class="nv">g</span>. <span class="nv">the</span> <span class="nv">Linux</span> <span class="nv">kernel</span> <span class="nv">atomics</span>[<span class="mi">1</span>].
+
+<span class="nv">The</span> <span class="nv">difference</span> <span class="nv">basically</span> <span class="nv">only</span> <span class="nv">matters</span> <span class="k">if</span> <span class="nv">you</span> <span class="nv">are</span> <span class="nv">writing</span> <span class="nv">the</span> <span class="nv">relatively</span>
+<span class="nv">common</span> <span class="nv">synchronization</span> <span class="nv">pattern</span>
+
+        <span class="nv">write</span> <span class="nv">A</span>                         <span class="nv">write</span> <span class="nv">B</span>
+        <span class="nv">smp_mb</span><span class="ss">()</span>                        <span class="nv">smp_mb</span><span class="ss">()</span>
+        <span class="nv">read</span> <span class="nv">B</span>                          <span class="nv">read</span> <span class="nv">A</span>
+        <span class="k">if</span> <span class="nv">not</span> <span class="nv">B</span> <span class="k">then</span> <span class="nv">sleep</span>             <span class="k">if</span> <span class="nv">A</span> <span class="k">then</span> <span class="nv">wake</span> <span class="nv">up</span> <span class="nv">the</span> <span class="nv">other</span> <span class="nv">side</span>
+        <span class="k">do</span> <span class="nv">something</span>
+
+<span class="nv">because</span> <span class="nv">you</span> <span class="nv">must</span> <span class="nv">either</span> <span class="nv">use</span> <span class="nv">memory</span> <span class="nv">barriers</span> <span class="nv">as</span> <span class="nv">above</span>, <span class="nv">or</span> <span class="nv">use</span> <span class="nv">seq</span><span class="o">-</span><span class="nv">cst</span>
+<span class="nv">writes</span> <span class="o">*</span><span class="nv">and</span><span class="o">*</span> <span class="nv">reads</span>.  <span class="nv">You</span> <span class="nv">cannot</span> <span class="nv">rely</span> <span class="nv">on</span> <span class="nv">having</span> <span class="nv">a</span> <span class="nv">memory</span> <span class="nv">barrier</span> <span class="nv">implicit</span>
+<span class="nv">in</span> <span class="nv">the</span> <span class="nv">writes</span>.
+
+<span class="nv">Paolo</span>
+
+[<span class="mi">1</span>] <span class="nv">https</span>:<span class="o">//</span><span class="nv">lists</span>.<span class="nv">gnu</span>.<span class="nv">org</span><span class="o">/</span><span class="nv">archive</span><span class="o">/</span><span class="nv">html</span><span class="o">/</span><span class="nv">qemu</span><span class="o">-</span><span class="nv">arm</span><span class="o">/</span><span class="mi">2019</span><span class="o">-</span><span class="mi">10</span><span class="o">/</span><span class="nv">msg00051</span>.<span class="nv">html</span>
+</code></pre></div>
+
+<p>在这个模型下面，主线程和io worker线程之间的执行逻辑去取决于共享变量<code>notify_me</code>
+和bh-&gt;flags | BH_SCHEDULE的值，两个线程之间又各自会写对方需要的分支判断条件，
+这样就存在一种竞争关系，作者在写代码的时候认为<code>atomic_or</code>或者<code>atomic_and</code>这类API函数
+在执行的时候会加barrier，保证代码执行的顺序逻辑（注意是从另外一个线程的角度去看），
+但不幸的是实际上并没有。为了验证这一点，我们在aarch64环境上对<code>aio_ctx_prepare</code>进行反汇编：</p>
+<p><img alt="aio_ctx_prepare" src="images/aio_ctx_prepare_asm.png"></p>
+<p>从反汇编可以看出，atomic_or这里对应一条orr指令，后面并没有添加任何barrier指令(dmb或者dsb指令)，
+也就是说<code>aio_ctx_prepare</code>中并不能保证smp环境下多线程之间的指令顺序执行。</p>
+<div class="highlight"><pre><span></span><code><span class="w">    </span><span class="n">atomic_or</span><span class="p">(</span><span class="o">&amp;</span><span class="n">ctx</span><span class="o">-&gt;</span><span class="n">notify_me</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span><span class="w">  </span>
+
+<span class="w">    </span><span class="cm">/* We assume there is no timeout already supplied */</span><span class="w"></span>
+<span class="w">    </span><span class="o">*</span><span class="n">timeout</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">qemu_timeout_ns_to_ms</span><span class="p">(</span><span class="n">aio_compute_timeout</span><span class="p">(</span><span class="n">ctx</span><span class="p">));</span><span class="w"></span>
+</code></pre></div>
+
+<p>所以这问题的根源在于：</p>
+<p>aarch64环境上的smp多线程场景下，线程间使用了共享变量
+（这里为例提升qemu aio的性能，主线程和IO线程之间使用共享变量方式进行同步，
+并没有采用互斥锁、条件变量、信号量等重量级同步方式来保证）
+可能会导致一些意想不到的结果，单独的用户态原子操作并不能保证smp多线程之间
+代码的执行顺序，只有在代码分支条件判断的关键点显式添加memory barrier才能
+保证代码的执顺序！！！</p>
+<p>为什么这个bug在x86上不出现而在aarch64上出现可以高概率复现？
+猜测是aarch64和x86上内存模型不同导致的结果。
+（注意：编译器barriers只能够防止代码被编译器优化，并不能防止指令在执行的时候被CPU重新排列）</p>
+<p>从ARMv8的PG文档可以看到aarch46使用的是一种weakly-ordered model of memory内存模型。
+通俗的讲就是处理器实际对内存访问（load and store）的执行序列和program order不一定保持严格的一致，
+处理器可以对内存访问进行reorder（可以参考：<a href="http://www.wowotech.net/armv8a_arch/__cpu_setup.html">http://www.wowotech.net/armv8a_arch/__cpu_setup.html</a>）。
+所以，很明显aarch64和x86的内存模型是很大不同的。</p>
+<div class="highlight"><pre><span></span><code><span class="n">ARMv8A</span><span class="w"> </span><span class="n">PG</span><span class="w"> </span><span class="n">Chapter</span><span class="w"> </span><span class="mf">13.</span><span class="w"> </span><span class="n">Memory</span><span class="w"> </span><span class="n">Ordering</span><span class="w"></span>
+
+<span class="n">The</span><span class="w"> </span><span class="n">ARMv8</span><span class="w"> </span><span class="n">architecture</span><span class="w"> </span><span class="n">employs</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="n">weakly</span><span class="o">-</span><span class="n">ordered</span><span class="w"> </span><span class="n">model</span><span class="w"> </span><span class="n">of</span><span class="w"> </span><span class="n">memory</span><span class="o">.</span><span class="w"> </span><span class="n">In</span><span class="w"> </span><span class="n">general</span><span class="w"> </span><span class="n">terms</span><span class="p">,</span><span class="w"> </span><span class="n">this</span><span class="w"> </span><span class="n">means</span><span class="w"> </span><span class="n">that</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">order</span><span class="w"> </span><span class="n">of</span><span class="w"> </span><span class="n">memory</span><span class="w"> </span><span class="n">accesses</span><span class="w"> </span><span class="k">is</span><span class="w"> </span><span class="ow">not</span><span class="w"> </span><span class="n">required</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="n">be</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">same</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">program</span><span class="w"> </span><span class="n">order</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="nb">load</span><span class="w"> </span><span class="ow">and</span><span class="w"> </span><span class="n">store</span><span class="w"> </span><span class="n">operations</span><span class="o">.</span><span class="w"> </span><span class="n">The</span><span class="w"> </span><span class="n">processor</span><span class="w"> </span><span class="k">is</span><span class="w"> </span><span class="n">able</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="n">re</span><span class="o">-</span><span class="n">order</span><span class="w"> </span><span class="n">memory</span><span class="w"> </span><span class="n">read</span><span class="w"> </span><span class="n">operations</span><span class="w"> </span><span class="n">with</span><span class="w"> </span><span class="n">respect</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="n">each</span><span class="w"> </span><span class="n">other</span><span class="o">.</span><span class="w"> </span><span class="n">Writes</span><span class="w"> </span><span class="n">may</span><span class="w"> </span><span class="n">also</span><span class="w"> </span><span class="n">be</span><span class="w"> </span><span class="n">re</span><span class="o">-</span><span class="n">ordered</span><span class="w"> </span><span class="p">(</span><span class="k">for</span><span class="w"> </span><span class="n">example</span><span class="p">,</span><span class="w"> </span><span class="n">write</span><span class="w"> </span><span class="n">combining</span><span class="p">)</span><span class="w"> </span><span class="o">.</span><span class="n">As</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="n">result</span><span class="p">,</span><span class="w"> </span><span class="n">hardware</span><span class="w"> </span><span class="n">optimizations</span><span class="p">,</span><span class="w"> </span><span class="n">such</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">use</span><span class="w"> </span><span class="n">of</span><span class="w"> </span><span class="n">cache</span><span class="w"> </span><span class="ow">and</span><span class="w"> </span><span class="n">write</span><span class="w"> </span><span class="n">buffer</span><span class="p">,</span><span class="w"> </span><span class="n">function</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="n">way</span><span class="w"> </span><span class="n">that</span><span class="w"> </span><span class="n">improves</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">performance</span><span class="w"> </span><span class="n">of</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">processor</span><span class="p">,</span><span class="w"> </span><span class="n">which</span><span class="w"> </span><span class="n">means</span><span class="w"> </span><span class="n">that</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">required</span><span class="w"> </span><span class="n">bandwidth</span><span class="w"> </span><span class="n">between</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">processor</span><span class="w"> </span><span class="ow">and</span><span class="w"> </span><span class="n">external</span><span class="w"> </span><span class="n">memory</span><span class="w"> </span><span class="n">can</span><span class="w"> </span><span class="n">be</span><span class="w"> </span><span class="n">reduced</span><span class="w"> </span><span class="ow">and</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">long</span><span class="w"> </span><span class="n">latencies</span><span class="w"> </span><span class="n">associated</span><span class="w"> </span><span class="n">with</span><span class="w"> </span><span class="n">such</span><span class="w"> </span><span class="n">external</span><span class="w"> </span><span class="n">memory</span><span class="w"> </span><span class="n">accesses</span><span class="w"> </span><span class="n">are</span><span class="w"> </span><span class="n">hidden</span><span class="o">.</span><span class="w"></span>
+</code></pre></div>
+
+<p>这里对x86环境上的<code>aio_ctx_prepare</code>进行反汇编得到的结果是：</p>
+<p><img alt="aio_ctx_prepare on x86" src="images/aio_ctx_prepare_asm_x86.png"></p>
+<p>可以看到x86上是一条lock orl指令，查询资料x86使用Total Store Order内存模型：</p>
+<div class="highlight"><pre><span></span><code>lock prefix guarantee that result of instruction is immediately globaly visible.
+</code></pre></div>
+
+<p>发现lock前缀是锁总线，可以保证执行操作立刻全局可见，难道这里顺带这里可以起到内存屏障的作用？</p>
+<p>更新一下最新进展，Paolo Bonzini已经开始发patch了，针对weakly-ordered内存模型体系结构修改了一些内容：</p>
+<p><a href="https://patchwork.kernel.org/cover/11476375/">https://patchwork.kernel.org/cover/11476375/</a></p>
+<p>还有针对这个问题的补丁已经post，不得不说社区大牛速度真是快，日常膜拜：</p>
+<p><a href="https://patchwork.kernel.org/patch/11476383/">https://patchwork.kernel.org/patch/11476383/</a></p>
+<p>SMP架构下的内存模型（Memory Model）与CPU Arch和编程语言息息相关，
+为了深入理解这个Topic，这里列举了一些参考文档供学习。</p>
+<p><strong>参考文献</strong>：</p>
+<ul>
+<li>http://www.cs.jhu.edu/~gyn/publications/memorymodels/writeup.html</li>
+<li>https://developer.arm.com/docs/den0024/a/memory-ordering</li>
+<li>https://www.csm.ornl.gov/workshops/openshmem2018/presentations/mm-openshmem2018.pdf</li>
+<li>https://github.com/qemu/qemu/blob/master/docs/devel/atomics.rst</li>
+<li>http://www.inf.ed.ac.uk/teaching/courses/pa/Notes/lecture07-sc.pdf</li>
+<li>https://www.cs.cmu.edu/afs/cs/academic/class/15740-s17/www/lectures/07-multiprocessor-consistency-cache.pdf</li>
+<li>https://people.mpi-sws.org/~viktor/wmc/c11.pdf</li>
+<li>https://www.jianshu.com/p/a26763dd9b0e</li>
+</ul>
+
+
+             
+ 
+                <p id="post-share-links">
+    Share on:
+      <a href="https://twitter.com/intent/tweet?text=A%20Qemu%20Hang%20Problem%20Revelant%20to%20AIO&url=https%3A//kernelgo.org/qemu-aio-internal.html&hashtags=aio" target="_blank" rel="nofollow noopener noreferrer" title="Share on Twitter">Twitter</a>
+ ❄       <a href="https://www.facebook.com/sharer/sharer.php?u=https%3A//kernelgo.org/qemu-aio-internal.html" target="_blank" rel="nofollow noopener noreferrer" title="Share on Facebook">Facebook</a>
+ ❄       <a href="mailto:?subject=A%20Qemu%20Hang%20Problem%20Revelant%20to%20AIO&amp;body=https%3A//kernelgo.org/qemu-aio-internal.html" target="_blank" rel="nofollow noopener noreferrer" title="Share via Email">Email</a>
+
+            
+            
+
+
+
+
+
+
+
+<section>
+    <h6 style="display:none;">Comments</h6>
+    <p id="comment-message"> </p>
+
+    <div class="accordion" id="accordion2">
+        <div class="accordion-group">
+            <div class="accordion-heading">
+                <a class="accordion-toggle disqus-comment-count comment-count collapsed"
+                   data-toggle="collapse"
+                   data-parent="#accordion2"
+                   data-disqus-identifier="https://kernelgo.org/qemu-aio-internal.html"
+                   href="https://kernelgo.org/qemu-aio-internal.html#comment_thread"
+                   id="comment-accordion-toggle">
+                    Comments
+                </a>
+            </div>
+            <div id="comment_thread" class="accordion-body collapse">
+                <div class="accordion-inner">
+                    <div class="comments">
+                        <div id="disqus_thread"></div>
+                        <script>
+    var disqus_shortname = 'kernelgo';
+    (function () {
+        var s = document.createElement('script'); s.async = true;
+        s.type = 'text/javascript';
+        s.src = '//' + disqus_shortname + '.disqus.com/count.js';
+        (document.getElementsByTagName('HEAD')[0] || document.getElementsByTagName('BODY')[0]).appendChild(s);
+    }());
+
+    var disqus_identifier = 'https://kernelgo.org/qemu-aio-internal.html';
+    var disqus_url = 'https://kernelgo.org/qemu-aio-internal.html';
+
+    (function() {
+        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    })();
+</script>
+
+<noscript>Please enable JavaScript to view the <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+            <hr/>
+            <aside>
+            <nav>
+            <ul class="articles-timeline">
+                <li class="previous-article">« <a href="https://kernelgo.org/reading2020.html" title="Previous: Article Archive 2020 Reading Plan">Article Archive 2020 Reading Plan</a></li>
+                <li class="next-article"><a href="https://kernelgo.org/qemu-device-hotplug.html" title="Next: Memory Hotplug &amp; CPU Hotplug">Memory Hotplug & CPU Hotplug</a> »</li>
+            </ul>
+            </nav>
+            </aside>
+        </div>
+        <section id="article-sidebar" class="span2">
+            <h4>Published</h4>
+            <time itemprop="dateCreated" datetime="2020-04-03T23:00:00+08:00">Fri 03 April 2020</time>
+
+            <h4>Category</h4>
+            <a class="category-link" href="https://kernelgo.org/categories.html#virtualization-ref">virtualization</a>
+            <h4>Tags</h4>
+            <ul class="list-of-tags tags-in-article">
+                <li><a href="https://kernelgo.org/tags.html#aio-ref">aio
+                    <span class="superscript">1</span>
+</a></li>
+            </ul>
+<h4>Contact</h4>
+<div id="sidebar-social-link">
+    <a href="https://github.com/fangying" title="" target="_blank" rel="nofollow noopener noreferrer">
+        <svg xmlns="http://www.w3.org/2000/svg" aria-label="GitHub" role="img" viewBox="0 0 512 512"><rect width="512" height="512" rx="15%" fill="#1B1817"/><path fill="#fff" d="M335 499c14 0 12 17 12 17H165s-2-17 12-17c13 0 16-6 16-12l-1-50c-71 16-86-28-86-28-12-30-28-37-28-37-24-16 1-16 1-16 26 2 40 26 40 26 22 39 59 28 74 22 2-17 9-28 16-35-57-6-116-28-116-126 0-28 10-51 26-69-3-6-11-32 3-67 0 0 21-7 70 26 42-12 86-12 128 0 49-33 70-26 70-26 14 35 6 61 3 67 16 18 26 41 26 69 0 98-60 120-117 126 10 8 18 24 18 48l-1 70c0 6 3 12 16 12z"/></svg>
+    </a>
+</div>
+            
+
+
+
+
+
+            
+
+
+
+
+
+        </section>
+</div>
+</article>
+<!-- Root element of PhotoSwipe. Must have class pswp. -->
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    <!-- Background of PhotoSwipe.
+         It's a separate element as animating opacity is faster than rgba(). -->
+    <div class="pswp__bg"></div>
+
+    <!-- Slides wrapper with overflow:hidden. -->
+    <div class="pswp__scroll-wrap">
+
+        <!-- Container that holds slides.
+            PhotoSwipe keeps only 3 of them in the DOM to save memory.
+            Don't modify these 3 pswp__item elements, data is added later on. -->
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        <!-- Default (PhotoSwipeUI_Default) interface on top of sliding area. Can be changed. -->
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                <!--  Controls are self-explanatory. Order can be changed. -->
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                <!-- Preloader demo https://codepen.io/dimsemenov/pen/yyBWoR -->
+                <!-- element will get class pswp__preloader--active when preloader is running -->
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                      <div class="pswp__preloader__cut">
+                        <div class="pswp__preloader__donut"></div>
+                      </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>                    </div>
+                    <div class="span1"></div>
+                </div>
+            </div>
+        </div>
+<footer>
+    <div>
+        <span xmlns:dct="http://purl.org/dc/terms/" property="dct:title"> kernelgo"</span> by <a xmlns:cc="http://creativecommons.org/ns#" href="https://kernelgo.org" property="cc:attributionName" rel="cc:attributionURL">Yori Fang</a> is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/3.0/deed.en_US">Creative Commons Attribution-ShareAlike 3.0 Unported License</a>.
+    </div>
+
+
+
+
+    <div id="fpowered">
+        Powered by: <a href="http://getpelican.com/" title="Pelican Home Page" target="_blank" rel="nofollow noopener noreferrer">Pelican</a>
+        Theme: <a href="https://elegant.oncrashreboot.com/" title="Theme Elegant Home Page" target="_blank" rel="nofollow noopener noreferrer">Elegant</a>
+    </div>
+</footer>            <script src="//code.jquery.com/jquery.min.js"></script>
+        <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/js/bootstrap.min.js"></script>
+        <script src="https://kernelgo.org/theme/js/elegant.prod.9e9d5ce754.js"></script>
+        <script>
+            function validateForm(query)
+            {
+                return (query.length > 0);
+            }
+        </script>
+
+    <script>
+    (function () {
+        if (window.location.hash.match(/^#comment-\d+$/)) {
+            $('#comment_thread').collapse('show');
+        }
+    })();
+    window.onhashchange=function(){
+        if (window.location.hash.match(/^#comment-\d+$/))
+            window.location.reload(true);
+    }
+    $('#comment_thread').on('shown', function () {
+        var link = document.getElementById('comment-accordion-toggle');
+        var old_innerHTML = link.innerHTML;
+        $(link).fadeOut(200, function() {
+            $(this).text('Click here to hide comments').fadeIn(200);
+        });
+        $('#comment_thread').on('hidden', function () {
+            $(link).fadeOut(200, function() {
+                $(this).text(old_innerHTML).fadeIn(200);
+            });
+        })
+    })
+</script>
+
+    </body>
+    <!-- Theme: Elegant built for Pelican
+        License : MIT -->
+</html>

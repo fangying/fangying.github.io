@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://kernelgo.org/theme/css/style.min.css?fc5adb95">
+
+        <link rel="dns-prefetch" href="//fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin>
+
+        <meta name="author" content="Yori Fang" />
+
+        <meta name="description" content="QEMU-KVM MMIO handling
+" />
+        <meta property="og:type" content="article" />
+        <meta name="twitter:card" content="summary">
+
+<meta name="keywords" content="virtualization, virtualization, " />
+
+<meta property="og:title" content="MMIO Emulation "/>
+<meta property="og:url" content="https://kernelgo.org/mmio.html" />
+<meta property="og:description" content="QEMU-KVM MMIO handling" />
+<meta property="og:site_name" content="kernelgo" />
+<meta property="og:article:author" content="Yori Fang" />
+<meta property="og:article:published_time" content="2018-05-17T23:00:00+08:00" />
+<meta property="og:article:modified_time" content="2018-05-17T23:00:00+08:00" />
+<meta name="twitter:title" content="MMIO Emulation ">
+<meta name="twitter:description" content="QEMU-KVM MMIO handling">
+
+        <title>MMIO Emulation  · kernelgo
+</title>
+<script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+     (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+     m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+     })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+    ga('create', 'UA-107392039-1', 'auto');
+    ga('send', 'pageview');
+</script>
+
+
+    </head>
+    <body>
+        <div id="content">
+            <div class="navbar navbar-static-top">
+                <div class="navbar-inner">
+                    <div class="container-fluid">
+                        <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                        </a>
+                        <a class="brand" href="https://kernelgo.org/"><span class=site-name>kernelgo</span></a>
+                        <div class="nav-collapse collapse">
+                            <ul class="nav pull-right top-menu">
+                                <li >
+                                    <a href=
+                                       https://kernelgo.org
+                                    >Home</a>
+                                </li>
+                                <li ><a href="https://kernelgo.org/pages/about.html">About</a></li>
+                                <li ><a href="https://kernelgo.org/categories.html">Categories</a></li>
+                                <li ><a href="https://kernelgo.org/tags.html">Tags</a></li>
+                                <li ><a href="https://kernelgo.org/archives.html">Archives</a></li>
+                                <li><form class="navbar-search" action="https://kernelgo.org/search.html" onsubmit="return validateForm(this.elements['q'].value);"> <input type="text" class="search-query" placeholder="Search" name="q" id="tipue_search_input"></form></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="container-fluid">
+                <div class="row-fluid">
+                    <div class="span1"></div>
+                    <div class="span10">
+<article itemscope>
+<div class="row-fluid">
+    <header class="page-header span10 offset2">
+        <h1>
+            <a href="https://kernelgo.org/mmio.html">
+                MMIO Emulation
+            </a>
+        </h1>
+    </header>
+</div>
+
+<div class="row-fluid">
+        <div class="span8 offset2 article-content">
+            
+            <p>我们知道X86体系结构上对设备进行访问可以通过PIO方式和MMIO(Memory Mapped I/O)两种方式进行，
+那么QEMU-KVM具体是如何实现设备MMIO访问的呢？</p>
+<p>MMIO是直接将设备I/O映射到物理地址空间内，虚拟机物理内存的虚拟化又是通过EPT机制来完成的，
+那么模拟设备的MMIO实现也需要利用EPT机制．虚拟机的EPT页表是在<code>EPT_VIOLATION</code>异常处理的时候建立起来的，
+对于模拟设备而言访问MMIO肯定要触发<code>VM_EXIT</code>然后交给QEMU/KVM去处理，那么怎样去标志MMIO访问异常呢？
+查看Intel SDM知道这是通过利用<code>EPT_MISCONFIG</code>来实现的．那么<code>EPT_VIOLATION</code>与<code>EPT_MISCONFIG</code>的区别是什么?</p>
+<div class="highlight"><pre><span></span><code>EXIT_REASON_EPT_VIOLATION is similar to a &quot;page not present&quot; pagefault.
+EXIT_REASON_EPT_MISCONFIG is similar to a &quot;reserved bit set&quot; pagefault.
+</code></pre></div>
+
+<p><code>EPT_VIOLATION</code>表示的是对应的物理页不存在，而<code>EPT_MISCONFIG</code>表示EPT页表中有非法的域．</p>
+<p>那么这里有２个问题需要弄清楚．</p>
+<h3>1  KVM如何标记EPT是MMIO类型 ?</h3>
+<p><code>hardware_setup</code>时候虚拟机如果开启了ept支持就调用<code>ept_set_mmio_spte_mask</code>初始化<code>shadow_mmio_mask</code>，
+设置EPT页表项最低3bit为：110b就会触发<code>ept_msconfig</code>（110b表示该页可读可写但是还未分配或者不存在，这显然是一个错误的EPT页表项）.</p>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">ept_set_mmio_spte_mask</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="cm">/*</span>
+<span class="cm">     * EPT Misconfigurations can be generated if the value of bits 2:0</span>
+<span class="cm">     * of an EPT paging-structure entry is 110b (write/execute).</span>
+<span class="cm">     */</span><span class="w"> </span>
+<span class="w">    </span><span class="n">kvm_mmu_set_mmio_spte_mask</span><span class="p">(</span><span class="n">VMX_EPT_RWX_MASK</span><span class="p">,</span><span class="w"></span>
+<span class="w">                   </span><span class="n">VMX_EPT_MISCONFIG_WX_VALUE</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>同时还要对EPT的一些特殊位进行标记来标志该spte表示MMIO而不是虚拟机的物理内存，例如这里</p>
+<div class="highlight"><pre><span></span><code>(1)set the special mask:  SPTE_SPECIAL_MASK．
+(2)reserved physical address bits:  the setting of a bit in the range 51:12 that is beyond the logical processor’s physical-address width
+</code></pre></div>
+
+<p>关于EPT_MISCONFIG在SDM中有详细说明．</p>
+<p><img alt="EPT_MISCONFIG" src="images/ept_misconfig.png"></p>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">kvm_mmu_set_mmio_spte_mask</span><span class="p">(</span><span class="n">u64</span><span class="w"> </span><span class="n">mmio_mask</span><span class="p">,</span><span class="w"> </span><span class="n">u64</span><span class="w"> </span><span class="n">mmio_value</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="n">BUG_ON</span><span class="p">((</span><span class="n">mmio_mask</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">mmio_value</span><span class="p">)</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">mmio_value</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">shadow_mmio_value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mmio_value</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">SPTE_SPECIAL_MASK</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="n">shadow_mmio_mask</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mmio_mask</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">SPTE_SPECIAL_MASK</span><span class="p">;</span><span class="w"></span>
+<span class="p">}</span><span class="w">       </span>
+<span class="n">EXPORT_SYMBOL_GPL</span><span class="p">(</span><span class="n">kvm_mmu_set_mmio_spte_mask</span><span class="p">);</span><span class="w"></span>
+
+<span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">kvm_set_mmio_spte_mask</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="n">u64</span><span class="w"> </span><span class="n">mask</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">maxphyaddr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">boot_cpu_data</span><span class="p">.</span><span class="n">x86_phys_bits</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/* </span>
+<span class="cm">     * Set the reserved bits and the present bit of an paging-structure</span>
+<span class="cm">     * entry to generate page fault with PFER.RSV = 1.</span>
+<span class="cm">     */</span><span class="w"></span>
+<span class="w">     </span><span class="cm">/* Mask the reserved physical address bits. */</span><span class="w"></span>
+<span class="w">    </span><span class="n">mask</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rsvd_bits</span><span class="p">(</span><span class="n">maxphyaddr</span><span class="p">,</span><span class="w"> </span><span class="mi">51</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/* Set the present bit. */</span><span class="w"></span>
+<span class="w">    </span><span class="n">mask</span><span class="w"> </span><span class="o">|=</span><span class="w"> </span><span class="mi">1ull</span><span class="p">;</span><span class="w"></span>
+
+<span class="cp">#ifdef CONFIG_X86_64</span>
+<span class="w">    </span><span class="cm">/*</span>
+<span class="cm">     * If reserved bit is not supported, clear the present bit to disable</span>
+<span class="cm">     * mmio page fault.</span>
+<span class="cm">     */</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">maxphyaddr</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">52</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="n">mask</span><span class="w"> </span><span class="o">&amp;=</span><span class="w"> </span><span class="o">~</span><span class="mi">1ull</span><span class="p">;</span><span class="w"></span>
+<span class="cp">#endif</span>
+
+<span class="w">    </span><span class="n">kvm_mmu_set_mmio_spte_mask</span><span class="p">(</span><span class="n">mask</span><span class="p">,</span><span class="w"> </span><span class="n">mask</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w">       </span>
+</code></pre></div>
+
+<p>KVM在建立EPT页表项之后设置了这些标志位再访问对应页的时候会触发EPT_MISCONFIG退出了，然后调用<code>handle_ept_misconfig</code> --&gt; <code>handle_mmio_page_fault</code>来完成MMIO处理操作．</p>
+<div class="highlight"><pre><span></span><code><span class="n">KVM内核相关代码</span><span class="err">：</span><span class="w"></span>
+<span class="n">handle_ept_misconfig</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">kvm_emulate_instruction</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">x86_emulate_instruction</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">x86_emulate_insn</span><span class="w"></span>
+<span class="n">writeback</span><span class="w"></span>
+<span class="w">    </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">segmented_write</span><span class="w"></span>
+<span class="w">        </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">emulator_write_emulated</span><span class="w"></span>
+<span class="w">            </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">emulator_read_write</span><span class="w"></span>
+<span class="w">              </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">emulator_read_write_onepage</span><span class="w"></span>
+<span class="w">                </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">ops</span><span class="o">-&gt;</span><span class="n">read_write_mmio</span><span class="w"> </span><span class="p">[</span><span class="n">write_mmio</span><span class="p">]</span><span class="w"></span>
+<span class="w">                  </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">vcpu_mmio_write</span><span class="w"></span>
+<span class="w">                    </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">kvm_io_bus_write</span><span class="w"></span>
+<span class="w">                      </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">__kvm_io_bus_write</span><span class="w"></span>
+<span class="w">                        </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">kvm_iodevice_write</span><span class="w"></span>
+<span class="w">                          </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">dev</span><span class="o">-&gt;</span><span class="n">ops</span><span class="o">-&gt;</span><span class="n">write</span><span class="w"> </span><span class="p">[</span><span class="n">ioeventfd_write</span><span class="p">]</span><span class="w"></span>
+
+<span class="n">最后会调用到ioeventfd_write</span><span class="err">，</span><span class="n">写eventfd给QEMU发送通知事件</span><span class="w"></span>
+<span class="cm">/* MMIO/PIO writes trigger an event if the addr/val match */</span><span class="w"></span>
+<span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"></span>
+<span class="n">ioeventfd_write</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="p">,</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_io_device</span><span class="w"> </span><span class="o">*</span><span class="n">this</span><span class="p">,</span><span class="w"> </span><span class="n">gpa_t</span><span class="w"> </span><span class="n">addr</span><span class="p">,</span><span class="w"></span>
+<span class="w">                </span><span class="kt">int</span><span class="w"> </span><span class="n">len</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">val</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="k">struct</span><span class="w"> </span><span class="nc">_ioeventfd</span><span class="w"> </span><span class="o">*</span><span class="n">p</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">to_ioeventfd</span><span class="p">(</span><span class="n">this</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">ioeventfd_in_range</span><span class="p">(</span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="n">addr</span><span class="p">,</span><span class="w"> </span><span class="n">len</span><span class="p">,</span><span class="w"> </span><span class="n">val</span><span class="p">))</span><span class="w"></span>
+<span class="w">                </span><span class="k">return</span><span class="w"> </span><span class="o">-</span><span class="n">EOPNOTSUPP</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">        </span><span class="n">eventfd_signal</span><span class="p">(</span><span class="n">p</span><span class="o">-&gt;</span><span class="n">eventfd</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<h3>2  QEMU如何标记设备的MMIO ?</h3>
+<p>这里以e1000网卡模拟为例，设备初始化MMIO时候时候注册的MemoryRegion为IO类型（不是RAM类型）．</p>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"></span>
+<span class="nf">e1000_mmio_setup</span><span class="p">(</span><span class="n">E1000State</span><span class="w"> </span><span class="o">*</span><span class="n">d</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">excluded_regs</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="n">E1000_MDIC</span><span class="p">,</span><span class="w"> </span><span class="n">E1000_ICR</span><span class="p">,</span><span class="w"> </span><span class="n">E1000_ICS</span><span class="p">,</span><span class="w"> </span><span class="n">E1000_IMS</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="n">E1000_IMC</span><span class="p">,</span><span class="w"> </span><span class="n">E1000_TCTL</span><span class="p">,</span><span class="w"> </span><span class="n">E1000_TDT</span><span class="p">,</span><span class="w"> </span><span class="n">PNPMMIO_SIZE</span><span class="w"></span>
+<span class="w">    </span><span class="p">};</span><span class="w"></span>
+<span class="w">    </span><span class="c1">// 这里注册MMIO，调用memory_region_init_io，mr-&gt;ram = false！！！</span>
+<span class="w">    </span><span class="n">memory_region_init_io</span><span class="p">(</span><span class="o">&amp;</span><span class="n">d</span><span class="o">-&gt;</span><span class="n">mmio</span><span class="p">,</span><span class="w"> </span><span class="n">OBJECT</span><span class="p">(</span><span class="n">d</span><span class="p">),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">e1000_mmio_ops</span><span class="p">,</span><span class="w"> </span><span class="n">d</span><span class="p">,</span><span class="w"></span>
+<span class="w">                          </span><span class="s">&quot;e1000-mmio&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">PNPMMIO_SIZE</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">memory_region_add_coalescing</span><span class="p">(</span><span class="o">&amp;</span><span class="n">d</span><span class="o">-&gt;</span><span class="n">mmio</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">excluded_regs</span><span class="p">[</span><span class="mi">0</span><span class="p">]);</span><span class="w"></span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">excluded_regs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">PNPMMIO_SIZE</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="n">memory_region_add_coalescing</span><span class="p">(</span><span class="o">&amp;</span><span class="n">d</span><span class="o">-&gt;</span><span class="n">mmio</span><span class="p">,</span><span class="w"> </span><span class="n">excluded_regs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                     </span><span class="n">excluded_regs</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">excluded_regs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">4</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">memory_region_init_io</span><span class="p">(</span><span class="o">&amp;</span><span class="n">d</span><span class="o">-&gt;</span><span class="n">io</span><span class="p">,</span><span class="w"> </span><span class="n">OBJECT</span><span class="p">(</span><span class="n">d</span><span class="p">),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">e1000_io_ops</span><span class="p">,</span><span class="w"> </span><span class="n">d</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;e1000-io&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">IOPORT_SIZE</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>结合QEMU-KVM内存管理知识我们知道，
+QEMU调用<code>kvm_set_phys_mem</code>注册虚拟机的物理内存到KVM相关的数据结构中的时候
+会调用<code>memory_region_is_ram</code>来判断该段物理地址空间是否是RAM设备，
+如果不是RAM设备直接return了．</p>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">kvm_set_phys_mem</span><span class="p">(</span><span class="n">KVMMemoryListener</span><span class="w"> </span><span class="o">*</span><span class="n">kml</span><span class="p">,</span><span class="w"></span>
+<span class="w">                             </span><span class="n">MemoryRegionSection</span><span class="w"> </span><span class="o">*</span><span class="n">section</span><span class="p">,</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">add</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="p">......</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">memory_region_is_ram</span><span class="p">(</span><span class="n">mr</span><span class="p">))</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">writeable</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="o">!</span><span class="n">kvm_readonly_mem_allowed</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="k">return</span><span class="p">;</span><span class="w">     </span><span class="c1">// 设备MR不是RAM但可以写，那么这里直接return不注册到kvm里面</span>
+<span class="w">        </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">mr</span><span class="o">-&gt;</span><span class="n">romd_mode</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="cm">/* If the memory device is not in romd_mode, then we actually want</span>
+<span class="cm">             * to remove the kvm memory slot so all accesses will trap. */</span><span class="w"></span>
+<span class="w">            </span><span class="n">add</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">......</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>对于MMIO类型的内存QEMU不会调用<code>kvm_set_user_memory_region</code>对其进行注册，
+那么KVM会认为该段内存的pfn类型为<code>KVM_PFN_NOSLOT</code>，
+进而调用<code>set_mmio_spte</code>来设置该段地址对应到spte，
+而该函数中会判断pfn是否为NOSLOT标记以确认这段地址空间为MMIO．</p>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="nf">set_mmio_spte</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="p">,</span><span class="w"> </span><span class="n">u64</span><span class="w"> </span><span class="o">*</span><span class="n">sptep</span><span class="p">,</span><span class="w"> </span><span class="n">gfn_t</span><span class="w"> </span><span class="n">gfn</span><span class="p">,</span><span class="w"></span>
+<span class="w">              </span><span class="n">kvm_pfn_t</span><span class="w"> </span><span class="n">pfn</span><span class="p">,</span><span class="w"> </span><span class="kt">unsigned</span><span class="w"> </span><span class="n">access</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">unlikely</span><span class="p">(</span><span class="n">is_noslot_pfn</span><span class="p">(</span><span class="n">pfn</span><span class="p">)))</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="n">mark_mmio_spte</span><span class="p">(</span><span class="n">vcpu</span><span class="p">,</span><span class="w"> </span><span class="n">sptep</span><span class="p">,</span><span class="w"> </span><span class="n">gfn</span><span class="p">,</span><span class="w"> </span><span class="n">access</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<h3>3　总结</h3>
+<p>MMIO是通过设置spte的保留位来标志的．</p>
+<ul>
+<li>虚拟机内部第一次访问MMIO的gpa时，发生了EPT_VIOLATION然后check gpa发现对应的pfn不存在（QEMU没有注册），那么认为这是个MMIO，于是<code>set_mmio_spte</code>来标志它的spte是一个MMIO．</li>
+<li>后面再次访问这个gpa时就发生EPT_MISCONFIG了，进而愉快地调用<code>handle_ept_misconfig</code> -&gt; <code>kvm_mmu_page_fault</code> -&gt; <code>x86_emulate_instruction</code> 来处理所有的MMIO操作了．</li>
+</ul>
+
+
+             
+ 
+                <p id="post-share-links">
+    Share on:
+      <a href="https://twitter.com/intent/tweet?text=MMIO%20Emulation&url=https%3A//kernelgo.org/mmio.html&hashtags=virtualization" target="_blank" rel="nofollow noopener noreferrer" title="Share on Twitter">Twitter</a>
+ ❄       <a href="https://www.facebook.com/sharer/sharer.php?u=https%3A//kernelgo.org/mmio.html" target="_blank" rel="nofollow noopener noreferrer" title="Share on Facebook">Facebook</a>
+ ❄       <a href="mailto:?subject=MMIO%20Emulation&amp;body=https%3A//kernelgo.org/mmio.html" target="_blank" rel="nofollow noopener noreferrer" title="Share via Email">Email</a>
+
+            
+            
+
+
+
+
+
+
+
+<section>
+    <h6 style="display:none;">Comments</h6>
+    <p id="comment-message"> </p>
+
+    <div class="accordion" id="accordion2">
+        <div class="accordion-group">
+            <div class="accordion-heading">
+                <a class="accordion-toggle disqus-comment-count comment-count collapsed"
+                   data-toggle="collapse"
+                   data-parent="#accordion2"
+                   data-disqus-identifier="https://kernelgo.org/mmio.html"
+                   href="https://kernelgo.org/mmio.html#comment_thread"
+                   id="comment-accordion-toggle">
+                    Comments
+                </a>
+            </div>
+            <div id="comment_thread" class="accordion-body collapse">
+                <div class="accordion-inner">
+                    <div class="comments">
+                        <div id="disqus_thread"></div>
+                        <script>
+    var disqus_shortname = 'kernelgo';
+    (function () {
+        var s = document.createElement('script'); s.async = true;
+        s.type = 'text/javascript';
+        s.src = '//' + disqus_shortname + '.disqus.com/count.js';
+        (document.getElementsByTagName('HEAD')[0] || document.getElementsByTagName('BODY')[0]).appendChild(s);
+    }());
+
+    var disqus_identifier = 'https://kernelgo.org/mmio.html';
+    var disqus_url = 'https://kernelgo.org/mmio.html';
+
+    (function() {
+        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    })();
+</script>
+
+<noscript>Please enable JavaScript to view the <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+            <hr/>
+<section>
+    <h2>Related Posts</h2>
+<ul class="related-posts-list">
+<li><a href="https://kernelgo.org/x86-nmi.html" title="Virt NMI Emulation">Virt NMI Emulation</a></li>
+<li><a href="https://kernelgo.org/reading2019.html" title="Article Archive 2019 Reading Plan">Article Archive 2019 Reading Plan</a></li>
+<li><a href="https://kernelgo.org/microVM.html" title="Lightweight Micro Virtual Machines">Lightweight Micro Virtual Machines</a></li>
+<li><a href="https://kernelgo.org/virtio-overview.html" title="Virtio Spec Overview">Virtio Spec Overview</a></li>
+<li><a href="https://kernelgo.org/reading2020.html" title="Article Archive 2020 Reading Plan">Article Archive 2020 Reading Plan</a></li>
+</ul>
+<hr />
+</section>
+            <aside>
+            <nav>
+            <ul class="articles-timeline">
+                <li class="previous-article">« <a href="https://kernelgo.org/vfio-introduction.html" title="Previous: VFIO Introduction">VFIO Introduction</a></li>
+                <li class="next-article"><a href="https://kernelgo.org/intel_iommu.html" title="Next: Intel IOMMU Introduction">Intel IOMMU Introduction</a> »</li>
+            </ul>
+            </nav>
+            </aside>
+        </div>
+        <section id="article-sidebar" class="span2">
+            <h4>Published</h4>
+            <time itemprop="dateCreated" datetime="2018-05-17T23:00:00+08:00">Thu 17 May 2018</time>
+
+            <h4>Category</h4>
+            <a class="category-link" href="https://kernelgo.org/categories.html#virtualization-ref">virtualization</a>
+            <h4>Tags</h4>
+            <ul class="list-of-tags tags-in-article">
+                <li><a href="https://kernelgo.org/tags.html#virtualization-ref">virtualization
+                    <span class="superscript">15</span>
+</a></li>
+            </ul>
+<h4>Contact</h4>
+<div id="sidebar-social-link">
+    <a href="https://github.com/fangying" title="" target="_blank" rel="nofollow noopener noreferrer">
+        <svg xmlns="http://www.w3.org/2000/svg" aria-label="GitHub" role="img" viewBox="0 0 512 512"><rect width="512" height="512" rx="15%" fill="#1B1817"/><path fill="#fff" d="M335 499c14 0 12 17 12 17H165s-2-17 12-17c13 0 16-6 16-12l-1-50c-71 16-86-28-86-28-12-30-28-37-28-37-24-16 1-16 1-16 26 2 40 26 40 26 22 39 59 28 74 22 2-17 9-28 16-35-57-6-116-28-116-126 0-28 10-51 26-69-3-6-11-32 3-67 0 0 21-7 70 26 42-12 86-12 128 0 49-33 70-26 70-26 14 35 6 61 3 67 16 18 26 41 26 69 0 98-60 120-117 126 10 8 18 24 18 48l-1 70c0 6 3 12 16 12z"/></svg>
+    </a>
+</div>
+            
+
+
+
+
+
+            
+
+
+
+
+
+        </section>
+</div>
+</article>
+<!-- Root element of PhotoSwipe. Must have class pswp. -->
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    <!-- Background of PhotoSwipe.
+         It's a separate element as animating opacity is faster than rgba(). -->
+    <div class="pswp__bg"></div>
+
+    <!-- Slides wrapper with overflow:hidden. -->
+    <div class="pswp__scroll-wrap">
+
+        <!-- Container that holds slides.
+            PhotoSwipe keeps only 3 of them in the DOM to save memory.
+            Don't modify these 3 pswp__item elements, data is added later on. -->
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        <!-- Default (PhotoSwipeUI_Default) interface on top of sliding area. Can be changed. -->
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                <!--  Controls are self-explanatory. Order can be changed. -->
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                <!-- Preloader demo https://codepen.io/dimsemenov/pen/yyBWoR -->
+                <!-- element will get class pswp__preloader--active when preloader is running -->
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                      <div class="pswp__preloader__cut">
+                        <div class="pswp__preloader__donut"></div>
+                      </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>                    </div>
+                    <div class="span1"></div>
+                </div>
+            </div>
+        </div>
+<footer>
+    <div>
+        <span xmlns:dct="http://purl.org/dc/terms/" property="dct:title"> kernelgo"</span> by <a xmlns:cc="http://creativecommons.org/ns#" href="https://kernelgo.org" property="cc:attributionName" rel="cc:attributionURL">Yori Fang</a> is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/3.0/deed.en_US">Creative Commons Attribution-ShareAlike 3.0 Unported License</a>.
+    </div>
+
+
+
+
+    <div id="fpowered">
+        Powered by: <a href="http://getpelican.com/" title="Pelican Home Page" target="_blank" rel="nofollow noopener noreferrer">Pelican</a>
+        Theme: <a href="https://elegant.oncrashreboot.com/" title="Theme Elegant Home Page" target="_blank" rel="nofollow noopener noreferrer">Elegant</a>
+    </div>
+</footer>            <script src="//code.jquery.com/jquery.min.js"></script>
+        <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/js/bootstrap.min.js"></script>
+        <script src="https://kernelgo.org/theme/js/elegant.prod.9e9d5ce754.js"></script>
+        <script>
+            function validateForm(query)
+            {
+                return (query.length > 0);
+            }
+        </script>
+
+    <script>
+    (function () {
+        if (window.location.hash.match(/^#comment-\d+$/)) {
+            $('#comment_thread').collapse('show');
+        }
+    })();
+    window.onhashchange=function(){
+        if (window.location.hash.match(/^#comment-\d+$/))
+            window.location.reload(true);
+    }
+    $('#comment_thread').on('shown', function () {
+        var link = document.getElementById('comment-accordion-toggle');
+        var old_innerHTML = link.innerHTML;
+        $(link).fadeOut(200, function() {
+            $(this).text('Click here to hide comments').fadeIn(200);
+        });
+        $('#comment_thread').on('hidden', function () {
+            $(link).fadeOut(200, function() {
+                $(this).text(old_innerHTML).fadeIn(200);
+            });
+        })
+    })
+</script>
+
+    </body>
+    <!-- Theme: Elegant built for Pelican
+        License : MIT -->
+</html>

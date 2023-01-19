@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://kernelgo.org/theme/css/style.min.css?fc5adb95">
+
+        <link rel="dns-prefetch" href="//fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin>
+
+        <meta name="author" content="Yori Fang" />
+
+        <meta name="description" content="the vhost protocal
+" />
+        <meta property="og:type" content="article" />
+        <meta name="twitter:card" content="summary">
+
+<meta name="keywords" content="vhost protocal, virtualization, " />
+
+<meta property="og:title" content="the vhost protocal "/>
+<meta property="og:url" content="https://kernelgo.org/drafts/vhost-protocal.html" />
+<meta property="og:description" content="the vhost protocal" />
+<meta property="og:site_name" content="kernelgo" />
+<meta property="og:article:author" content="Yori Fang" />
+<meta property="og:article:published_time" content="2019-12-12T23:00:00+08:00" />
+<meta name="twitter:title" content="the vhost protocal ">
+<meta name="twitter:description" content="the vhost protocal">
+
+        <title>the vhost protocal  · kernelgo
+</title>
+<script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+     (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+     m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+     })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+    ga('create', 'UA-107392039-1', 'auto');
+    ga('send', 'pageview');
+</script>
+
+
+    </head>
+    <body>
+        <div id="content">
+            <div class="navbar navbar-static-top">
+                <div class="navbar-inner">
+                    <div class="container-fluid">
+                        <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                        </a>
+                        <a class="brand" href="https://kernelgo.org/"><span class=site-name>kernelgo</span></a>
+                        <div class="nav-collapse collapse">
+                            <ul class="nav pull-right top-menu">
+                                <li >
+                                    <a href=
+                                       https://kernelgo.org
+                                    >Home</a>
+                                </li>
+                                <li ><a href="https://kernelgo.org/pages/about.html">About</a></li>
+                                <li ><a href="https://kernelgo.org/categories.html">Categories</a></li>
+                                <li ><a href="https://kernelgo.org/tags.html">Tags</a></li>
+                                <li ><a href="https://kernelgo.org/archives.html">Archives</a></li>
+                                <li><form class="navbar-search" action="https://kernelgo.org/search.html" onsubmit="return validateForm(this.elements['q'].value);"> <input type="text" class="search-query" placeholder="Search" name="q" id="tipue_search_input"></form></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="container-fluid">
+                <div class="row-fluid">
+                    <div class="span1"></div>
+                    <div class="span10">
+<article itemscope>
+<div class="row-fluid">
+    <header class="page-header span10 offset2">
+        <h1>
+            <a href="https://kernelgo.org/drafts/vhost-protocal.html">
+                the vhost protocal
+            </a>
+        </h1>
+    </header>
+</div>
+
+<div class="row-fluid">
+        <div class="span8 offset2 article-content">
+            
+            <h2>0. vhost protocal</h2>
+<p>以vhost net为例</p>
+<p>前端仍然是virtio-net</p>
+<p>struct virtnet_info 定义了virtio-net网卡的信息，一个网卡包含3个队列（控制队列[可以没有]，发送队列和接收队列）。</p>
+<h2>1. vhost net初始化流程分析</h2>
+<p>virtio模式下：
+收包：Hardware =&gt; Host Kernel =&gt; Qemu =&gt; Guest
+发包：Guest =&gt; Host Kernel =&gt; Qemu =&gt; Host Kernel =&gt; Hardware</p>
+<p>Vhost模式下：
+收包： Hardware =&gt; Host Kernel =&gt; Guest
+发包： Guest =&gt; Host Kernel =&gt; Hardware</p>
+<p>收包：底层设备通过socket唤醒worker线程调度收报处理函数，接受完成之后写eventfd向虚拟机注入中断。
+发包：vCPU退出写eventfd唤醒worker线程调度，调用发包函数发包</p>
+<p>关键数据结构，对象抽象： vhost_dev, vhost_net, vhost_poll, vhost_work, vhost_virtqueue</p>
+<div class="highlight"><pre><span></span><code><span class="nv">struct</span> <span class="nv">vhost_dev</span> {
+        <span class="nv">struct</span> <span class="nv">mm_struct</span> <span class="o">*</span><span class="nv">mm</span><span class="c1">;</span>
+        <span class="nv">struct</span> <span class="nv">mutex</span> <span class="nv">mutex</span><span class="c1">;</span>
+        <span class="nv">struct</span> <span class="nv">vhost_virtqueue</span> <span class="o">**</span><span class="nv">vqs</span><span class="c1">;</span>
+        <span class="nv">int</span> <span class="nv">nvqs</span><span class="c1">;</span>
+        <span class="nv">struct</span> <span class="nv">eventfd_ctx</span> <span class="o">*</span><span class="nv">log_ctx</span><span class="c1">;</span>
+        <span class="nv">struct</span> <span class="nv">llist_head</span> <span class="nv">work_list</span><span class="c1">;</span>
+        <span class="nv">struct</span> <span class="nv">task_struct</span> <span class="o">*</span><span class="nv">worker</span><span class="c1">;</span>
+        <span class="nv">struct</span> <span class="nv">vhost_umem</span> <span class="o">*</span><span class="nv">umem</span><span class="c1">;</span>
+        <span class="nv">struct</span> <span class="nv">vhost_umem</span> <span class="o">*</span><span class="nv">iotlb</span><span class="c1">;</span>
+        <span class="nv">spinlock_t</span> <span class="nv">iotlb_lock</span><span class="c1">;</span>
+        <span class="nv">struct</span> <span class="nv">list_head</span> <span class="nv">read_list</span><span class="c1">;</span>
+        <span class="nv">struct</span> <span class="nv">list_head</span> <span class="nv">pending_list</span><span class="c1">;</span>
+        <span class="nv">wait_queue_head_t</span> <span class="k">wait</span><span class="c1">;</span>
+        <span class="nv">int</span> <span class="nv">iov_limit</span><span class="c1">;</span>
+        <span class="nv">int</span> <span class="nv">weight</span><span class="c1">;</span>
+        <span class="nv">int</span> <span class="nv">byte_weight</span><span class="c1">;</span>
+}<span class="c1">; </span>
+</code></pre></div>
+
+<p>tap设备的初始化流程</p>
+<div class="highlight"><pre><span></span><code><span class="n">net_client_init</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">net_client_init1</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">net_client_init_fun</span><span class="w"> </span>
+<span class="w">        </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">net_init_tap</span><span class="w"> </span>
+<span class="w">                </span><span class="k">for</span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">queues</span><span class="p">)</span><span class="w"> </span><span class="c1">// 每个queue初始化一个tap设备 </span>
+<span class="w">                </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">fd</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">net_tap_init</span><span class="p">(</span><span class="n">ifname</span><span class="p">)</span><span class="w"> </span><span class="c1">//根据传入的ifname，打开/dev/net/tup创建tap设备返回fd</span>
+<span class="w">                </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">net_init_tap_one</span><span class="p">(</span><span class="n">fd</span><span class="p">)</span><span class="w"></span>
+<span class="w">                        </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">vhostfd</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">open</span><span class="p">(</span><span class="s">&quot;/dev/vhost-net&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">O_RDWR</span><span class="p">)</span><span class="w"> </span><span class="c1">// 打开vhost-net获得驱动fd</span>
+<span class="w">                        </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">net_tap_fd_init</span><span class="w">      </span><span class="c1">// 设置tap offload参数，header信息等</span>
+<span class="w">                        </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">tap_set_sndbuf</span><span class="w">       </span><span class="c1">// 设置tap发送buffer大小</span>
+<span class="w">                        </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">vhost_net_init</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">vhost_dev_init</span><span class="p">(</span><span class="n">vhostfd</span><span class="p">)</span><span class="w">  </span><span class="c1">// 重点分析</span>
+</code></pre></div>
+
+<p>vhost_net初始化流程</p>
+<div class="highlight"><pre><span></span><code><span class="n">virtio_pci_common_write</span><span class="w"> </span><span class="c1">// 写MMIO退出</span>
+<span class="w">    </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">virtio_set_status</span><span class="w"> </span>
+<span class="w">        </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">virtio_net_set_status</span><span class="w"></span>
+<span class="w">            </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">virtio_net_vhost_status</span><span class="w"></span>
+<span class="w">                </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">vhost_net_start</span><span class="w"></span>
+<span class="w">                    </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">vhost_net_start_one</span><span class="w"></span>
+<span class="w">                        </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">vhost_dev_start</span><span class="w"></span>
+
+<span class="n">vhost_dev_start</span><span class="w"></span>
+<span class="w">        </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">vhost_dev_set_features</span><span class="w"> </span><span class="n">设置feature</span><span class="w"></span>
+<span class="w">        </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">vhost_set_mem_table</span><span class="w"> </span><span class="n">设置mem</span><span class="w"> </span><span class="n">table</span><span class="w"> </span><span class="p">(</span><span class="n">memslot共享</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">vhost_virtqueue_start</span><span class="w"> </span><span class="n">vring地址共享</span><span class="p">,</span><span class="n">创建eventfds消息机制</span><span class="err">，</span><span class="w"></span>
+<span class="w">            </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">virtio_queue_get_desc_addr</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">vhost_memory_map</span><span class="w"></span>
+<span class="w">            </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">virtio_queue_get_avail_addr</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">vhost_memory_map</span><span class="w"></span>
+<span class="w">            </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">virtio_queue_get_used_size</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">vhost_memory_map</span><span class="w"></span>
+<span class="w">            </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">vhost_virtqueue_set_addr</span><span class="w"></span>
+<span class="w">                </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">vhost_kernel_set_vring_addr</span><span class="w"></span>
+<span class="w">            </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">vhost_set_vring_kick</span><span class="w"> </span><span class="n">设置vring_kick</span><span class="w"> </span><span class="n">fd</span><span class="w"></span>
+<span class="w">            </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">vhost_set_vring_call</span><span class="w"> </span><span class="n">设置vring_call</span><span class="w"> </span><span class="n">fd</span><span class="w"></span>
+</code></pre></div>
+
+<h2>2. vhost-net 发包流程分析</h2>
+<p>发包流程：</p>
+<div class="highlight"><pre><span></span><code><span class="n">iov</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">eventfd_kick</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">worker</span><span class="w"> </span>
+<span class="w">        </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">handle_tx_kick</span><span class="w"> </span>
+<span class="w">        </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">handle_tx</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">handle_tx_copy</span><span class="w"></span>
+</code></pre></div>
+
+<p>随后又会为网卡实例初始化收发包的virtqueue队列，<code>virtnet_probe</code> -&gt; <code>init_vqs</code> -&gt;  <code>virtnet_alloc_queues</code>。</p>
+<div class="highlight"><pre><span></span><code><span class="c1">// virtio-net使用内核NAPI（New API）是内核中的网卡收发包统一框架</span>
+<span class="c1">// NAPI是中断和轮训两种收发包模式的结合，数据量低时采用中断，数据量高时采用轮询。</span>
+<span class="c1">// 平时是中断方式，当有数据到达时，会触发中断处理函数执行，中断处理函数关闭中断开始处理。</span>
+<span class="c1">// 如果此时有数据到达，则没必要再触发中断了，因为中断处理函数中会轮询处理数据，直到没有新数据时才打开中断。</span>
+<span class="c1">// NAPI工作在各大网卡厂商驱动的上层</span>
+<span class="w">        </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">max_queue_pairs</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">                </span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">rq</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">pages</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span><span class="w"></span>
+<span class="w">                </span><span class="n">netif_napi_add</span><span class="p">(</span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">dev</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">rq</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">napi</span><span class="p">,</span><span class="w"> </span><span class="n">virtnet_poll</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                  </span><span class="n">napi_weight</span><span class="p">);</span><span class="w"></span>
+<span class="w">                </span><span class="n">netif_tx_napi_add</span><span class="p">(</span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">dev</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">sq</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">napi</span><span class="p">,</span><span class="w"> </span><span class="n">virtnet_poll_tx</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                  </span><span class="n">napi_tx</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">napi_weight</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">                </span><span class="n">sg_init_table</span><span class="p">(</span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">rq</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">sg</span><span class="p">,</span><span class="w"> </span><span class="n">ARRAY_SIZE</span><span class="p">(</span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">rq</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">sg</span><span class="p">));</span><span class="w"></span>
+<span class="w">                </span><span class="n">ewma_pkt_len_init</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">rq</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">mrg_avg_pkt_len</span><span class="p">);</span><span class="w"></span>
+<span class="w">                </span><span class="n">sg_init_table</span><span class="p">(</span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">sq</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">sg</span><span class="p">,</span><span class="w"> </span><span class="n">ARRAY_SIZE</span><span class="p">(</span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">sq</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">sg</span><span class="p">));</span><span class="w"></span>
+
+<span class="w">                </span><span class="n">u64_stats_init</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">rq</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">stats</span><span class="p">.</span><span class="n">syncp</span><span class="p">);</span><span class="w"></span>
+<span class="w">                </span><span class="n">u64_stats_init</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">sq</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">stats</span><span class="p">.</span><span class="n">syncp</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p><code>virtnet_alloc_queues</code>在分配队列的时候，注册了一组NAPI poll回调函数，即<code>virtnet_poll_tx</code>（收包）和<code>virtnet_poll</code>（发包）。</p>
+<h2>3. vhost-net 收包流程分析</h2>
+<h2>4. vhost-user-net分析</h2>
+<p>vhost-user的IO路径：
+* guest 设置好tx;
+* kick通知host
+* guest退出到kvm；
+* kvm通知vhost-backend；
+* vhost-backend将tx数据直接发送到nic设备。</p>
+<p>大小</p>
+
+
+             
+ 
+            
+            
+            
+
+
+
+
+
+
+
+            <hr/>
+        </div>
+        <section id="article-sidebar" class="span2">
+            <h4>Published</h4>
+            <time itemprop="dateCreated" datetime="2019-12-12T23:00:00+08:00">Thu 12 December 2019</time>
+            <h4>Category</h4>
+            <a class="category-link" href="https://kernelgo.org/categories.html#virtualization-ref">virtualization</a>
+            <h4>Tags</h4>
+            <ul class="list-of-tags tags-in-article">
+                <li><a href="https://kernelgo.org/tags.html#vhost-protocal-ref">vhost protocal
+</a></li>
+            </ul>
+<h4>Contact</h4>
+<div id="sidebar-social-link">
+    <a href="https://github.com/fangying" title="" target="_blank" rel="nofollow noopener noreferrer">
+        <svg xmlns="http://www.w3.org/2000/svg" aria-label="GitHub" role="img" viewBox="0 0 512 512"><rect width="512" height="512" rx="15%" fill="#1B1817"/><path fill="#fff" d="M335 499c14 0 12 17 12 17H165s-2-17 12-17c13 0 16-6 16-12l-1-50c-71 16-86-28-86-28-12-30-28-37-28-37-24-16 1-16 1-16 26 2 40 26 40 26 22 39 59 28 74 22 2-17 9-28 16-35-57-6-116-28-116-126 0-28 10-51 26-69-3-6-11-32 3-67 0 0 21-7 70 26 42-12 86-12 128 0 49-33 70-26 70-26 14 35 6 61 3 67 16 18 26 41 26 69 0 98-60 120-117 126 10 8 18 24 18 48l-1 70c0 6 3 12 16 12z"/></svg>
+    </a>
+</div>
+            
+
+
+
+
+
+            
+
+
+
+
+
+        </section>
+</div>
+</article>
+<!-- Root element of PhotoSwipe. Must have class pswp. -->
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    <!-- Background of PhotoSwipe.
+         It's a separate element as animating opacity is faster than rgba(). -->
+    <div class="pswp__bg"></div>
+
+    <!-- Slides wrapper with overflow:hidden. -->
+    <div class="pswp__scroll-wrap">
+
+        <!-- Container that holds slides.
+            PhotoSwipe keeps only 3 of them in the DOM to save memory.
+            Don't modify these 3 pswp__item elements, data is added later on. -->
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        <!-- Default (PhotoSwipeUI_Default) interface on top of sliding area. Can be changed. -->
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                <!--  Controls are self-explanatory. Order can be changed. -->
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                <!-- Preloader demo https://codepen.io/dimsemenov/pen/yyBWoR -->
+                <!-- element will get class pswp__preloader--active when preloader is running -->
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                      <div class="pswp__preloader__cut">
+                        <div class="pswp__preloader__donut"></div>
+                      </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>                    </div>
+                    <div class="span1"></div>
+                </div>
+            </div>
+        </div>
+<footer>
+    <div>
+        <span xmlns:dct="http://purl.org/dc/terms/" property="dct:title"> kernelgo"</span> by <a xmlns:cc="http://creativecommons.org/ns#" href="https://kernelgo.org" property="cc:attributionName" rel="cc:attributionURL">Yori Fang</a> is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/3.0/deed.en_US">Creative Commons Attribution-ShareAlike 3.0 Unported License</a>.
+    </div>
+
+
+
+
+    <div id="fpowered">
+        Powered by: <a href="http://getpelican.com/" title="Pelican Home Page" target="_blank" rel="nofollow noopener noreferrer">Pelican</a>
+        Theme: <a href="https://elegant.oncrashreboot.com/" title="Theme Elegant Home Page" target="_blank" rel="nofollow noopener noreferrer">Elegant</a>
+    </div>
+</footer>            <script src="//code.jquery.com/jquery.min.js"></script>
+        <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/js/bootstrap.min.js"></script>
+        <script src="https://kernelgo.org/theme/js/elegant.prod.9e9d5ce754.js"></script>
+        <script>
+            function validateForm(query)
+            {
+                return (query.length > 0);
+            }
+        </script>
+
+    <script>
+    (function () {
+        if (window.location.hash.match(/^#comment-\d+$/)) {
+            $('#comment_thread').collapse('show');
+        }
+    })();
+    window.onhashchange=function(){
+        if (window.location.hash.match(/^#comment-\d+$/))
+            window.location.reload(true);
+    }
+    $('#comment_thread').on('shown', function () {
+        var link = document.getElementById('comment-accordion-toggle');
+        var old_innerHTML = link.innerHTML;
+        $(link).fadeOut(200, function() {
+            $(this).text('Click here to hide comments').fadeIn(200);
+        });
+        $('#comment_thread').on('hidden', function () {
+            $(link).fadeOut(200, function() {
+                $(this).text(old_innerHTML).fadeIn(200);
+            });
+        })
+    })
+</script>
+
+    </body>
+    <!-- Theme: Elegant built for Pelican
+        License : MIT -->
+</html>

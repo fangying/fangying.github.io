@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://kernelgo.org/theme/css/style.min.css?fc5adb95">
+
+        <link rel="dns-prefetch" href="//fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin>
+
+        <meta name="author" content="Yori Fang" />
+
+        <meta name="description" content="Reading Plan 2020
+" />
+        <meta property="og:type" content="article" />
+        <meta name="twitter:card" content="summary">
+
+<meta name="keywords" content="virtualization, utils, " />
+
+<meta property="og:title" content="Article Archive 2020 Reading Plan "/>
+<meta property="og:url" content="https://kernelgo.org/reading2020.html" />
+<meta property="og:description" content="Reading Plan 2020" />
+<meta property="og:site_name" content="kernelgo" />
+<meta property="og:article:author" content="Yori Fang" />
+<meta property="og:article:published_time" content="2020-01-19T23:00:00+08:00" />
+<meta property="og:article:modified_time" content="2020-01-19T23:00:00+08:00" />
+<meta name="twitter:title" content="Article Archive 2020 Reading Plan ">
+<meta name="twitter:description" content="Reading Plan 2020">
+
+        <title>Article Archive 2020 Reading Plan  · kernelgo
+</title>
+<script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+     (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+     m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+     })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+    ga('create', 'UA-107392039-1', 'auto');
+    ga('send', 'pageview');
+</script>
+
+
+    </head>
+    <body>
+        <div id="content">
+            <div class="navbar navbar-static-top">
+                <div class="navbar-inner">
+                    <div class="container-fluid">
+                        <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                        </a>
+                        <a class="brand" href="https://kernelgo.org/"><span class=site-name>kernelgo</span></a>
+                        <div class="nav-collapse collapse">
+                            <ul class="nav pull-right top-menu">
+                                <li >
+                                    <a href=
+                                       https://kernelgo.org
+                                    >Home</a>
+                                </li>
+                                <li ><a href="https://kernelgo.org/pages/about.html">About</a></li>
+                                <li ><a href="https://kernelgo.org/categories.html">Categories</a></li>
+                                <li ><a href="https://kernelgo.org/tags.html">Tags</a></li>
+                                <li ><a href="https://kernelgo.org/archives.html">Archives</a></li>
+                                <li><form class="navbar-search" action="https://kernelgo.org/search.html" onsubmit="return validateForm(this.elements['q'].value);"> <input type="text" class="search-query" placeholder="Search" name="q" id="tipue_search_input"></form></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="container-fluid">
+                <div class="row-fluid">
+                    <div class="span1"></div>
+                    <div class="span10">
+<article itemscope>
+<div class="row-fluid">
+    <header class="page-header span10 offset2">
+        <h1>
+            <a href="https://kernelgo.org/reading2020.html">
+                Article Archive 2020 Reading Plan
+            </a>
+        </h1>
+    </header>
+</div>
+
+<div class="row-fluid">
+        <div class="span8 offset2 article-content">
+            
+            <h2>2020年学习计划</h2>
+<p>一转眼2019已经过了，制定的2019年阅读计划执行并不好。2019年上半年工作上太忙碌了，压得喘不过气来，所以阅读较少。
+2019年下半年有执行一部分的阅读计划，但个人时间利用率并不高，欠了很多阅读债务。
+作为一个在虚拟化领域工作快4年的人了，好多特性还没有系统的学习过，真的很汗颜。
+2020年伊始告别了我的台式机入手了BP16寸，可以很方便的带到公众场合学习，所以2020年一定要恶补一下相关领域的知识，
+不然出去混真的混不开。这里简单的制定一下2020年的学习计划，当然计划是活动的，所以随时更新。</p>
+<ul>
+<li>学习dpdk和vhost-user方案的原理和代码；</li>
+<li>学习openvswitch的原理和基本知识；</li>
+<li>学习一些存储方面的知识，包括但不限于spdk等基本内容；</li>
+<li>如果有时间要学习RSIC-V相关的知识，并补齐arm64的基本原理。</li>
+<li>继续学习和使用Rust编程语言，Rust是系统编程和基础软件开发的不二之选。</li>
+</ul>
+<p>2020好好学习，天天向上，加油！</p>
+<h2>阅读笔记摘要</h2>
+<h3>1. <a href="https://uefi.org/sites/default/files/resources/ACPI_6_3_final_Jan30.pdf">ACPI基础知识学习</a></h3>
+<p>ACPI的学习资料最好的还是ACPI Spec文档，但阅读文档总是让人觉得卷帙浩繁。这次主要看了下ACPI Spec Chapter 4和ACPI
+Chapter 5，这两个章节分别描述了ACPI 硬件接口和软件编程模型，让我们明白ACPI标准是如何在为OS体统更好的电源管理能力的同时
+又为硬件厂商提供高度的灵活性。尤其是Chapter5，非常适合OS设计人员阅读，该章节介绍了ACPI System Description Table Achitecture，
+方便我们理解ACPI里面的系统描述表的具体结构和作用。</p>
+<p>总体上，ACPI固件定义两种数据结构：data tables 和 defination blocks，data tables里提供了给设备驱动程序的元数据，
+defination blocks里面则包含了OS可以执行的Byte Code，defination blocks可以用一种叫做ASL语言来定义和描述。
+ASL(ACPI Source language)是ACPI中用来描述硬件信息以及硬件操作给OSPM的表达式语言（相当于源代码），
+通过ASL Compiler编译后生成了AML（ACPI Machine Language）格式，不同的AML模块组合在一起构成了ACPI Firmware，
+是一种与OS平台无关的格式。详情可以看ACPI Spec，也可以看这里一个关于ASL的Tutorial，
+可以快速了解ASL的基本语法:<a href="https://acpica.org/sites/acpica/files/asl_tutorial_v20190625.pdf">https://acpica.org/sites/acpica/files/asl_tutorial_v20190625.pdf</a>
+另外还有一个文章带你快速了解ACPI的架构：<a href="https://acpica.org/sites/acpica/files/ACPI-Introduction.pdft">https://acpica.org/sites/acpica/files/ACPI-Introduction.pdf</a></p>
+<p>QEMU里面的i440fx主板对应的南桥芯片组是piix4，它包含了一个IDE Controller，一个USB Controller，一个PCI-ISA bridge和
+RTC, PIT, PICs等设备。其中piix4里面包含了一个PM模块（本质是一个PCI设备），这个PM设备便是芯片组支持ACPI的接口。
+同理，Q35主板上我们拥有一个叫做ich9的芯片组，它除了集成了AHCI controller，USB controller, network adapter, audio adapter, PCI-E and PCI bus LPC bus for the SuperIO devices等一堆设备之外，也具备一个Power Management模块，负责ACPI规范的支持。具体可以参考：https://wiki.qemu.org/Features/Q35。</p>
+<p>x86平台上QEMU初始化主板的最后阶段，pc_machine_done -&gt; acpi_setup 初始化x86的ACPI子系统。
+arm64平台上virt主板最后初始化阶段，virt_machine_done -&gt; virt_acpi_setup 初始化aarch64的ACPI子系统。
+ACPI提供了CPU热插拔、内存热插拔以及pci/pcie 热插拔相关接口给操作系统。</p>
+<h3>2.0 QEMU FwCfg机制</h3>
+<p>QEMU使用fw_cfg设备向OS呈现系统固件(firmware)信息， 
+其中主要包括：device bootorder，ACPI和SMBIOS tables，VM UUID，SMP/NUMA，
+kenerl/initrd images for direct (Linux) kernel booting等（fw_cfg直接把硬件信息报告给OS）。</p>
+<p>fw_cfg设备对外提供了3个关键寄存器用来完成设备操作，x86上使用PIO方式，arm上使用MMIO方式访问寄存器。</p>
+<div class="highlight"><pre><span></span><code>=== x86, x86_64 Register Locations ===
+
+Selector Register IOport: 0x510
+Data Register IOport:     0x511
+DMA Address IOport:       0x514
+
+=== ARM Register Locations ===
+
+Selector Register address: Base + 8 (2 bytes)
+Data Register address:     Base + 0 (8 bytes)
+DMA Address address:       Base + 16 (8 bytes)
+</code></pre></div>
+
+<p>Select Register是Write Only的，通过写这个寄存器来选择要操作的Firmware。
+Data Register是WR的，通过读Data Register内容可以将Select Register选中的固件内容按Byte读取出来。
+DMA Address寄存器为fw_cfg提供了DMA方式访问固件的能力，相对于按Byte读取固件，可以提升固件读取的速率。</p>
+<p>除此之外，fw_cfg还提供了ACPI接口给OS访问固件使用，其ACPI描述表信息中包含了固件目录信息（FW_CFG_FILE_DIR），
+具体格式可以参考一下：<a href="https://richardweiyang.gitbooks.io/understanding_qemu/fw_cfg/01-spec.html">fw_cfg ACPI数据结构</a></p>
+<p>除了能由ACPI，DTB进行fw_cfg实例化之外，也可以直接配置内核引导参数使用fw_cfg，
+很显然这种方法是为了适用于QEMU直接引导内核的场景。</p>
+<div class="highlight"><pre><span></span><code><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">The</span><span class="w"> </span><span class="n">fw_cfg</span><span class="w"> </span><span class="n">device</span><span class="w"> </span><span class="n">may</span><span class="w"> </span><span class="n">be</span><span class="w"> </span><span class="n">instantiated</span><span class="w"> </span><span class="n">via</span><span class="w"> </span><span class="n">either</span><span class="w"> </span><span class="n">an</span><span class="w"> </span><span class="n">ACPI</span><span class="w"> </span><span class="n">node</span><span class="w"> </span><span class="p">(</span><span class="n">on</span><span class="w"> </span><span class="n">x86</span><span class="w"></span>
+<span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">and</span><span class="w"> </span><span class="n">select</span><span class="w"> </span><span class="n">subsets</span><span class="w"> </span><span class="n">of</span><span class="w"> </span><span class="n">aarch64</span><span class="p">),</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="n">Device</span><span class="w"> </span><span class="n">Tree</span><span class="w"> </span><span class="n">node</span><span class="w"> </span><span class="p">(</span><span class="n">on</span><span class="w"> </span><span class="n">arm</span><span class="p">),</span><span class="w"> </span><span class="n">or</span><span class="w"> </span><span class="n">using</span><span class="w"></span>
+<span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="n">kernel</span><span class="w"> </span><span class="n">module</span><span class="w"> </span><span class="p">(</span><span class="n">or</span><span class="w"> </span><span class="n">command</span><span class="w"> </span><span class="n">line</span><span class="p">)</span><span class="w"> </span><span class="n">parameter</span><span class="w"> </span><span class="n">with</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">following</span><span class="w"> </span><span class="n">syntax</span><span class="o">:</span><span class="w"></span>
+<span class="w"> </span><span class="o">*</span><span class="w"></span>
+<span class="w"> </span><span class="o">*</span><span class="w">      </span><span class="p">[</span><span class="n">qemu_fw_cfg</span><span class="p">.]</span><span class="n">ioport</span><span class="o">=&lt;</span><span class="n">size</span><span class="o">&gt;</span><span class="p">@</span><span class="o">&lt;</span><span class="n">base</span><span class="o">&gt;</span><span class="p">[</span><span class="o">:&lt;</span><span class="n">ctrl_off</span><span class="o">&gt;:&lt;</span><span class="n">data_off</span><span class="o">&gt;</span><span class="p">[</span><span class="o">:&lt;</span><span class="n">dma_off</span><span class="o">&gt;</span><span class="p">]]</span><span class="w"></span>
+<span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">or</span><span class="w"></span>
+<span class="w"> </span><span class="o">*</span><span class="w">      </span><span class="p">[</span><span class="n">qemu_fw_cfg</span><span class="p">.]</span><span class="n">mmio</span><span class="o">=&lt;</span><span class="n">size</span><span class="o">&gt;</span><span class="p">@</span><span class="o">&lt;</span><span class="n">base</span><span class="o">&gt;</span><span class="p">[</span><span class="o">:&lt;</span><span class="n">ctrl_off</span><span class="o">&gt;:&lt;</span><span class="n">data_off</span><span class="o">&gt;</span><span class="p">[</span><span class="o">:&lt;</span><span class="n">dma_off</span><span class="o">&gt;</span><span class="p">]]</span><span class="w"></span>
+<span class="w"> </span><span class="o">*</span><span class="w"></span>
+<span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">where</span><span class="o">:</span><span class="w"></span>
+<span class="w"> </span><span class="o">*</span><span class="w">      </span><span class="o">&lt;</span><span class="n">size</span><span class="o">&gt;</span><span class="w">     </span><span class="o">:=</span><span class="w"> </span><span class="n">size</span><span class="w"> </span><span class="n">of</span><span class="w"> </span><span class="n">ioport</span><span class="w"> </span><span class="n">or</span><span class="w"> </span><span class="n">mmio</span><span class="w"> </span><span class="n">range</span><span class="w"></span>
+<span class="w"> </span><span class="o">*</span><span class="w">      </span><span class="o">&lt;</span><span class="n">base</span><span class="o">&gt;</span><span class="w">     </span><span class="o">:=</span><span class="w"> </span><span class="n">physical</span><span class="w"> </span><span class="n">base</span><span class="w"> </span><span class="n">address</span><span class="w"> </span><span class="n">of</span><span class="w"> </span><span class="n">ioport</span><span class="w"> </span><span class="n">or</span><span class="w"> </span><span class="n">mmio</span><span class="w"> </span><span class="n">range</span><span class="w"></span>
+<span class="w"> </span><span class="o">*</span><span class="w">      </span><span class="o">&lt;</span><span class="n">ctrl_off</span><span class="o">&gt;</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="p">(</span><span class="n">optional</span><span class="p">)</span><span class="w"> </span><span class="n">offset</span><span class="w"> </span><span class="n">of</span><span class="w"> </span><span class="n">control</span><span class="w"> </span><span class="k">register</span><span class="w"></span>
+<span class="w"> </span><span class="o">*</span><span class="w">      </span><span class="o">&lt;</span><span class="n">data_off</span><span class="o">&gt;</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="p">(</span><span class="n">optional</span><span class="p">)</span><span class="w"> </span><span class="n">offset</span><span class="w"> </span><span class="n">of</span><span class="w"> </span><span class="n">data</span><span class="w"> </span><span class="k">register</span><span class="w"></span>
+<span class="w"> </span><span class="o">*</span><span class="w">      </span><span class="o">&lt;</span><span class="n">dma_off</span><span class="o">&gt;</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="p">(</span><span class="n">optional</span><span class="p">)</span><span class="w"> </span><span class="n">offset</span><span class="w"> </span><span class="n">of</span><span class="w"> </span><span class="n">dma</span><span class="w"> </span><span class="k">register</span><span class="w"></span>
+<span class="w"> </span><span class="o">*</span><span class="w"></span>
+<span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">e</span><span class="p">.</span><span class="n">g</span><span class="p">.</span><span class="o">:</span><span class="w"></span>
+<span class="w"> </span><span class="o">*</span><span class="w">      </span><span class="n">qemu_fw_cfg</span><span class="p">.</span><span class="n">ioport</span><span class="o">=</span><span class="mi">12</span><span class="mh">@0x510</span><span class="o">:</span><span class="mi">0</span><span class="o">:</span><span class="mi">1</span><span class="o">:</span><span class="mi">4</span><span class="w">   </span><span class="p">(</span><span class="n">the</span><span class="w"> </span><span class="k">default</span><span class="w"> </span><span class="n">on</span><span class="w"> </span><span class="n">x86</span><span class="p">)</span><span class="w"></span>
+<span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">or</span><span class="w"></span>
+<span class="w"> </span><span class="o">*</span><span class="w">      </span><span class="n">qemu_fw_cfg</span><span class="p">.</span><span class="n">mmio</span><span class="o">=</span><span class="mi">16</span><span class="mh">@0x9020000</span><span class="o">:</span><span class="mi">8</span><span class="o">:</span><span class="mi">0</span><span class="o">:</span><span class="mi">16</span><span class="w">    </span><span class="p">(</span><span class="n">the</span><span class="w"> </span><span class="k">default</span><span class="w"> </span><span class="n">on</span><span class="w"> </span><span class="n">arm</span><span class="p">)</span><span class="w"></span>
+<span class="w"> </span><span class="o">*/</span><span class="w"></span>
+</code></pre></div>
+
+<p>这里可以参考：</p>
+<ol>
+<li><a href="https://wiki.osdev.org/QEMU_fw_cfg">https://wiki.osdev.org/QEMU_fw_cfg</a></li>
+<li><a href="https://git.qemu.org/?p=qemu.git;a=blob;f=docs/specs/fw_cfg.txt">https://git.qemu.org/?p=qemu.git;a=blob;f=docs/specs/fw_cfg.txt</a></li>
+<li><a href="https://github.com/torvalds/linux/blob/master/drivers/firmware/qemu_fw_cfg.c">https://github.com/torvalds/linux/blob/master/drivers/firmware/qemu_fw_cfg.c</a></li>
+<li><a href="https://www.kernel.org/doc/Documentation/devicetree/bindings/arm/fw-cfg.txt">https://www.kernel.org/doc/Documentation/devicetree/bindings/arm/fw-cfg.txt</a></li>
+</ol>
+<h3>3. FDT、ACPI和SMBIOS的区别与联系</h3>
+<p>TODO</p>
+<p>SMBIOS Mappings<a href="https://gist.github.com/smoser/290f74c256c89cb3f3bd434a27b9f64c">https://gist.github.com/smoser/290f74c256c89cb3f3bd434a27b9f64c</a></p>
+<h3>4. QEMU Direct Boot引导内核</h3>
+<p>TODO</p>
+<p>glue load_elf elf_ops.h</p>
+<h3>5.内核大锁的讨论</h3>
+<p>https://kernelnewbies.org/BigKernelLock</p>
+<h3>6. PVH Boot引导方式</h3>
+<p><a href="https://patchwork.kernel.org/cover/10722233/">https://patchwork.kernel.org/cover/10722233/</a>
+PVH特性的目的是为了让QEMU支持内核的快速启动，可以跳过固件直接引导一个未经压缩的内核，
+听上去是不是有点酷。在KVM之前，Xen上就已经有支持Linux和FreeBSD的PVH guests和ABI。</p>
+<ol>
+<li><a href="https://ts.data61.csiro.au/publications/nicta_slides/8768.pdf">For a Microkernel, a BIG Lock is fine !</a></li>
+</ol>
+<h2>阅读清单</h2>
+<ol>
+<li><a href="https://blog.csdn.net/pwl999/article/details/80514271">perf event原理和使用方法</a></li>
+<li><a href="https://blog.csdn.net/pwl999/article/list/1">perf 原理和代码分析</a></li>
+</ol>
+
+
+             
+ 
+                <p id="post-share-links">
+    Share on:
+      <a href="https://twitter.com/intent/tweet?text=Article%20Archive%202020%20Reading%20Plan&url=https%3A//kernelgo.org/reading2020.html&hashtags=virtualization" target="_blank" rel="nofollow noopener noreferrer" title="Share on Twitter">Twitter</a>
+ ❄       <a href="https://www.facebook.com/sharer/sharer.php?u=https%3A//kernelgo.org/reading2020.html" target="_blank" rel="nofollow noopener noreferrer" title="Share on Facebook">Facebook</a>
+ ❄       <a href="mailto:?subject=Article%20Archive%202020%20Reading%20Plan&amp;body=https%3A//kernelgo.org/reading2020.html" target="_blank" rel="nofollow noopener noreferrer" title="Share via Email">Email</a>
+
+            
+            
+
+
+
+
+
+
+
+<section>
+    <h6 style="display:none;">Comments</h6>
+    <p id="comment-message"> </p>
+
+    <div class="accordion" id="accordion2">
+        <div class="accordion-group">
+            <div class="accordion-heading">
+                <a class="accordion-toggle disqus-comment-count comment-count collapsed"
+                   data-toggle="collapse"
+                   data-parent="#accordion2"
+                   data-disqus-identifier="https://kernelgo.org/reading2020.html"
+                   href="https://kernelgo.org/reading2020.html#comment_thread"
+                   id="comment-accordion-toggle">
+                    Comments
+                </a>
+            </div>
+            <div id="comment_thread" class="accordion-body collapse">
+                <div class="accordion-inner">
+                    <div class="comments">
+                        <div id="disqus_thread"></div>
+                        <script>
+    var disqus_shortname = 'kernelgo';
+    (function () {
+        var s = document.createElement('script'); s.async = true;
+        s.type = 'text/javascript';
+        s.src = '//' + disqus_shortname + '.disqus.com/count.js';
+        (document.getElementsByTagName('HEAD')[0] || document.getElementsByTagName('BODY')[0]).appendChild(s);
+    }());
+
+    var disqus_identifier = 'https://kernelgo.org/reading2020.html';
+    var disqus_url = 'https://kernelgo.org/reading2020.html';
+
+    (function() {
+        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    })();
+</script>
+
+<noscript>Please enable JavaScript to view the <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+            <hr/>
+<section>
+    <h2>Related Posts</h2>
+<ul class="related-posts-list">
+<li><a href="https://kernelgo.org/vim8.html" title="VIM8 Customized Configuration">VIM8 Customized Configuration</a></li>
+<li><a href="https://kernelgo.org/x86-nmi.html" title="Virt NMI Emulation">Virt NMI Emulation</a></li>
+<li><a href="https://kernelgo.org/reading2019.html" title="Article Archive 2019 Reading Plan">Article Archive 2019 Reading Plan</a></li>
+<li><a href="https://kernelgo.org/microVM.html" title="Lightweight Micro Virtual Machines">Lightweight Micro Virtual Machines</a></li>
+<li><a href="https://kernelgo.org/virtio-overview.html" title="Virtio Spec Overview">Virtio Spec Overview</a></li>
+</ul>
+<hr />
+</section>
+            <aside>
+            <nav>
+            <ul class="articles-timeline">
+                <li class="previous-article">« <a href="https://kernelgo.org/live-migration-with-passthroughed-device.html" title="Previous: Live Migration with Passthroughed Device (Draft)">Live Migration with Passthroughed Device (Draft)</a></li>
+                <li class="next-article"><a href="https://kernelgo.org/qemu-aio-internal.html" title="Next: A Qemu Hang Problem Revelant to AIO">A Qemu Hang Problem Revelant to AIO</a> »</li>
+            </ul>
+            </nav>
+            </aside>
+        </div>
+        <section id="article-sidebar" class="span2">
+            <h4>Published</h4>
+            <time itemprop="dateCreated" datetime="2020-01-19T23:00:00+08:00">Sun 19 January 2020</time>
+
+            <h4>Category</h4>
+            <a class="category-link" href="https://kernelgo.org/categories.html#utils-ref">utils</a>
+            <h4>Tags</h4>
+            <ul class="list-of-tags tags-in-article">
+                <li><a href="https://kernelgo.org/tags.html#virtualization-ref">virtualization
+                    <span class="superscript">15</span>
+</a></li>
+            </ul>
+<h4>Contact</h4>
+<div id="sidebar-social-link">
+    <a href="https://github.com/fangying" title="" target="_blank" rel="nofollow noopener noreferrer">
+        <svg xmlns="http://www.w3.org/2000/svg" aria-label="GitHub" role="img" viewBox="0 0 512 512"><rect width="512" height="512" rx="15%" fill="#1B1817"/><path fill="#fff" d="M335 499c14 0 12 17 12 17H165s-2-17 12-17c13 0 16-6 16-12l-1-50c-71 16-86-28-86-28-12-30-28-37-28-37-24-16 1-16 1-16 26 2 40 26 40 26 22 39 59 28 74 22 2-17 9-28 16-35-57-6-116-28-116-126 0-28 10-51 26-69-3-6-11-32 3-67 0 0 21-7 70 26 42-12 86-12 128 0 49-33 70-26 70-26 14 35 6 61 3 67 16 18 26 41 26 69 0 98-60 120-117 126 10 8 18 24 18 48l-1 70c0 6 3 12 16 12z"/></svg>
+    </a>
+</div>
+            
+
+
+
+
+
+            
+
+
+
+
+
+        </section>
+</div>
+</article>
+<!-- Root element of PhotoSwipe. Must have class pswp. -->
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    <!-- Background of PhotoSwipe.
+         It's a separate element as animating opacity is faster than rgba(). -->
+    <div class="pswp__bg"></div>
+
+    <!-- Slides wrapper with overflow:hidden. -->
+    <div class="pswp__scroll-wrap">
+
+        <!-- Container that holds slides.
+            PhotoSwipe keeps only 3 of them in the DOM to save memory.
+            Don't modify these 3 pswp__item elements, data is added later on. -->
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        <!-- Default (PhotoSwipeUI_Default) interface on top of sliding area. Can be changed. -->
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                <!--  Controls are self-explanatory. Order can be changed. -->
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                <!-- Preloader demo https://codepen.io/dimsemenov/pen/yyBWoR -->
+                <!-- element will get class pswp__preloader--active when preloader is running -->
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                      <div class="pswp__preloader__cut">
+                        <div class="pswp__preloader__donut"></div>
+                      </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>                    </div>
+                    <div class="span1"></div>
+                </div>
+            </div>
+        </div>
+<footer>
+    <div>
+        <span xmlns:dct="http://purl.org/dc/terms/" property="dct:title"> kernelgo"</span> by <a xmlns:cc="http://creativecommons.org/ns#" href="https://kernelgo.org" property="cc:attributionName" rel="cc:attributionURL">Yori Fang</a> is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/3.0/deed.en_US">Creative Commons Attribution-ShareAlike 3.0 Unported License</a>.
+    </div>
+
+
+
+
+    <div id="fpowered">
+        Powered by: <a href="http://getpelican.com/" title="Pelican Home Page" target="_blank" rel="nofollow noopener noreferrer">Pelican</a>
+        Theme: <a href="https://elegant.oncrashreboot.com/" title="Theme Elegant Home Page" target="_blank" rel="nofollow noopener noreferrer">Elegant</a>
+    </div>
+</footer>            <script src="//code.jquery.com/jquery.min.js"></script>
+        <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/js/bootstrap.min.js"></script>
+        <script src="https://kernelgo.org/theme/js/elegant.prod.9e9d5ce754.js"></script>
+        <script>
+            function validateForm(query)
+            {
+                return (query.length > 0);
+            }
+        </script>
+
+    <script>
+    (function () {
+        if (window.location.hash.match(/^#comment-\d+$/)) {
+            $('#comment_thread').collapse('show');
+        }
+    })();
+    window.onhashchange=function(){
+        if (window.location.hash.match(/^#comment-\d+$/))
+            window.location.reload(true);
+    }
+    $('#comment_thread').on('shown', function () {
+        var link = document.getElementById('comment-accordion-toggle');
+        var old_innerHTML = link.innerHTML;
+        $(link).fadeOut(200, function() {
+            $(this).text('Click here to hide comments').fadeIn(200);
+        });
+        $('#comment_thread').on('hidden', function () {
+            $(link).fadeOut(200, function() {
+                $(this).text(old_innerHTML).fadeIn(200);
+            });
+        })
+    })
+</script>
+
+    </body>
+    <!-- Theme: Elegant built for Pelican
+        License : MIT -->
+</html>

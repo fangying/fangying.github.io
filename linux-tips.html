@@ -1,0 +1,1076 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://kernelgo.org/theme/css/style.min.css?fc5adb95">
+
+        <link rel="dns-prefetch" href="//fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin>
+
+        <meta name="author" content="Yori Fang" />
+
+        <meta name="description" content="linux-tips
+" />
+        <meta property="og:type" content="article" />
+        <meta name="twitter:card" content="summary">
+
+<meta name="keywords" content="x86, linux, " />
+
+<meta property="og:title" content="Tips on Linux "/>
+<meta property="og:url" content="https://kernelgo.org/linux-tips.html" />
+<meta property="og:description" content="linux-tips" />
+<meta property="og:site_name" content="kernelgo" />
+<meta property="og:article:author" content="Yori Fang" />
+<meta property="og:article:published_time" content="2018-06-12T23:00:00+08:00" />
+<meta property="og:article:modified_time" content="2018-06-12T23:00:00+08:00" />
+<meta name="twitter:title" content="Tips on Linux ">
+<meta name="twitter:description" content="linux-tips">
+
+        <title>Tips on Linux  · kernelgo
+</title>
+<script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+     (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+     m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+     })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+    ga('create', 'UA-107392039-1', 'auto');
+    ga('send', 'pageview');
+</script>
+
+
+    </head>
+    <body>
+        <div id="content">
+            <div class="navbar navbar-static-top">
+                <div class="navbar-inner">
+                    <div class="container-fluid">
+                        <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                        </a>
+                        <a class="brand" href="https://kernelgo.org/"><span class=site-name>kernelgo</span></a>
+                        <div class="nav-collapse collapse">
+                            <ul class="nav pull-right top-menu">
+                                <li >
+                                    <a href=
+                                       https://kernelgo.org
+                                    >Home</a>
+                                </li>
+                                <li ><a href="https://kernelgo.org/pages/about.html">About</a></li>
+                                <li ><a href="https://kernelgo.org/categories.html">Categories</a></li>
+                                <li ><a href="https://kernelgo.org/tags.html">Tags</a></li>
+                                <li ><a href="https://kernelgo.org/archives.html">Archives</a></li>
+                                <li><form class="navbar-search" action="https://kernelgo.org/search.html" onsubmit="return validateForm(this.elements['q'].value);"> <input type="text" class="search-query" placeholder="Search" name="q" id="tipue_search_input"></form></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="container-fluid">
+                <div class="row-fluid">
+                    <div class="span1"></div>
+                    <div class="span10">
+<article itemscope>
+<div class="row-fluid">
+    <header class="page-header span10 offset2">
+        <h1>
+            <a href="https://kernelgo.org/linux-tips.html">
+                Tips on Linux
+            </a>
+        </h1>
+    </header>
+</div>
+
+<div class="row-fluid">
+        <div class="span8 offset2 article-content">
+            
+            <h3>QEMU gdb调试屏蔽若干信号</h3>
+<div class="highlight"><pre><span></span><code>echo &#39;handle SIGUSR1 SIGUSR2 noprint nostop&#39; &gt;&gt; ~/.gdbinit
+</code></pre></div>
+
+<h4>生成内核符号表</h4>
+<div class="highlight"><pre><span></span><code>make tags <span class="nv">ARCH</span><span class="o">=</span>x86
+make cscope <span class="nv">ARCH</span><span class="o">=</span>x86
+</code></pre></div>
+
+<h4>GDB设置条件断点</h4>
+<p>设置条件断点除了使用break if语句之外还有一种便捷的方法。
+例如，我们在qemu的函数vmstate_save_sate_v上设置断点，抓取virtio-blk设备的状态保存。
+可以这么做：</p>
+<div class="highlight"><pre><span></span><code><span class="n">b</span><span class="w"> </span><span class="n">vmstate_save_sate_v</span><span class="w"></span>
+<span class="n">continue</span><span class="w">  </span>
+<span class="cp"># 等到获取断点后使用</span><span class="w"></span>
+<span class="n">condition</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="n">strcmp</span><span class="p">(</span><span class="n">vmsd</span><span class="o">-&gt;</span><span class="n">name</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;virtio-blk&quot;</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="w"></span>
+<span class="cp"># i b</span><span class="w"></span>
+<span class="err">可以看到多了一个条件，表示额外需要满足这个条件在</span><span class="n">hit这个断点</span><span class="w"></span>
+</code></pre></div>
+
+<p>参考: https://www.fayewilliams.com/2011/07/13/gdb-conditional-breakpoints/</p>
+<h4>密码输错超过最大次数，解锁骚操作</h4>
+<div class="highlight"><pre><span></span><code>pam_tally2 --user root
+pam_tally2 -r -u root
+</code></pre></div>
+
+<h4>更新let's encrypt证书</h4>
+<div class="highlight"><pre><span></span><code>yum -y install yum-utils
+yum-config-manager --enable rhui-REGION-rhel-server-extras rhui-REGION-rhel-server-optional
+yum install python2-certbot-nginx
+certbot --nginx
+certbot renew --dry-run
+</code></pre></div>
+
+<h3>ftrace查看pCPU上的调度情况</h3>
+<p>这里以查看pCPU2的调度状况为例</p>
+<div class="highlight"><pre><span></span><code>mount -t debugfs none /sys/kernel/debug/
+<span class="nb">cd</span> /sys/kernel/debug/tracing
+<span class="nb">echo</span> <span class="m">1</span> &gt; events/sched/enable <span class="p">;</span> sleep <span class="m">2</span> <span class="p">;</span> <span class="nb">echo</span> <span class="m">0</span> &gt; events/sched/enable
+cat per_cpu/cpu2/trace &gt; /home/trace.txt
+</code></pre></div>
+
+<p>可以看到PCPU上的调度情况</p>
+<div class="highlight"><pre><span></span><code><span class="err">#</span><span class="w"> </span><span class="nl">tracer</span><span class="p">:</span><span class="w"> </span><span class="n">nop</span><span class="w"></span>
+<span class="err">#</span><span class="w"></span>
+<span class="err">#</span><span class="w"> </span><span class="n">entries</span><span class="o">-</span><span class="ow">in</span><span class="o">-</span><span class="n">buffer</span><span class="o">/</span><span class="n">entries</span><span class="o">-</span><span class="nl">written</span><span class="p">:</span><span class="w"> </span><span class="mi">381200</span><span class="o">/</span><span class="mi">1199928</span><span class="w">   </span><span class="n">#P</span><span class="err">:</span><span class="mi">24</span><span class="w"></span>
+<span class="err">#</span><span class="w"></span>
+<span class="err">#</span><span class="w">                              </span><span class="n">_</span><span class="o">-----=&gt;</span><span class="w"> </span><span class="n">irqs</span><span class="o">-</span><span class="k">off</span><span class="w"></span>
+<span class="err">#</span><span class="w">                             </span><span class="o">/</span><span class="w"> </span><span class="n">_</span><span class="o">----=&gt;</span><span class="w"> </span><span class="n">need</span><span class="o">-</span><span class="n">resched</span><span class="w"></span>
+<span class="err">#</span><span class="w">                            </span><span class="o">|</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">_</span><span class="o">---=&gt;</span><span class="w"> </span><span class="n">hardirq</span><span class="o">/</span><span class="n">softirq</span><span class="w"></span>
+<span class="err">#</span><span class="w">                            </span><span class="o">||</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">_</span><span class="o">--=&gt;</span><span class="w"> </span><span class="n">preempt</span><span class="o">-</span><span class="k">depth</span><span class="w"></span>
+<span class="err">#</span><span class="w">                            </span><span class="o">|||</span><span class="w"> </span><span class="o">/</span><span class="w">     </span><span class="n">delay</span><span class="w"></span>
+<span class="err">#</span><span class="w">           </span><span class="n">TASK</span><span class="o">-</span><span class="n">PID</span><span class="w">   </span><span class="n">CPU</span><span class="err">#</span><span class="w">  </span><span class="o">||||</span><span class="w">    </span><span class="nc">TIMESTAMP</span><span class="w">  </span><span class="k">FUNCTION</span><span class="w"></span>
+<span class="err">#</span><span class="w">              </span><span class="o">|</span><span class="w"> </span><span class="o">|</span><span class="w">       </span><span class="o">|</span><span class="w">   </span><span class="o">||||</span><span class="w">       </span><span class="o">|</span><span class="w">         </span><span class="o">|</span><span class="w"></span>
+<span class="w">          </span><span class="o">&lt;</span><span class="n">idle</span><span class="o">&gt;-</span><span class="mi">0</span><span class="w">     </span><span class="o">[</span><span class="n">002</span><span class="o">]</span><span class="w"> </span><span class="n">d</span><span class="p">...</span><span class="w"> </span><span class="mf">158158.084267</span><span class="err">:</span><span class="w"> </span><span class="nl">sched_switch</span><span class="p">:</span><span class="w"> </span><span class="n">prev_comm</span><span class="o">=</span><span class="n">swapper</span><span class="o">/</span><span class="mi">2</span><span class="w"> </span><span class="n">prev_pid</span><span class="o">=</span><span class="mi">0</span><span class="w"> </span><span class="n">prev_prio</span><span class="o">=</span><span class="mi">120</span><span class="w"> </span><span class="n">prev_state</span><span class="o">=</span><span class="n">R</span><span class="w"> </span><span class="o">==&gt;</span><span class="w"> </span><span class="n">next_comm</span><span class="o">=</span><span class="n">CPU</span><span class="w"> </span><span class="mi">0</span><span class="o">/</span><span class="n">KVM</span><span class="w"> </span><span class="n">next_pid</span><span class="o">=</span><span class="mi">2046</span><span class="w"> </span><span class="n">next_prio</span><span class="o">=</span><span class="mi">120</span><span class="w"></span>
+<span class="w">       </span><span class="n">CPU</span><span class="w"> </span><span class="mi">0</span><span class="o">/</span><span class="n">KVM</span><span class="o">-</span><span class="mi">2046</span><span class="w">  </span><span class="o">[</span><span class="n">002</span><span class="o">]</span><span class="w"> </span><span class="n">d</span><span class="p">...</span><span class="w"> </span><span class="mf">158158.084280</span><span class="err">:</span><span class="w"> </span><span class="nl">sched_stat_runtime</span><span class="p">:</span><span class="w"> </span><span class="n">comm</span><span class="o">=</span><span class="n">CPU</span><span class="w"> </span><span class="mi">0</span><span class="o">/</span><span class="n">KVM</span><span class="w"> </span><span class="n">pid</span><span class="o">=</span><span class="mi">2046</span><span class="w"> </span><span class="n">runtime</span><span class="o">=</span><span class="mi">16239</span><span class="w"> </span><span class="o">[</span><span class="n">ns</span><span class="o">]</span><span class="w"> </span><span class="n">vruntime</span><span class="o">=</span><span class="mi">105862773195</span><span class="w"> </span><span class="o">[</span><span class="n">ns</span><span class="o">]</span><span class="w"></span>
+<span class="w">       </span><span class="n">CPU</span><span class="w"> </span><span class="mi">0</span><span class="o">/</span><span class="n">KVM</span><span class="o">-</span><span class="mi">2046</span><span class="w">  </span><span class="o">[</span><span class="n">002</span><span class="o">]</span><span class="w"> </span><span class="n">d</span><span class="p">...</span><span class="w"> </span><span class="mf">158158.084281</span><span class="err">:</span><span class="w"> </span><span class="nl">sched_switch</span><span class="p">:</span><span class="w"> </span><span class="n">prev_comm</span><span class="o">=</span><span class="n">CPU</span><span class="w"> </span><span class="mi">0</span><span class="o">/</span><span class="n">KVM</span><span class="w"> </span><span class="n">prev_pid</span><span class="o">=</span><span class="mi">2046</span><span class="w"> </span><span class="n">prev_prio</span><span class="o">=</span><span class="mi">120</span><span class="w"> </span><span class="n">prev_state</span><span class="o">=</span><span class="n">S</span><span class="w"> </span><span class="o">==&gt;</span><span class="w"> </span><span class="n">next_comm</span><span class="o">=</span><span class="n">swapper</span><span class="o">/</span><span class="mi">2</span><span class="w"> </span><span class="n">next_pid</span><span class="o">=</span><span class="mi">0</span><span class="w"> </span><span class="n">next_prio</span><span class="o">=</span><span class="mi">120</span><span class="w"></span>
+<span class="w">          </span><span class="o">&lt;</span><span class="n">idle</span><span class="o">&gt;-</span><span class="mi">0</span><span class="w">     </span><span class="o">[</span><span class="n">002</span><span class="o">]</span><span class="w"> </span><span class="n">dNh</span><span class="p">.</span><span class="w"> </span><span class="mf">158158.085265</span><span class="err">:</span><span class="w"> </span><span class="nl">sched_wakeup</span><span class="p">:</span><span class="w"> </span><span class="n">comm</span><span class="o">=</span><span class="n">CPU</span><span class="w"> </span><span class="mi">0</span><span class="o">/</span><span class="n">KVM</span><span class="w"> </span><span class="n">pid</span><span class="o">=</span><span class="mi">2046</span><span class="w"> </span><span class="n">prio</span><span class="o">=</span><span class="mi">120</span><span class="w"> </span><span class="n">success</span><span class="o">=</span><span class="mi">1</span><span class="w"> </span><span class="n">target_cpu</span><span class="o">=</span><span class="mi">002</span><span class="w"></span>
+<span class="w">          </span><span class="o">&lt;</span><span class="n">idle</span><span class="o">&gt;-</span><span class="mi">0</span><span class="w">     </span><span class="o">[</span><span class="n">002</span><span class="o">]</span><span class="w"> </span><span class="n">d</span><span class="p">...</span><span class="w"> </span><span class="mf">158158.085266</span><span class="err">:</span><span class="w"> </span><span class="nl">sched_switch</span><span class="p">:</span><span class="w"> </span><span class="n">prev_comm</span><span class="o">=</span><span class="n">swapper</span><span class="o">/</span><span class="mi">2</span><span class="w"> </span><span class="n">prev_pid</span><span class="o">=</span><span class="mi">0</span><span class="w"> </span><span class="n">prev_prio</span><span class="o">=</span><span class="mi">120</span><span class="w"> </span><span class="n">prev_state</span><span class="o">=</span><span class="n">R</span><span class="w"> </span><span class="o">==&gt;</span><span class="w"> </span><span class="n">next_comm</span><span class="o">=</span><span class="n">CPU</span><span class="w"> </span><span class="mi">0</span><span class="o">/</span><span class="n">KVM</span><span class="w"> </span><span class="n">next_pid</span><span class="o">=</span><span class="mi">2046</span><span class="w"> </span><span class="n">next_prio</span><span class="o">=</span><span class="mi">120</span><span class="w"></span>
+<span class="w">       </span><span class="n">CPU</span><span class="w"> </span><span class="mi">0</span><span class="o">/</span><span class="n">KVM</span><span class="o">-</span><span class="mi">2046</span><span class="w">  </span><span class="o">[</span><span class="n">002</span><span class="o">]</span><span class="w"> </span><span class="n">d</span><span class="p">...</span><span class="w"> </span><span class="mf">158158.085280</span><span class="err">:</span><span class="w"> </span><span class="nl">sched_stat_runtime</span><span class="p">:</span><span class="w"> </span><span class="n">comm</span><span class="o">=</span><span class="n">CPU</span><span class="w"> </span><span class="mi">0</span><span class="o">/</span><span class="n">KVM</span><span class="w"> </span><span class="n">pid</span><span class="o">=</span><span class="mi">2046</span><span class="w"> </span><span class="n">runtime</span><span class="o">=</span><span class="mi">16148</span><span class="w"> </span><span class="o">[</span><span class="n">ns</span><span class="o">]</span><span class="w"> </span><span class="n">vruntime</span><span class="o">=</span><span class="mi">105862789343</span><span class="w"> </span><span class="o">[</span><span class="n">ns</span><span class="o">]</span><span class="w"></span>
+<span class="w">       </span><span class="n">CPU</span><span class="w"> </span><span class="mi">0</span><span class="o">/</span><span class="n">KVM</span><span class="o">-</span><span class="mi">2046</span><span class="w">  </span><span class="o">[</span><span class="n">002</span><span class="o">]</span><span class="w"> </span><span class="n">d</span><span class="p">...</span><span class="w"> </span><span class="mf">158158.085281</span><span class="err">:</span><span class="w"> </span><span class="nl">sched_switch</span><span class="p">:</span><span class="w"> </span><span class="n">prev_comm</span><span class="o">=</span><span class="n">CPU</span><span class="w"> </span><span class="mi">0</span><span class="o">/</span><span class="n">KVM</span><span class="w"> </span><span class="n">prev_pid</span><span class="o">=</span><span class="mi">2046</span><span class="w"> </span><span class="n">prev_prio</span><span class="o">=</span><span class="mi">120</span><span class="w"> </span><span class="n">prev_state</span><span class="o">=</span><span class="n">S</span><span class="w"> </span><span class="o">==&gt;</span><span class="w"> </span><span class="n">next_comm</span><span class="o">=</span><span class="n">swapper</span><span class="o">/</span><span class="mi">2</span><span class="w"> </span><span class="n">next_pid</span><span class="o">=</span><span class="mi">0</span><span class="w"> </span><span class="n">next_prio</span><span class="o">=</span><span class="mi">120</span><span class="w"></span>
+<span class="w">          </span><span class="o">&lt;</span><span class="n">idle</span><span class="o">&gt;-</span><span class="mi">0</span><span class="w">     </span><span class="o">[</span><span class="n">002</span><span class="o">]</span><span class="w"> </span><span class="n">dNh</span><span class="p">.</span><span class="w"> </span><span class="mf">158158.086265</span><span class="err">:</span><span class="w"> </span><span class="nl">sched_wakeup</span><span class="p">:</span><span class="w"> </span><span class="n">comm</span><span class="o">=</span><span class="n">CPU</span><span class="w"> </span><span class="mi">0</span><span class="o">/</span><span class="n">KVM</span><span class="w"> </span><span class="n">pid</span><span class="o">=</span><span class="mi">2046</span><span class="w"> </span><span class="n">prio</span><span class="o">=</span><span class="mi">120</span><span class="w"> </span><span class="n">success</span><span class="o">=</span><span class="mi">1</span><span class="w"> </span><span class="n">target_cpu</span><span class="o">=</span><span class="mi">002</span><span class="w"></span>
+</code></pre></div>
+
+<h4>测试NUMA NODE内存性能</h4>
+<p>这里以加压100M为例</p>
+<div class="highlight"><pre><span></span><code>#关闭NMI watchdog，防止压力过大把系统搞死
+echo 0 &gt; /proc/sys/kernel/nmi_watchdog
+
+#打开shell的cgroup隔离
+echo $$ &gt; /sys/fs/cgroup/cpuset/tasks
+
+获取Stream加压工具
+git clone https://github.com/jeffhammond/STREAM
+cd STREAM-master
+gcc -O -DSTREAM_ARRAY_SIZE=100000000 stream.c -o stream.100M
+
+#获取pcm带宽测试工具
+git clone https://github.com/opcm/pcm
+chmod +x ./pcm-memory.x
+./pcm-memory.x 查看带宽
+</code></pre></div>
+
+<h4>如何查看任务的调度延时</h4>
+<p>通过perf sched 查看某段时间内进程的调度延时</p>
+<div class="highlight"><pre><span></span><code><span class="n">perf</span><span class="w"> </span><span class="n">sched</span><span class="w"> </span><span class="n">record</span><span class="w"> </span><span class="o">--</span><span class="w"> </span><span class="n">sleep</span><span class="w"> </span><span class="mi">1</span><span class="w"></span>
+<span class="cp">#观察调度延迟</span>
+<span class="n">perf</span><span class="w"> </span><span class="n">sched</span><span class="w"> </span><span class="n">latency</span><span class="w"> </span><span class="o">--</span><span class="n">sort</span><span class="o">=</span><span class="n">max</span><span class="w"></span>
+</code></pre></div>
+
+<h3>No newline at end of file</h3>
+<div class="highlight"><pre><span></span><code>:set binary noeol
+</code></pre></div>
+
+<h4>如何查找一个系统调用的定义在哪个文件中</h4>
+<div class="highlight"><pre><span></span><code>grep -E &quot;SYSCALL_DEFINE[0-6]\(listen&quot; -nr
+</code></pre></div>
+
+<h4>perf查看虚拟机性能数据</h4>
+<div class="highlight"><pre><span></span><code>pid=$(pgrep qemu-kvm)
+perf kvm stat record -p $pid
+perf kvm stat report
+</code></pre></div>
+
+<h4>wget下载指定目录的指定文件到</h4>
+<div class="highlight"><pre><span></span><code> wget -c -r -nd -np -k -L -p -A &quot;qemu*.rpm&quot; \
+  http://mirrors.aliyun.com/centos/7.6.1810/updates/x86_64/Packages/
+
+ -c 断点续传， -r 递归， -nd不在本地创建对应文件夹， -np不下载父目录， -A 接受哪些类型的文件（这里可以试一个glob表达式）
+</code></pre></div>
+
+<h4>查询设备/设备类属性</h4>
+<div class="highlight"><pre><span></span><code> 设备属性
+ virsh qemu-monitor-command vmname &#39;{&quot;arguments&quot;: {&quot;typename&quot;: &quot;virtio-net-pci&quot;}, &quot;execute&quot;:&quot;device-list-properties&quot;}&#39;
+ 设备类属性
+ virsh qemu-monitor-command vmname &#39;{&quot;arguments&quot;: {&quot;typename&quot;: &quot;virtio-net-pci&quot;}, &quot;execute&quot;:&quot;qom-list-properties&quot;}&#39;
+ 设备实例的属性
+ virsh qemu-monitor-command fangying --hmp &quot;info qtree&quot; | less
+</code></pre></div>
+
+<h4>配置yum proxy</h4>
+<div class="highlight"><pre><span></span><code># append to /etc/yum.conf
+proxy=http://xxxx
+proxy_username=xxxx
+proxy_password=xxxx
+</code></pre></div>
+
+<h4>配置docker hub</h4>
+<p>众所周知,docker hub默认国外镜像在国内几乎无法访问,需要配置国内支持匿名pull的docker hub.
+edit <code>/etc/docker/daemon.json</code></p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="s">&quot;registry-mirrors&quot;</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="s">&quot;https://dockerhub.azk8s.cn&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="s">&quot;https://docker.mirrors.ustc.edu.cn&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="s">&quot;https://registry.docker-cn.com&quot;</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>然后重新启动Docker服务</p>
+<div class="highlight"><pre><span></span><code>sudo systemctl daemon-reload
+sudo systemctl restart docker
+</code></pre></div>
+
+<h4>编译firecracker</h4>
+<div class="highlight"><pre><span></span><code>docker run --user 0:0 --workdir /firecracker -it \
+--name firecracker --net host --volume $(pwd):/firecracker:z \
+--env OPT_LOCAL_IMAGES_PATH=/firecracker/build \
+--env PYTHONDONTWRITEBYTECODE=1 fcuvm/dev:v12
+</code></pre></div>
+
+<h4>虚拟机文件系统扩容</h4>
+<p>情况1： 非lvm卷，rootfs是ext4文件系统</p>
+<p>安装的虚拟机根分区太小，磁盘格式是qcow2的，可以直接扩容，先qemu-img扩展镜像大小，再到虚拟机里面扩展文件系统。</p>
+<div class="highlight"><pre><span></span><code><span class="err">#</span><span class="w"> </span><span class="n">root</span><span class="nv">@ubuntu</span><span class="err">:</span><span class="o">~</span><span class="err">#</span><span class="w"> </span><span class="n">lsblk</span><span class="w"></span>
+<span class="n">NAME</span><span class="w">   </span><span class="nl">MAJ</span><span class="p">:</span><span class="nf">MIN</span><span class="w"> </span><span class="n">RM</span><span class="w">  </span><span class="k">SIZE</span><span class="w"> </span><span class="n">RO</span><span class="w"> </span><span class="n">TYPE</span><span class="w"> </span><span class="n">MOUNTPOINT</span><span class="w"></span>
+<span class="n">sda</span><span class="w">      </span><span class="mi">8</span><span class="err">:</span><span class="mi">0</span><span class="w">    </span><span class="mi">0</span><span class="w">   </span><span class="mi">10</span><span class="n">G</span><span class="w">  </span><span class="mi">0</span><span class="w"> </span><span class="k">disk</span><span class="w"></span>
+<span class="err">├─</span><span class="n">sda1</span><span class="w">   </span><span class="mi">8</span><span class="err">:</span><span class="mi">1</span><span class="w">    </span><span class="mi">0</span><span class="w">  </span><span class="mi">512</span><span class="n">M</span><span class="w">  </span><span class="mi">0</span><span class="w"> </span><span class="n">part</span><span class="w"> </span><span class="o">/</span><span class="n">boot</span><span class="o">/</span><span class="n">efi</span><span class="w"></span>
+<span class="err">└─</span><span class="n">sda2</span><span class="w">   </span><span class="mi">8</span><span class="err">:</span><span class="mi">2</span><span class="w">    </span><span class="mi">0</span><span class="w">  </span><span class="mf">9.5</span><span class="n">G</span><span class="w">  </span><span class="mi">0</span><span class="w"> </span><span class="n">part</span><span class="w"> </span><span class="o">/</span><span class="w"></span>
+<span class="n">sr0</span><span class="w">     </span><span class="mi">11</span><span class="err">:</span><span class="mi">0</span><span class="w">    </span><span class="mi">1</span><span class="w">  </span><span class="mf">7.6</span><span class="n">G</span><span class="w">  </span><span class="mi">0</span><span class="w"> </span><span class="n">rom</span><span class="w"></span>
+
+<span class="err">#</span><span class="w"> </span><span class="n">qemu</span><span class="o">-</span><span class="n">img</span><span class="w"> </span><span class="n">resize</span><span class="w"> </span><span class="n">vm</span><span class="o">-</span><span class="n">imgage</span><span class="p">.</span><span class="n">qcow2</span><span class="w"> </span><span class="o">+</span><span class="mi">100</span><span class="n">G</span><span class="w"></span>
+
+<span class="err">#</span><span class="w"> </span><span class="n">root</span><span class="nv">@ubuntu</span><span class="err">:</span><span class="o">~</span><span class="err">#</span><span class="w"> </span><span class="n">lsblk</span><span class="w"></span>
+<span class="n">NAME</span><span class="w">   </span><span class="nl">MAJ</span><span class="p">:</span><span class="nf">MIN</span><span class="w"> </span><span class="n">RM</span><span class="w">  </span><span class="k">SIZE</span><span class="w"> </span><span class="n">RO</span><span class="w"> </span><span class="n">TYPE</span><span class="w"> </span><span class="n">MOUNTPOINT</span><span class="w"></span>
+<span class="n">sda</span><span class="w">      </span><span class="mi">8</span><span class="err">:</span><span class="mi">0</span><span class="w">    </span><span class="mi">0</span><span class="w">  </span><span class="mi">110</span><span class="n">G</span><span class="w">  </span><span class="mi">0</span><span class="w"> </span><span class="k">disk</span><span class="w"></span>
+<span class="err">├─</span><span class="n">sda1</span><span class="w">   </span><span class="mi">8</span><span class="err">:</span><span class="mi">1</span><span class="w">    </span><span class="mi">0</span><span class="w">  </span><span class="mi">512</span><span class="n">M</span><span class="w">  </span><span class="mi">0</span><span class="w"> </span><span class="n">part</span><span class="w"> </span><span class="o">/</span><span class="n">boot</span><span class="o">/</span><span class="n">efi</span><span class="w"></span>
+<span class="err">└─</span><span class="n">sda2</span><span class="w">   </span><span class="mi">8</span><span class="err">:</span><span class="mi">2</span><span class="w">    </span><span class="mi">0</span><span class="w">  </span><span class="mf">9.5</span><span class="n">G</span><span class="w">  </span><span class="mi">0</span><span class="w"> </span><span class="n">part</span><span class="w"> </span><span class="o">/</span><span class="w"></span>
+<span class="n">sr0</span><span class="w">     </span><span class="mi">11</span><span class="err">:</span><span class="mi">0</span><span class="w">    </span><span class="mi">1</span><span class="w">  </span><span class="mf">7.6</span><span class="n">G</span><span class="w">  </span><span class="mi">0</span><span class="w"> </span><span class="n">rom</span><span class="w"></span>
+
+<span class="n">先删除原来的分区</span><span class="err">，</span><span class="n">然后重新创建分区</span><span class="err">，</span><span class="n">前提是这个分区是磁盘的最后一个分区</span><span class="w"></span>
+<span class="err">#</span><span class="w"> </span><span class="n">gparted</span><span class="w"> </span><span class="o">/</span><span class="n">dev</span><span class="o">/</span><span class="n">sda</span><span class="w"></span>
+<span class="p">(</span><span class="n">parted</span><span class="p">)</span><span class="w"> </span><span class="n">rm</span><span class="w"> </span><span class="mi">2</span><span class="w"></span>
+<span class="nl">Warning</span><span class="p">:</span><span class="w"> </span><span class="k">Partition</span><span class="w"> </span><span class="o">/</span><span class="n">dev</span><span class="o">/</span><span class="n">sda2</span><span class="w"> </span><span class="k">is</span><span class="w"> </span><span class="n">being</span><span class="w"> </span><span class="n">used</span><span class="p">.</span><span class="w"> </span><span class="k">Are</span><span class="w"> </span><span class="n">you</span><span class="w"> </span><span class="n">sure</span><span class="w"> </span><span class="n">you</span><span class="w"> </span><span class="n">want</span><span class="w"> </span><span class="k">to</span><span class="w"> </span><span class="k">continue</span><span class="vm">?</span><span class="w"></span>
+<span class="n">Yes</span><span class="o">/</span><span class="k">No</span><span class="vm">?</span><span class="w"> </span><span class="n">Yes</span><span class="w"></span>
+<span class="nl">Error</span><span class="p">:</span><span class="w"> </span><span class="k">Partition</span><span class="p">(</span><span class="n">s</span><span class="p">)</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="k">on</span><span class="w"> </span><span class="o">/</span><span class="n">dev</span><span class="o">/</span><span class="n">sda</span><span class="w"> </span><span class="n">have</span><span class="w"> </span><span class="n">been</span><span class="w"> </span><span class="n">written</span><span class="p">,</span><span class="w"> </span><span class="n">but</span><span class="w"> </span><span class="n">we</span><span class="w"> </span><span class="n">have</span><span class="w"> </span><span class="n">been</span><span class="w"> </span><span class="n">unable</span><span class="w"> </span><span class="k">to</span><span class="w"> </span><span class="n">inform</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">kernel</span><span class="w"> </span><span class="k">of</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">change</span><span class="p">,</span><span class="w"> </span><span class="n">probably</span><span class="w"> </span><span class="n">because</span><span class="w"> </span><span class="n">it</span><span class="o">/</span><span class="n">they</span><span class="w"> </span><span class="k">are</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="k">use</span><span class="p">.</span><span class="w">  </span><span class="k">As</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="k">result</span><span class="p">,</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="k">old</span><span class="w"> </span><span class="k">partition</span><span class="p">(</span><span class="n">s</span><span class="p">)</span><span class="w"> </span><span class="n">will</span><span class="w"></span>
+<span class="n">remain</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="k">use</span><span class="p">.</span><span class="w">  </span><span class="n">You</span><span class="w"> </span><span class="n">should</span><span class="w"> </span><span class="n">reboot</span><span class="w"> </span><span class="n">now</span><span class="w"> </span><span class="k">before</span><span class="w"> </span><span class="n">making</span><span class="w"> </span><span class="n">further</span><span class="w"> </span><span class="n">changes</span><span class="p">.</span><span class="w"></span>
+<span class="k">Ignore</span><span class="o">/</span><span class="n">Cancel</span><span class="vm">?</span><span class="w"> </span><span class="k">Ignore</span><span class="w"></span>
+
+<span class="err">#</span><span class="w"> </span><span class="n">gparted</span><span class="w"> </span><span class="o">/</span><span class="n">dev</span><span class="o">/</span><span class="n">sda</span><span class="w"></span>
+<span class="p">(</span><span class="n">parted</span><span class="p">)</span><span class="w"> </span><span class="n">mkpart</span><span class="w"></span>
+<span class="k">Start</span><span class="vm">?</span><span class="w"> </span><span class="mi">538</span><span class="n">MB</span><span class="w"></span>
+<span class="k">End</span><span class="vm">?</span><span class="w"> </span><span class="mi">100</span><span class="n">G</span><span class="w"></span>
+<span class="p">(</span><span class="n">parted</span><span class="p">)</span><span class="w"> </span><span class="n">quit</span><span class="w"></span>
+
+<span class="n">文件系统扩容</span><span class="w"></span>
+<span class="err">#</span><span class="w"> </span><span class="n">resize2fs</span><span class="w"> </span><span class="o">/</span><span class="w"></span>
+</code></pre></div>
+
+<p>重启虚拟机就OK了</p>
+<p>情况2：lvm卷，rootfs是 xfs的</p>
+<p>策略还是先调整qcow2磁盘大小，然后进入系统调整pv的大小，然后对lv进行扩容，最后再把xfs系统扩大。</p>
+<div class="highlight"><pre><span></span><code><span class="err">#</span><span class="w"> </span><span class="n">lsblk</span><span class="w"></span>
+<span class="n">vda</span><span class="w">                 </span><span class="mi">252</span><span class="err">:</span><span class="mi">0</span><span class="w">     </span><span class="mi">0</span><span class="w">    </span><span class="mi">10</span><span class="n">G</span><span class="w">  </span><span class="mi">0</span><span class="w"> </span><span class="n">part</span><span class="w"></span>
+<span class="o">|</span><span class="n">__vda1</span><span class="w">             </span><span class="mi">252</span><span class="err">:</span><span class="mi">1</span><span class="w">     </span><span class="mi">0</span><span class="w">    </span><span class="mi">1</span><span class="n">G</span><span class="w">   </span><span class="mi">0</span><span class="w"> </span><span class="n">part</span><span class="w"> </span><span class="o">/</span><span class="n">boot</span><span class="w"></span>
+<span class="o">|</span><span class="n">__vda2</span><span class="w">             </span><span class="mi">252</span><span class="err">:</span><span class="mi">2</span><span class="w">     </span><span class="mi">0</span><span class="w">    </span><span class="mi">9</span><span class="n">G</span><span class="w">   </span><span class="mi">0</span><span class="w"> </span><span class="n">part</span><span class="w"></span>
+<span class="w">   </span><span class="o">|</span><span class="n">__fedora</span><span class="o">-</span><span class="n">root</span><span class="w">   </span><span class="mi">253</span><span class="err">:</span><span class="mi">0</span><span class="w">     </span><span class="mi">0</span><span class="w">    </span><span class="mi">8</span><span class="n">G</span><span class="w">   </span><span class="mi">0</span><span class="w"> </span><span class="n">lvm</span><span class="w">  </span><span class="o">/</span><span class="w"></span>
+<span class="w">   </span><span class="o">|</span><span class="n">__fedora</span><span class="o">-</span><span class="n">swap</span><span class="w">   </span><span class="mi">253</span><span class="err">:</span><span class="mi">1</span><span class="w">     </span><span class="mi">0</span><span class="w">    </span><span class="mi">1</span><span class="n">G</span><span class="w">   </span><span class="mi">0</span><span class="w"> </span><span class="n">lvm</span><span class="w">  </span><span class="o">[</span><span class="n">SWAP</span><span class="o">]</span><span class="w"></span>
+
+<span class="n">将磁盘扩大</span><span class="err">，</span><span class="n">扩大个100G</span><span class="w"></span>
+<span class="err">#</span><span class="w"> </span><span class="n">qemu</span><span class="o">-</span><span class="n">img</span><span class="w"> </span><span class="n">resize</span><span class="w"> </span><span class="n">fedora_31_64_server</span><span class="p">.</span><span class="n">qcow2</span><span class="w"> </span><span class="o">+</span><span class="mi">100</span><span class="n">G</span><span class="w"></span>
+
+<span class="err">#</span><span class="w"> </span><span class="n">cfdisk</span><span class="w"> </span><span class="o">/</span><span class="n">dev</span><span class="o">/</span><span class="n">vda2</span><span class="w"> </span>
+<span class="n">删除原来</span><span class="o">/</span><span class="n">dev</span><span class="o">/</span><span class="n">vda2分期</span><span class="err">，</span><span class="n">重建分区把后面扇区都扩进来</span><span class="w"></span>
+
+
+<span class="err">#</span><span class="w"> </span><span class="n">lsblk</span><span class="w"></span>
+<span class="n">vda</span><span class="w">                 </span><span class="mi">252</span><span class="err">:</span><span class="mi">0</span><span class="w">     </span><span class="mi">0</span><span class="w">    </span><span class="mi">110</span><span class="n">G</span><span class="w">  </span><span class="mi">0</span><span class="w"> </span><span class="n">part</span><span class="w"></span>
+<span class="o">|</span><span class="n">__vda1</span><span class="w">             </span><span class="mi">252</span><span class="err">:</span><span class="mi">1</span><span class="w">     </span><span class="mi">0</span><span class="w">    </span><span class="mi">1</span><span class="n">G</span><span class="w">    </span><span class="mi">0</span><span class="w"> </span><span class="n">part</span><span class="w"> </span><span class="o">/</span><span class="n">boot</span><span class="w"></span>
+<span class="o">|</span><span class="n">__vda2</span><span class="w">             </span><span class="mi">252</span><span class="err">:</span><span class="mi">2</span><span class="w">     </span><span class="mi">0</span><span class="w">    </span><span class="mi">9</span><span class="n">G</span><span class="w">    </span><span class="mi">0</span><span class="w"> </span><span class="n">part</span><span class="w"></span>
+<span class="w">   </span><span class="o">|</span><span class="n">__fedora</span><span class="o">-</span><span class="n">root</span><span class="w">   </span><span class="mi">253</span><span class="err">:</span><span class="mi">0</span><span class="w">     </span><span class="mi">0</span><span class="w">    </span><span class="mi">8</span><span class="n">G</span><span class="w">    </span><span class="mi">0</span><span class="w"> </span><span class="n">lvm</span><span class="w">  </span><span class="o">/</span><span class="w"></span>
+<span class="w">   </span><span class="o">|</span><span class="n">__fedora</span><span class="o">-</span><span class="n">swap</span><span class="w">   </span><span class="mi">253</span><span class="err">:</span><span class="mi">1</span><span class="w">     </span><span class="mi">0</span><span class="w">    </span><span class="mi">1</span><span class="n">G</span><span class="w">    </span><span class="mi">0</span><span class="w"> </span><span class="n">lvm</span><span class="w">  </span><span class="o">[</span><span class="n">SWAP</span><span class="o">]</span><span class="w"></span>
+
+<span class="n">接着对</span><span class="o">/</span><span class="n">dev</span><span class="o">/</span><span class="n">vda2进行pv扩容</span><span class="err">，</span><span class="n">将剩余的空间都划成PE</span><span class="w"></span>
+<span class="err">#</span><span class="w"> </span><span class="n">pvresize</span><span class="w"> </span><span class="o">/</span><span class="n">dev</span><span class="o">/</span><span class="n">vda2</span><span class="w"></span>
+<span class="err">#</span><span class="w"> </span><span class="n">pvdisplay</span><span class="w"> </span><span class="n">确认PE扩展成功</span><span class="w"></span>
+
+<span class="n">对LV进行扩容</span><span class="w"></span>
+<span class="err">#</span><span class="w"> </span><span class="n">lvextend</span><span class="w"> </span><span class="o">-</span><span class="n">L</span><span class="w"> </span><span class="o">+</span><span class="mi">100</span><span class="n">G</span><span class="w"> </span><span class="o">/</span><span class="n">dev</span><span class="o">/</span><span class="n">mapper</span><span class="o">/</span><span class="n">fedora</span><span class="o">-</span><span class="n">root</span><span class="w"></span>
+
+<span class="n">对文件系统进行扩容</span><span class="w"></span>
+<span class="err">#</span><span class="w"> </span><span class="n">xfs_growfs</span><span class="w"> </span><span class="o">/</span><span class="w"></span>
+
+<span class="n">搞定了</span><span class="w"></span>
+</code></pre></div>
+
+<h4>Debug Qemu代码</h4>
+<div class="highlight"><pre><span></span><code>QEMU_BINARY=/mnt/sdc/fangying/x86/qemu/x86_64-softmmu/qemu-system-x86_64
+IMAGE=$(pwd)/plc_centos_7.4_64.qcow2
+gdb --args $QEMU_BINARY \
+    -machine pc-i440fx-2.8,accel=kvm,kernel_irqchip \
+    -cpu host \
+    -m 8192,slots=4,maxmem=16950M \
+    -smp 4 \
+    -chardev pty,id=charserial0 \
+    -device isa-serial,chardev=charserial0,id=serial0 \
+    -netdev tap,id=tap0,ifname=tap0,vhost=off,script=no \
+    -device virtio-net-pci,netdev=tap0 \
+    -drive file=$IMAGE \
+    -vnc :9
+</code></pre></div>
+
+<h4>将进程proc cmdline格式化一下</h4>
+<div class="highlight"><pre><span></span><code>sed -i &quot;s/ -/ \\\ \n-/g&quot; cmd.txt &amp;&amp; sed -i &#39;s/ *$//&#39; cmd.txt
+</code></pre></div>
+
+<h4>使用quilt补丁管理工具来管理补丁</h4>
+<div class="highlight"><pre><span></span><code>quilt add filename
+quilt diff
+quilt top
+quilt push
+quilt pop
+quilt refresh
+quilt edit
+quilt files
+quilt fork
+quilt graph
+quilt import
+quilt ...
+</code></pre></div>
+
+<p>请参看教程：
+<a href="https://www.cnblogs.com/openix/p/3984538.html">https://www.cnblogs.com/openix/p/3984538.html</a></p>
+<h3>macOS catalina 配置git 自动补全</h3>
+<p>https://dev.to/saltyshiomix/a-guide-for-upgrading-macos-to-catalina-and-migrating-the-default-shell-from-bash-to-zsh-4ep3</p>
+<h4>git 将本地自己拉出来的分支push到远程</h4>
+<div class="highlight"><pre><span></span><code><span class="nv">git</span> <span class="nv">checkout</span> <span class="o">-</span><span class="nv">b</span> <span class="nv">test</span>
+<span class="o">//</span> <span class="k">do</span> <span class="nv">some</span> <span class="nv">commit</span>
+<span class="nv">git</span> <span class="nv">push</span> <span class="o">--</span><span class="nv">set</span><span class="o">-</span><span class="nv">upstream</span> <span class="nv">origin</span> <span class="nv">test</span>
+</code></pre></div>
+
+<h4>DPDK源码编译和测试</h4>
+<p>参考：</p>
+<ul>
+<li>http://doc.dpdk.org/guides/linux_gsg/build_dpdk.html</li>
+<li>http://doc.dpdk.org/guides/linux_gsg/quick_start.html</li>
+<li>https://blog.51cto.com/10017068/2107562</li>
+</ul>
+<div class="highlight"><pre><span></span><code>git clone https://github.com/DPDK/dpdk.git
+git checkout v20.02
+pip3 install meson ninja
+meson build
+ninja
+sudo ninja install
+ldconfig
+</code></pre></div>
+
+<p>x86平台上使用</p>
+<div class="highlight"><pre><span></span><code><span class="n">make</span><span class="w"> </span><span class="n">config</span><span class="w"> </span><span class="n">T</span><span class="o">=</span><span class="n">x86_64</span><span class="o">-</span><span class="n">native</span><span class="o">-</span><span class="n">linux</span><span class="o">-</span><span class="n">gcc</span><span class="w">   </span>
+<span class="n">export</span><span class="w"> </span><span class="n">RTE_SDK</span><span class="o">=/</span><span class="n">usr</span><span class="o">/</span><span class="n">local</span><span class="w">    </span><span class="err">#</span><span class="w"> </span><span class="n">指定DPDK的安装路径</span><span class="w"> </span>
+<span class="n">export</span><span class="w"> </span><span class="n">RTE_TARGET</span><span class="o">=</span><span class="n">x86_64</span><span class="o">-</span><span class="n">native</span><span class="o">-</span><span class="n">linuxapp</span><span class="o">-</span><span class="n">gcc</span><span class="w">  </span><span class="err">#</span><span class="w"> </span><span class="n">指定TARGET名称</span><span class="w"></span>
+<span class="n">make</span><span class="w"> </span><span class="o">-</span><span class="n">j</span><span class="w"></span>
+</code></pre></div>
+
+<p>编译出来的目标文件默认存放路径是：</p>
+<div class="highlight"><pre><span></span><code>$RTE_SDK/$RTE_TARGET
+
+例如： testpmd应用路径
+$RTE_SDK/$RTE_TARGET/app/testpmd
+</code></pre></div>
+
+<p>安装到系统目录下，fedora下默认的DESTDIR=/usr/local目录：</p>
+<div class="highlight"><pre><span></span><code>make install // install to /usr/local/share/dpdk
+</code></pre></div>
+
+<p>配置静态大页，2M大页可以动态配置但1G大页还是要重启虚拟机。</p>
+<div class="highlight"><pre><span></span><code>echo 1024 &gt; /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
+或者numa系统上
+echo 1024 &gt; /sys/devices/system/node/node0/hugepages/hugepages-2048kB/nr_hugepages
+echo 1024 &gt; /sys/devices/system/node/node1/hugepages/hugepages-2048kB/nr_hugepages
+挂在hugepagetlbfs文件系统
+mkdir /mnt/huge
+mount -t hugetlbfs nodev /mnt/huge
+写fstab
+nodev /mnt/huge hugetlbfs defaults 0 0
+或者配置内核参数
+default_hugepagesz=2M hugepagesz=2M hugepages=1024
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code><span class="err">绑定驱动到</span><span class="n">vfio</span><span class="o">-</span><span class="n">pci</span><span class="w"></span>
+<span class="n">sudo</span><span class="w"> </span><span class="n">modprobe</span><span class="w"> </span><span class="n">vfio</span><span class="w"> </span><span class="n">vfio</span><span class="o">-</span><span class="n">pci</span><span class="w"></span>
+<span class="n">sudo</span><span class="w"> </span><span class="o">./</span><span class="n">usertools</span><span class="o">/</span><span class="n">dpdk</span><span class="o">-</span><span class="n">devbind</span><span class="o">.</span><span class="n">py</span><span class="w"> </span><span class="o">--</span><span class="n">bind</span><span class="o">=</span><span class="n">vfio</span><span class="o">-</span><span class="n">pci</span><span class="w"> </span><span class="mi">0000</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">1</span><span class="n">f</span><span class="o">.</span><span class="mi">6</span><span class="w"></span>
+</code></pre></div>
+
+<p>绑定好了之后确认下是否成功了</p>
+<div class="highlight"><pre><span></span><code><span class="err">$</span><span class="w"> </span><span class="n">lspci</span><span class="w"> </span><span class="o">-</span><span class="n">vvvs</span><span class="w"> </span><span class="mi">0000</span><span class="err">:</span><span class="mi">00</span><span class="err">:</span><span class="mi">1</span><span class="n">f</span><span class="mf">.6</span><span class="w"></span>
+<span class="mi">00</span><span class="err">:</span><span class="mi">1</span><span class="n">f</span><span class="mf">.6</span><span class="w"> </span><span class="n">Ethernet</span><span class="w"> </span><span class="nl">controller</span><span class="p">:</span><span class="w"> </span><span class="n">Intel</span><span class="w"> </span><span class="n">Corporation</span><span class="w"> </span><span class="n">Ethernet</span><span class="w"> </span><span class="k">Connection</span><span class="w"> </span><span class="p">(</span><span class="mi">2</span><span class="p">)</span><span class="w"> </span><span class="n">I219</span><span class="o">-</span><span class="n">V</span><span class="w"></span>
+<span class="w">    </span><span class="nl">Subsystem</span><span class="p">:</span><span class="w"> </span><span class="n">Gigabyte</span><span class="w"> </span><span class="n">Technology</span><span class="w"> </span><span class="n">Co</span><span class="p">.,</span><span class="w"> </span><span class="n">Ltd</span><span class="w"> </span><span class="n">Device</span><span class="w"> </span><span class="n">e000</span><span class="w"></span>
+<span class="w">    </span><span class="nl">Control</span><span class="p">:</span><span class="w"> </span><span class="n">I</span><span class="o">/</span><span class="n">O</span><span class="o">-</span><span class="w"> </span><span class="n">Mem</span><span class="o">-</span><span class="w"> </span><span class="n">BusMaster</span><span class="o">-</span><span class="w"> </span><span class="n">SpecCycle</span><span class="o">-</span><span class="w"> </span><span class="n">MemWINV</span><span class="o">-</span><span class="w"> </span><span class="n">VGASnoop</span><span class="o">-</span><span class="w"> </span><span class="n">ParErr</span><span class="o">-</span><span class="w"> </span><span class="n">Stepping</span><span class="o">-</span><span class="w"> </span><span class="n">SERR</span><span class="o">-</span><span class="w"> </span><span class="n">FastB2B</span><span class="o">-</span><span class="w"> </span><span class="n">DisINTx</span><span class="o">+</span><span class="w"></span>
+<span class="w">    </span><span class="nl">Status</span><span class="p">:</span><span class="w"> </span><span class="n">Cap</span><span class="o">+</span><span class="w"> </span><span class="mi">66</span><span class="n">MHz</span><span class="o">-</span><span class="w"> </span><span class="n">UDF</span><span class="o">-</span><span class="w"> </span><span class="n">FastB2B</span><span class="o">-</span><span class="w"> </span><span class="n">ParErr</span><span class="o">-</span><span class="w"> </span><span class="n">DEVSEL</span><span class="o">=</span><span class="n">fast</span><span class="w"> </span><span class="o">&gt;</span><span class="n">TAbort</span><span class="o">-</span><span class="w"> </span><span class="o">&lt;</span><span class="n">TAbort</span><span class="o">-</span><span class="w"> </span><span class="o">&lt;</span><span class="n">MAbort</span><span class="o">-</span><span class="w"> </span><span class="o">&gt;</span><span class="n">SERR</span><span class="o">-</span><span class="w"> </span><span class="o">&lt;</span><span class="n">PERR</span><span class="o">-</span><span class="w"> </span><span class="n">INTx</span><span class="o">-</span><span class="w"></span>
+<span class="w">    </span><span class="nl">Interrupt</span><span class="p">:</span><span class="w"> </span><span class="n">pin</span><span class="w"> </span><span class="n">A</span><span class="w"> </span><span class="n">routed</span><span class="w"> </span><span class="k">to</span><span class="w"> </span><span class="n">IRQ</span><span class="w"> </span><span class="mi">16</span><span class="w"></span>
+<span class="w">    </span><span class="n">Region</span><span class="w"> </span><span class="mi">0</span><span class="err">:</span><span class="w"> </span><span class="n">Memory</span><span class="w"> </span><span class="k">at</span><span class="w"> </span><span class="n">ef500000</span><span class="w"> </span><span class="p">(</span><span class="mi">32</span><span class="o">-</span><span class="nc">bit</span><span class="p">,</span><span class="w"> </span><span class="n">non</span><span class="o">-</span><span class="n">prefetchable</span><span class="p">)</span><span class="w"> </span><span class="o">[</span><span class="n">disabled</span><span class="o">]</span><span class="w"> </span><span class="o">[</span><span class="n">size=128K</span><span class="o">]</span><span class="w"></span>
+<span class="w">    </span><span class="nl">Capabilities</span><span class="p">:</span><span class="w"> </span><span class="o">&lt;</span><span class="n">access</span><span class="w"> </span><span class="n">denied</span><span class="o">&gt;</span><span class="w"></span>
+<span class="w">    </span><span class="n">Kernel</span><span class="w"> </span><span class="n">driver</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="k">use</span><span class="err">:</span><span class="w"> </span><span class="n">vfio</span><span class="o">-</span><span class="n">pci</span><span class="w"></span>
+<span class="nl">lspci</span><span class="p">:</span><span class="w"> </span><span class="n">Unable</span><span class="w"> </span><span class="k">to</span><span class="w"> </span><span class="k">load</span><span class="w"> </span><span class="n">libkmod</span><span class="w"> </span><span class="nl">resources</span><span class="p">:</span><span class="w"> </span><span class="n">error</span><span class="w"> </span><span class="o">-</span><span class="mi">12</span><span class="w"></span>
+</code></pre></div>
+
+<p>执行一下helloworld测试用例：</p>
+<div class="highlight"><pre><span></span><code><span class="err">╰─$</span><span class="w"> </span><span class="n">sudo</span><span class="w"> </span><span class="p">.</span><span class="o">/</span><span class="n">helloworld</span><span class="w"></span>
+<span class="o">[</span><span class="n">sudo</span><span class="o">]</span><span class="w"> </span><span class="n">fang</span><span class="w"> </span><span class="n">的密码</span><span class="err">：</span><span class="w"></span>
+<span class="nl">EAL</span><span class="p">:</span><span class="w"> </span><span class="n">Detected</span><span class="w"> </span><span class="mi">8</span><span class="w"> </span><span class="n">lcore</span><span class="p">(</span><span class="n">s</span><span class="p">)</span><span class="w"></span>
+<span class="nl">EAL</span><span class="p">:</span><span class="w"> </span><span class="n">Detected</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="n">NUMA</span><span class="w"> </span><span class="n">nodes</span><span class="w"></span>
+<span class="nl">EAL</span><span class="p">:</span><span class="w"> </span><span class="n">Multi</span><span class="o">-</span><span class="n">process</span><span class="w"> </span><span class="n">socket</span><span class="w"> </span><span class="o">/</span><span class="nf">var</span><span class="o">/</span><span class="n">run</span><span class="o">/</span><span class="n">dpdk</span><span class="o">/</span><span class="n">rte</span><span class="o">/</span><span class="n">mp_socket</span><span class="w"></span>
+<span class="nl">EAL</span><span class="p">:</span><span class="w"> </span><span class="n">Selected</span><span class="w"> </span><span class="n">IOVA</span><span class="w"> </span><span class="n">mode</span><span class="w"> </span><span class="s1">&#39;VA&#39;</span><span class="w"></span>
+<span class="nl">EAL</span><span class="p">:</span><span class="w"> </span><span class="k">No</span><span class="w"> </span><span class="n">available</span><span class="w"> </span><span class="n">hugepages</span><span class="w"> </span><span class="n">reported</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="n">hugepages</span><span class="o">-</span><span class="mi">1048576</span><span class="n">kB</span><span class="w"></span>
+<span class="nl">EAL</span><span class="p">:</span><span class="w"> </span><span class="n">Probing</span><span class="w"> </span><span class="n">VFIO</span><span class="w"> </span><span class="n">support</span><span class="p">...</span><span class="w"></span>
+<span class="nl">EAL</span><span class="p">:</span><span class="w"> </span><span class="n">VFIO</span><span class="w"> </span><span class="n">support</span><span class="w"> </span><span class="n">initialized</span><span class="w"></span>
+<span class="nl">EAL</span><span class="p">:</span><span class="w"> </span><span class="n">PCI</span><span class="w"> </span><span class="n">device</span><span class="w"> </span><span class="mi">0000</span><span class="err">:</span><span class="mi">00</span><span class="err">:</span><span class="mi">1</span><span class="n">f</span><span class="mf">.6</span><span class="w"> </span><span class="k">on</span><span class="w"> </span><span class="n">NUMA</span><span class="w"> </span><span class="n">socket</span><span class="w"> </span><span class="o">-</span><span class="mi">1</span><span class="w"></span>
+<span class="nl">EAL</span><span class="p">:</span><span class="w">   </span><span class="n">Invalid</span><span class="w"> </span><span class="n">NUMA</span><span class="w"> </span><span class="n">socket</span><span class="p">,</span><span class="w"> </span><span class="k">default</span><span class="w"> </span><span class="k">to</span><span class="w"> </span><span class="mi">0</span><span class="w"></span>
+<span class="nl">EAL</span><span class="p">:</span><span class="w">   </span><span class="n">probe</span><span class="w"> </span><span class="nl">driver</span><span class="p">:</span><span class="w"> </span><span class="mi">8086</span><span class="err">:</span><span class="mi">15</span><span class="n">b8</span><span class="w"> </span><span class="n">net_e1000_em</span><span class="w"></span>
+<span class="nl">EAL</span><span class="p">:</span><span class="w">   </span><span class="k">using</span><span class="w"> </span><span class="n">IOMMU</span><span class="w"> </span><span class="n">type</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="p">(</span><span class="n">Type</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="w"></span>
+<span class="n">hello</span><span class="w"> </span><span class="k">from</span><span class="w"> </span><span class="n">core</span><span class="w"> </span><span class="mi">1</span><span class="w"></span>
+<span class="n">hello</span><span class="w"> </span><span class="k">from</span><span class="w"> </span><span class="n">core</span><span class="w"> </span><span class="mi">2</span><span class="w"></span>
+<span class="n">hello</span><span class="w"> </span><span class="k">from</span><span class="w"> </span><span class="n">core</span><span class="w"> </span><span class="mi">3</span><span class="w"></span>
+<span class="n">hello</span><span class="w"> </span><span class="k">from</span><span class="w"> </span><span class="n">core</span><span class="w"> </span><span class="mi">4</span><span class="w"></span>
+<span class="n">hello</span><span class="w"> </span><span class="k">from</span><span class="w"> </span><span class="n">core</span><span class="w"> </span><span class="mi">5</span><span class="w"></span>
+<span class="n">hello</span><span class="w"> </span><span class="k">from</span><span class="w"> </span><span class="n">core</span><span class="w"> </span><span class="mi">6</span><span class="w"></span>
+<span class="n">hello</span><span class="w"> </span><span class="k">from</span><span class="w"> </span><span class="n">core</span><span class="w"> </span><span class="mi">7</span><span class="w"></span>
+<span class="n">hello</span><span class="w"> </span><span class="k">from</span><span class="w"> </span><span class="n">core</span><span class="w"> </span><span class="mi">0</span><span class="w"></span>
+</code></pre></div>
+
+<p>再来测试一下报文转发，执行测试用例testpmd程序，进入交互模式后执行start</p>
+<div class="highlight"><pre><span></span><code><span class="n">sudo</span><span class="w"> </span><span class="p">.</span><span class="o">/</span><span class="n">testpmd</span><span class="w"> </span><span class="o">-</span><span class="n">l</span><span class="w"> </span><span class="mi">0-3</span><span class="w"> </span><span class="o">-</span><span class="n">n</span><span class="w"> </span><span class="mi">4</span><span class="w"> </span><span class="o">--</span><span class="w"> </span><span class="o">-</span><span class="n">i</span><span class="w"> </span><span class="o">--</span><span class="n">portmask</span><span class="o">=</span><span class="mh">0x1</span><span class="w"> </span><span class="o">--</span><span class="n">nb</span><span class="o">-</span><span class="n">cores</span><span class="o">=</span><span class="mi">2</span><span class="w"></span>
+
+<span class="n">testpmd</span><span class="o">&gt;</span><span class="w"> </span><span class="n">start</span><span class="w"></span>
+<span class="n">io</span><span class="w"> </span><span class="n">packet</span><span class="w"> </span><span class="n">forwarding</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">ports</span><span class="o">=</span><span class="mi">1</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">cores</span><span class="o">=</span><span class="mi">1</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">streams</span><span class="o">=</span><span class="mi">1</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">NUMA</span><span class="w"> </span><span class="n">support</span><span class="w"> </span><span class="n">enabled</span><span class="p">,</span><span class="w"> </span><span class="n">MP</span><span class="w"> </span><span class="n">allocation</span><span class="w"> </span><span class="n">mode</span><span class="o">:</span><span class="w"> </span><span class="n">native</span><span class="w"></span>
+<span class="n">Logical</span><span class="w"> </span><span class="n">Core</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="p">(</span><span class="n">socket</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="n">forwards</span><span class="w"> </span><span class="n">packets</span><span class="w"> </span><span class="n">on</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="n">streams</span><span class="o">:</span><span class="w"></span>
+<span class="w">  </span><span class="n">RX</span><span class="w"> </span><span class="n">P</span><span class="o">=</span><span class="mi">0</span><span class="o">/</span><span class="n">Q</span><span class="o">=</span><span class="mi">0</span><span class="w"> </span><span class="p">(</span><span class="n">socket</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">TX</span><span class="w"> </span><span class="n">P</span><span class="o">=</span><span class="mi">0</span><span class="o">/</span><span class="n">Q</span><span class="o">=</span><span class="mi">0</span><span class="w"> </span><span class="p">(</span><span class="n">socket</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="n">peer</span><span class="o">=</span><span class="mo">02</span><span class="o">:</span><span class="mo">00</span><span class="o">:</span><span class="mo">00</span><span class="o">:</span><span class="mo">00</span><span class="o">:</span><span class="mo">00</span><span class="o">:</span><span class="mo">00</span><span class="w"></span>
+
+<span class="w">  </span><span class="n">io</span><span class="w"> </span><span class="n">packet</span><span class="w"> </span><span class="n">forwarding</span><span class="w"> </span><span class="n">packets</span><span class="o">/</span><span class="n">burst</span><span class="o">=</span><span class="mi">32</span><span class="w"></span>
+<span class="w">  </span><span class="n">nb</span><span class="w"> </span><span class="n">forwarding</span><span class="w"> </span><span class="n">cores</span><span class="o">=</span><span class="mi">2</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">nb</span><span class="w"> </span><span class="n">forwarding</span><span class="w"> </span><span class="n">ports</span><span class="o">=</span><span class="mi">1</span><span class="w"></span>
+<span class="w">  </span><span class="n">port</span><span class="w"> </span><span class="mi">0</span><span class="o">:</span><span class="w"> </span><span class="n">RX</span><span class="w"> </span><span class="n">queue</span><span class="w"> </span><span class="n">number</span><span class="o">:</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="n">Tx</span><span class="w"> </span><span class="n">queue</span><span class="w"> </span><span class="n">number</span><span class="o">:</span><span class="w"> </span><span class="mi">1</span><span class="w"></span>
+<span class="w">    </span><span class="n">Rx</span><span class="w"> </span><span class="n">offloads</span><span class="o">=</span><span class="mh">0x0</span><span class="w"> </span><span class="n">Tx</span><span class="w"> </span><span class="n">offloads</span><span class="o">=</span><span class="mh">0x0</span><span class="w"></span>
+<span class="w">    </span><span class="n">RX</span><span class="w"> </span><span class="n">queue</span><span class="o">:</span><span class="w"> </span><span class="mi">0</span><span class="w"></span>
+<span class="w">      </span><span class="n">RX</span><span class="w"> </span><span class="n">desc</span><span class="o">=</span><span class="mi">256</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">RX</span><span class="w"> </span><span class="n">free</span><span class="w"> </span><span class="n">threshold</span><span class="o">=</span><span class="mi">0</span><span class="w"></span>
+<span class="w">      </span><span class="n">RX</span><span class="w"> </span><span class="n">threshold</span><span class="w"> </span><span class="n">registers</span><span class="o">:</span><span class="w"> </span><span class="n">pthresh</span><span class="o">=</span><span class="mi">0</span><span class="w"> </span><span class="n">hthresh</span><span class="o">=</span><span class="mi">0</span><span class="w">  </span><span class="n">wthresh</span><span class="o">=</span><span class="mi">0</span><span class="w"></span>
+<span class="w">      </span><span class="n">RX</span><span class="w"> </span><span class="n">Offloads</span><span class="o">=</span><span class="mh">0x0</span><span class="w"></span>
+<span class="w">    </span><span class="n">TX</span><span class="w"> </span><span class="n">queue</span><span class="o">:</span><span class="w"> </span><span class="mi">0</span><span class="w"></span>
+<span class="w">      </span><span class="n">TX</span><span class="w"> </span><span class="n">desc</span><span class="o">=</span><span class="mi">256</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">TX</span><span class="w"> </span><span class="n">free</span><span class="w"> </span><span class="n">threshold</span><span class="o">=</span><span class="mi">0</span><span class="w"></span>
+<span class="w">      </span><span class="n">TX</span><span class="w"> </span><span class="n">threshold</span><span class="w"> </span><span class="n">registers</span><span class="o">:</span><span class="w"> </span><span class="n">pthresh</span><span class="o">=</span><span class="mi">0</span><span class="w"> </span><span class="n">hthresh</span><span class="o">=</span><span class="mi">0</span><span class="w">  </span><span class="n">wthresh</span><span class="o">=</span><span class="mi">0</span><span class="w"></span>
+<span class="w">      </span><span class="n">TX</span><span class="w"> </span><span class="n">offloads</span><span class="o">=</span><span class="mh">0x0</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">TX</span><span class="w"> </span><span class="n">RS</span><span class="w"> </span><span class="n">bit</span><span class="w"> </span><span class="n">threshold</span><span class="o">=</span><span class="mi">0</span><span class="w"></span>
+</code></pre></div>
+
+<p>这时候我的台式机风扇就呜呜跑起来了，因为有一个CPU执行pmd驱动，CPU占用率达到了100%。</p>
+<div class="highlight"><pre><span></span><code><span class="n">top</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">21</span><span class="p">:</span><span class="mi">21</span><span class="p">:</span><span class="mi">17</span><span class="w"> </span><span class="n">up</span><span class="w">  </span><span class="mi">8</span><span class="p">:</span><span class="mi">30</span><span class="p">,</span><span class="w">  </span><span class="mi">3</span><span class="w"> </span><span class="n">users</span><span class="p">,</span><span class="w">  </span><span class="nb">load</span><span class="w"> </span><span class="n">average</span><span class="p">:</span><span class="w"> </span><span class="mf">0.40</span><span class="p">,</span><span class="w"> </span><span class="mf">0.13</span><span class="p">,</span><span class="w"> </span><span class="mf">0.04</span><span class="w"></span>
+<span class="n">Tasks</span><span class="p">:</span><span class="w"> </span><span class="mi">291</span><span class="w"> </span><span class="n">total</span><span class="p">,</span><span class="w">   </span><span class="mi">1</span><span class="w"> </span><span class="n">running</span><span class="p">,</span><span class="w"> </span><span class="mi">290</span><span class="w"> </span><span class="n">sleeping</span><span class="p">,</span><span class="w">   </span><span class="mi">0</span><span class="w"> </span><span class="n">stopped</span><span class="p">,</span><span class="w">   </span><span class="mi">0</span><span class="w"> </span><span class="n">zombie</span><span class="w"></span>
+<span class="o">%</span><span class="n">Cpu</span><span class="p">(</span><span class="n">s</span><span class="p">):</span><span class="w"> </span><span class="mf">12.9</span><span class="w"> </span><span class="n">us</span><span class="p">,</span><span class="w">  </span><span class="mf">0.3</span><span class="w"> </span><span class="n">sy</span><span class="p">,</span><span class="w">  </span><span class="mf">0.0</span><span class="w"> </span><span class="n">ni</span><span class="p">,</span><span class="w"> </span><span class="mf">86.7</span><span class="w"> </span><span class="n">id</span><span class="p">,</span><span class="w">  </span><span class="mf">0.0</span><span class="w"> </span><span class="n">wa</span><span class="p">,</span><span class="w">  </span><span class="mf">0.0</span><span class="w"> </span><span class="n">hi</span><span class="p">,</span><span class="w">  </span><span class="mf">0.0</span><span class="w"> </span><span class="n">si</span><span class="p">,</span><span class="w">  </span><span class="mf">0.0</span><span class="w"> </span><span class="n">st</span><span class="w"></span>
+<span class="n">MiB</span><span class="w"> </span><span class="n">Mem</span><span class="w"> </span><span class="p">:</span><span class="w">  </span><span class="mf">15982.0</span><span class="w"> </span><span class="n">total</span><span class="p">,</span><span class="w">   </span><span class="mf">6987.8</span><span class="w"> </span><span class="n">free</span><span class="p">,</span><span class="w">   </span><span class="mf">4255.0</span><span class="w"> </span><span class="n">used</span><span class="p">,</span><span class="w">   </span><span class="mf">4739.1</span><span class="w"> </span><span class="n">buff</span><span class="o">/</span><span class="n">cache</span><span class="w"></span>
+<span class="n">MiB</span><span class="w"> </span><span class="n">Swap</span><span class="p">:</span><span class="w">   </span><span class="mf">8192.0</span><span class="w"> </span><span class="n">total</span><span class="p">,</span><span class="w">   </span><span class="mf">8148.2</span><span class="w"> </span><span class="n">free</span><span class="p">,</span><span class="w">     </span><span class="mf">43.8</span><span class="w"> </span><span class="n">used</span><span class="o">.</span><span class="w">  </span><span class="mf">10993.1</span><span class="w"> </span><span class="n">avail</span><span class="w"> </span><span class="n">Mem</span><span class="w"></span>
+
+<span class="w">    </span><span class="n">PID</span><span class="w"> </span><span class="n">USER</span><span class="w">      </span><span class="n">PR</span><span class="w">  </span><span class="n">NI</span><span class="w">    </span><span class="n">VIRT</span><span class="w">    </span><span class="n">RES</span><span class="w">    </span><span class="n">SHR</span><span class="w"> </span><span class="n">S</span><span class="w">  </span><span class="o">%</span><span class="n">CPU</span><span class="w">  </span><span class="o">%</span><span class="n">MEM</span><span class="w">     </span><span class="n">TIME</span><span class="o">+</span><span class="w"> </span><span class="n">COMMAND</span><span class="w"></span>
+<span class="w"> </span><span class="mi">624935</span><span class="w"> </span><span class="n">root</span><span class="w">      </span><span class="mi">20</span><span class="w">   </span><span class="mi">0</span><span class="w">   </span><span class="mf">64.2</span><span class="n">g</span><span class="w">  </span><span class="mi">66428</span><span class="w">  </span><span class="mi">16644</span><span class="w"> </span><span class="n">S</span><span class="w"> </span><span class="mf">100.0</span><span class="w">   </span><span class="mf">0.4</span><span class="w">   </span><span class="mi">0</span><span class="p">:</span><span class="mf">32.82</span><span class="w"> </span><span class="n">testpmd</span><span class="w"></span>
+<span class="w">   </span><span class="mi">1578</span><span class="w"> </span><span class="n">root</span><span class="w">      </span><span class="mi">20</span><span class="w">   </span><span class="mi">0</span><span class="w">  </span><span class="mi">236660</span><span class="w">  </span><span class="mi">14648</span><span class="w">   </span><span class="mi">2768</span><span class="w"> </span><span class="n">S</span><span class="w">   </span><span class="mf">1.0</span><span class="w">   </span><span class="mf">0.1</span><span class="w">   </span><span class="mi">4</span><span class="p">:</span><span class="mf">02.44</span><span class="w"> </span><span class="n">phdaemon</span><span class="w"></span>
+<span class="w"> </span><span class="mi">169477</span><span class="w"> </span><span class="n">root</span><span class="w">      </span><span class="mi">20</span><span class="w">   </span><span class="mi">0</span><span class="w">  </span><span class="mi">252768</span><span class="w">  </span><span class="mi">29536</span><span class="w">   </span><span class="mi">8136</span><span class="w"> </span><span class="n">S</span><span class="w">   </span><span class="mf">0.3</span><span class="w">   </span><span class="mf">0.2</span><span class="w">   </span><span class="mi">0</span><span class="p">:</span><span class="mf">30.76</span><span class="w"> </span><span class="n">sssd_kcm</span><span class="w"></span>
+<span class="w">      </span><span class="mi">1</span><span class="w"> </span><span class="n">root</span><span class="w">      </span><span class="mi">20</span><span class="w">   </span><span class="mi">0</span><span class="w">  </span><span class="mi">172240</span><span class="w">  </span><span class="mi">12648</span><span class="w">   </span><span class="mi">8996</span><span class="w"> </span><span class="n">S</span><span class="w">   </span><span class="mf">0.0</span><span class="w">   </span><span class="mf">0.1</span><span class="w">   </span><span class="mi">0</span><span class="p">:</span><span class="mf">08.36</span><span class="w"> </span><span class="n">systemd</span><span class="w"></span>
+</code></pre></div>
+
+<h4>Docker配置内部代理</h4>
+<p>方法一：写Dockerfile，启动容器OS后传入proxy</p>
+<div class="highlight"><pre><span></span><code>From docker.io/fedora:latest
+
+RUN <span class="o">[</span>-n <span class="nv">$http_proxy</span> <span class="o">]</span> <span class="o">&amp;&amp;</span> sed -i <span class="s2">&quot;</span>$<span class="s2"> a proxy=</span><span class="nv">$http_proxy</span><span class="s2">&quot;</span> /etc/dnf/dnf.conf<span class="p">;</span> <span class="nb">true</span>
+
+RUN dnf install -y vim
+</code></pre></div>
+
+<h3>multifd live migration</h3>
+<p>Since qemu 4.1.0</p>
+<div class="highlight"><pre><span></span><code>virsh migrate --live --unsafe --parallel --parallel-connections 4 \
+    --migrateuri tcp://192.168.3.33 testvm qemu+tcp://192.168.3.33/system --verbose
+</code></pre></div>
+
+<h3>check ASLR是否开启</h3>
+<p>Check if ASLR is currently activated on the system:</p>
+<div class="highlight"><pre><span></span><code>cat /proc/sys/kernel/randomize_va_space
+</code></pre></div>
+
+<p>Activate ASLR:</p>
+<div class="highlight"><pre><span></span><code>echo 0 &gt; /proc/sys/kernel/randomize_va_space
+</code></pre></div>
+
+<h3>qemu常用hmp/qmp命令</h3>
+<p>查询qom设备树：</p>
+<div class="highlight"><pre><span></span><code>virsh qemu-monitor-command openeuler-test --hmp &quot;info qom-tree&quot;
+</code></pre></div>
+
+<p>查询设备属性：</p>
+<div class="highlight"><pre><span></span><code>virsh qemu-monitor-command openeuler-test &#39;{&quot;execute&quot;: &quot;qom-get&quot;, &quot;arguments&quot;: {&quot;path&quot;: &quot;/machine&quot;, &quot;property&quot;: &quot;gic-version&quot;}}&#39;
+virsh qemu-monitor-command openeuler-test &#39;{&quot;execute&quot;: &quot;qom-get&quot;, &quot;arguments&quot;: {&quot;path&quot;: &quot;/machine/unattached/device[1]&quot;, &quot;property&quot;: &quot;mp-affinity&quot;}}&#39;
+</code></pre></div>
+
+<h3>AArch64 Qemu Direct Boot</h3>
+<div class="highlight"><pre><span></span><code>QEMU_BIN=/root/fangying/opensrc/qemu/build/aarch64-softmmu/qemu-system-aarch64  
+$QEMU_BIN \                                                                     
+    -machine virt-4.1,accel=kvm,usb=off,dump-guest-core=off,gic-version=3 \     
+    -cpu host \                                                                 
+    -smp 1 \                                                                    
+    -m 2048 \                                                                   
+    -kernel /root/fangying/opensrc/linux/arch/arm64/boot/Image \                
+    -append &quot;console=ttyAMA0 root=/dev/vda rw pci=off reboot=k panic=1 &quot; \      
+    -drive file=/root/ljj/opensrc/stratovirt/rootfs.ext4,id=rootfs,readonly=off \
+    -nographic 
+</code></pre></div>
+
+<h3>AArch64 QEMU UEFI boot with kernel</h3>
+<div class="highlight"><pre><span></span><code><span class="n">QEMU_BIN</span><span class="o">=/</span><span class="n">root</span><span class="o">/</span><span class="n">fangying</span><span class="o">/</span><span class="n">opensrc</span><span class="o">/</span><span class="n">qemu</span><span class="o">/</span><span class="n">build</span><span class="o">/</span><span class="n">aarch64</span><span class="o">-</span><span class="n">softmmu</span><span class="o">/</span><span class="n">qemu</span><span class="o">-</span><span class="n">system</span><span class="o">-</span><span class="n">aarch64</span><span class="w">                                                                                                                                  </span>
+<span class="o">$</span><span class="n">QEMU_BIN</span><span class="w"> </span>\<span class="w">                                                                     </span>
+<span class="w">    </span><span class="o">-</span><span class="n">machine</span><span class="w"> </span><span class="n">virt</span><span class="o">-</span><span class="mf">4.1</span><span class="p">,</span><span class="n">accel</span><span class="o">=</span><span class="n">kvm</span><span class="p">,</span><span class="n">usb</span><span class="o">=</span><span class="n">off</span><span class="p">,</span><span class="n">dump</span><span class="o">-</span><span class="n">guest</span><span class="o">-</span><span class="n">core</span><span class="o">=</span><span class="n">off</span><span class="p">,</span><span class="n">gic</span><span class="o">-</span><span class="n">version</span><span class="o">=</span><span class="mi">3</span><span class="w"> </span>\<span class="w">     </span>
+<span class="w">    </span><span class="o">-</span><span class="n">cpu</span><span class="w"> </span><span class="n">host</span><span class="w"> </span>\<span class="w">                                                                 </span>
+<span class="w">    </span><span class="o">-</span><span class="n">smp</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span>\<span class="w">                                                                    </span>
+<span class="w">    </span><span class="o">-</span><span class="n">m</span><span class="w"> </span><span class="mi">2048</span><span class="w"> </span>\<span class="w">                                                                   </span>
+<span class="w">    </span><span class="o">-</span><span class="n">kernel</span><span class="w"> </span><span class="o">/</span><span class="n">root</span><span class="o">/</span><span class="n">fangying</span><span class="o">/</span><span class="n">opensrc</span><span class="o">/</span><span class="n">linux</span><span class="o">/</span><span class="n">arch</span><span class="o">/</span><span class="n">arm64</span><span class="o">/</span><span class="n">boot</span><span class="o">/</span><span class="n">Image</span><span class="w"> </span>\<span class="w">                </span>
+<span class="w">    </span><span class="o">-</span><span class="n">append</span><span class="w"> </span><span class="s2">&quot;console=ttyAMA0 root=/dev/vda rw pci=off reboot=k panic=1 &quot;</span><span class="w"> </span>\<span class="w">      </span>
+<span class="w">    </span><span class="o">-</span><span class="n">drive</span><span class="w"> </span><span class="n">file</span><span class="o">=/</span><span class="n">usr</span><span class="o">/</span><span class="n">share</span><span class="o">/</span><span class="n">edk2</span><span class="o">/</span><span class="n">aarch64</span><span class="o">/</span><span class="n">QEMU_EFI</span><span class="o">-</span><span class="n">pflash</span><span class="o">.</span><span class="n">raw</span><span class="p">,</span><span class="k">if</span><span class="o">=</span><span class="n">pflash</span><span class="p">,</span><span class="n">format</span><span class="o">=</span><span class="n">raw</span><span class="p">,</span><span class="n">unit</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span><span class="n">readonly</span><span class="o">=</span><span class="n">on</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">drive</span><span class="w"> </span><span class="n">file</span><span class="o">=/</span><span class="k">var</span><span class="o">/</span><span class="n">lib</span><span class="o">/</span><span class="n">libvirt</span><span class="o">/</span><span class="n">qemu</span><span class="o">/</span><span class="n">nvram</span><span class="o">/</span><span class="n">fangying_openeuler_VARS</span><span class="o">.</span><span class="n">fd</span><span class="p">,</span><span class="k">if</span><span class="o">=</span><span class="n">pflash</span><span class="p">,</span><span class="n">format</span><span class="o">=</span><span class="n">raw</span><span class="p">,</span><span class="n">unit</span><span class="o">=</span><span class="mi">1</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">drive</span><span class="w"> </span><span class="n">file</span><span class="o">=/</span><span class="n">root</span><span class="o">/</span><span class="n">ljj</span><span class="o">/</span><span class="n">opensrc</span><span class="o">/</span><span class="n">stratovirt</span><span class="o">/</span><span class="n">rootfs</span><span class="o">.</span><span class="n">ext4</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">rootfs</span><span class="p">,</span><span class="n">readonly</span><span class="o">=</span><span class="n">off</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">nographic</span><span class="w"> </span>
+</code></pre></div>
+
+<h3>EDK2日志开关</h3>
+<p>以ArmVirt主板为例，我们为例查看详细的UEFI启动日志，需要打开一个日志开关。
+在文件：ArmVirtPkg/ArmVirt.dsc.inc中找到：DEBUG_PRINT_ERROR_LEVEL，
+该开关通过bitmask控制日志级别。</p>
+<div class="highlight"><pre><span></span><code><span class="k">[Defines]</span><span class="w"></span>
+<span class="w">  </span><span class="na">DEFINE DEBUG_PRINT_ERROR_LEVEL</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">0x8000004F</span><span class="w"></span>
+<span class="na">改为：</span><span class="w"></span>
+<span class="w">  </span><span class="na">DEFINE DEBUG_PRINT_ERROR_LEVEL</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">0xFFFFFFFF</span><span class="w"></span>
+</code></pre></div>
+
+<p>然后再编译我们的edk2，使用DEBUG模式:</p>
+<div class="highlight"><pre><span></span><code>yum install iasl libuuid-devel -y
+cd edk2
+git submodule update --init
+make -C BaseTools -j
+NCPUS=`/usr/bin/getconf _NPROCESSORS_ONLN`
+BUILD_OPTION=&quot;-t GCC5 -n $NCPUS -b DEBUG&quot; 
+. ./edksetup.sh
+build $BUILD_OPTION
+build -t GCC5 -n 128 -b DEBUG -a AARCH64 -p ArmVirtPkg/ArmVirtQemu.dsc
+</code></pre></div>
+
+<h3>CMake 引入外部库</h3>
+<p>例如我们将libboundscheck动态库引入工程，需要定义：</p>
+<ul>
+<li><code>link_directories</code>指定libboundscheck动态库的寻找路径；</li>
+<li><code>target_link_libraries</code>指定库名字为boundscheck；</li>
+<li><code>target_include_directories</code>指定头文件查找路径</li>
+</ul>
+<div class="highlight"><pre><span></span><code><span class="nb">cmake_minimum_required</span><span class="p">(</span><span class="s">VERSION</span><span class="w"> </span><span class="s">3.15</span><span class="p">)</span>
+<span class="nb">project</span><span class="p">(</span><span class="s">TestPrjt</span><span class="w"> </span><span class="s">C</span><span class="p">)</span>
+
+<span class="nb">set</span><span class="p">(</span><span class="s">CMAKE_C_STANDARD</span><span class="w"> </span><span class="s">99</span><span class="p">)</span>
+
+
+<span class="nb">link_directories</span><span class="p">(</span><span class="s">/usr/local/lib）</span>
+
+<span class="s">add_executable(TestPrjt</span><span class="w"> </span><span class="s">main.c</span><span class="p">)</span>
+<span class="nb">target_link_libraries</span><span class="p">(</span><span class="s">TestPrjt</span><span class="w"> </span><span class="s">boundscheck</span><span class="p">)</span>
+<span class="nb">target_include_directories</span><span class="p">(</span><span class="s">TestPrjt</span><span class="w"> </span><span class="s">PRIVATE</span><span class="w"> </span><span class="s">/usr/local/include/libboundscheck</span><span class="p">)</span>
+</code></pre></div>
+
+<h3>VFIO 直通虚拟机</h3>
+<p>查询网卡的PCI外设号码</p>
+<div class="highlight"><pre><span></span><code><span class="w"> </span><span class="n">sudo</span><span class="w"> </span><span class="n">ethtool</span><span class="w"> </span><span class="o">-</span><span class="n">i</span><span class="w"> </span><span class="n">enp6s0</span><span class="w"></span>
+<span class="o">[</span><span class="n">sudo</span><span class="o">]</span><span class="w"> </span><span class="n">password</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="nl">fang</span><span class="p">:</span><span class="w"> </span>
+<span class="nl">driver</span><span class="p">:</span><span class="w"> </span><span class="n">alx</span><span class="w"></span>
+<span class="nl">version</span><span class="p">:</span><span class="w"> </span><span class="mf">5.6.0</span><span class="o">-</span><span class="n">rc3</span><span class="o">+</span><span class="w"></span>
+<span class="n">firmware</span><span class="o">-</span><span class="nl">version</span><span class="p">:</span><span class="w"> </span>
+<span class="n">expansion</span><span class="o">-</span><span class="n">rom</span><span class="o">-</span><span class="nl">version</span><span class="p">:</span><span class="w"> </span>
+<span class="n">bus</span><span class="o">-</span><span class="nl">info</span><span class="p">:</span><span class="w"> </span><span class="mi">0000</span><span class="err">:</span><span class="mi">00</span><span class="err">:</span><span class="mi">1</span><span class="n">f</span><span class="mf">.6</span><span class="w"></span>
+<span class="n">supports</span><span class="o">-</span><span class="k">statistics</span><span class="err">:</span><span class="w"> </span><span class="n">yes</span><span class="w"></span>
+<span class="n">supports</span><span class="o">-</span><span class="nl">test</span><span class="p">:</span><span class="w"> </span><span class="k">no</span><span class="w"></span>
+<span class="n">supports</span><span class="o">-</span><span class="n">eeprom</span><span class="o">-</span><span class="nl">access</span><span class="p">:</span><span class="w"> </span><span class="k">no</span><span class="w"></span>
+<span class="n">supports</span><span class="o">-</span><span class="n">register</span><span class="o">-</span><span class="k">dump</span><span class="err">:</span><span class="w"> </span><span class="k">no</span><span class="w"></span>
+<span class="n">supports</span><span class="o">-</span><span class="n">priv</span><span class="o">-</span><span class="nl">flags</span><span class="p">:</span><span class="w"> </span><span class="k">no</span><span class="w"></span>
+</code></pre></div>
+
+<p>加载驱动</p>
+<div class="highlight"><pre><span></span><code>modprobe vfio vfio-pci
+</code></pre></div>
+
+<p>bind到vfio-pci驱动上</p>
+<div class="highlight"><pre><span></span><code>readlink /sys/bus/pci/devices/0000:00:1f.6/iommu_group
+
+echo &quot;bind to vfio-pci&quot;
+echo 0000:00:1f.6 &gt; /sys/bus/pci/devices/0000:00:1f.6/driver/unbind
+echo &quot;vfio-pci&quot; &gt; &quot;/sys/bus/pci/devices/0000:00:1f.6/driver_override&quot;
+echo 0000:00:1f.6 &gt; /sys/bus/pci/drivers_probe
+
+echo &quot;bind back&quot;
+echo &quot;0000:00:1f.6&quot; &gt; &quot;/sys/bus/pci/devices/0000:00:1f.6/driver/unbind&quot;
+echo &quot;0000:00:1f.6&quot; &gt; /sys/bus/pci/drivers_probe
+</code></pre></div>
+
+<p>启动虚拟机了：</p>
+<div class="highlight"><pre><span></span><code>gdb --args /home/fang/code/fang/qemu/build/x86_64-softmmu/qemu-system-x86_64 \
+        -enable-kvm -m 2048 \
+        -boot c \
+        -drive driver=qcow2,file=$PWD/centos7.qcow2 \
+        -netdev tap,id=tap0,ifname=$E1000_TAP_NAME,script=no \
+        -device e1000,netdev=tap0,id=net0 \
+        -netdev tap,id=tap1,ifname=$VIRTIO_NET_TAP_NAME,script=no \
+        -device virtio-net-pci,netdev=tap1,id=net1,addr=05.0 \
+        -device piix3-usb-uhci,id=uhci,addr=04.0 \
+        -smp cpus=4 \
+        -vnc :88 \
+        -cdrom virtio-win-0.1.141.iso \
+        -device vfio-pci,host=0000:00:1f.6,id=hostdev0
+</code></pre></div>
+
+<h3>PL011 串口调试</h3>
+<div class="highlight"><pre><span></span><code><span class="n">QEMU_BIN</span><span class="o">=/</span><span class="n">root</span><span class="o">/</span><span class="n">fangying</span><span class="o">/</span><span class="n">opensrc</span><span class="o">/</span><span class="n">qemu</span><span class="o">-</span><span class="n">fangying</span><span class="o">/</span><span class="n">build</span><span class="o">/</span><span class="n">aarch64</span><span class="o">-</span><span class="n">softmmu</span><span class="o">/</span><span class="n">qemu</span><span class="o">-</span><span class="n">system</span><span class="o">-</span><span class="n">aarch64</span><span class="w"></span>
+<span class="o">$</span><span class="n">QEMU_BIN</span><span class="w"> </span>\<span class="w">                                                                     </span>
+<span class="w">    </span><span class="o">-</span><span class="n">machine</span><span class="w"> </span><span class="n">virt</span><span class="o">-</span><span class="mf">4.0</span><span class="p">,</span><span class="n">accel</span><span class="o">=</span><span class="n">kvm</span><span class="p">,</span><span class="n">gic</span><span class="o">-</span><span class="n">version</span><span class="o">=</span><span class="mi">3</span><span class="w"> </span>\<span class="w">                                 </span>
+<span class="w">    </span><span class="o">-</span><span class="n">cpu</span><span class="w"> </span><span class="n">host</span><span class="w"> </span>\<span class="w">                                                                 </span>
+<span class="w">    </span><span class="o">-</span><span class="n">smp</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span>\<span class="w">                                                                    </span>
+<span class="w">    </span><span class="o">-</span><span class="n">nographic</span><span class="w"> </span>\<span class="w">                                                                </span>
+<span class="w">    </span><span class="o">-</span><span class="n">m</span><span class="w"> </span><span class="mi">512</span><span class="n">M</span><span class="w"> </span>\<span class="w">                                                                   </span>
+<span class="w">    </span><span class="o">-</span><span class="n">kernel</span><span class="w"> </span><span class="o">/</span><span class="n">root</span><span class="o">/</span><span class="n">fangying</span><span class="o">/</span><span class="n">opensrc</span><span class="o">/</span><span class="n">linux</span><span class="o">/</span><span class="n">vmlinux</span><span class="o">.</span><span class="n">bin</span><span class="w"> </span>\<span class="w">                          </span>
+<span class="w">    </span><span class="o">-</span><span class="n">drive</span><span class="w"> </span><span class="n">id</span><span class="o">=</span><span class="n">test</span><span class="p">,</span><span class="n">file</span><span class="o">=/</span><span class="n">root</span><span class="o">/</span><span class="n">fangying</span><span class="o">/</span><span class="n">vm</span><span class="o">/</span><span class="n">rootfs_arm</span><span class="p">,</span><span class="n">format</span><span class="o">=</span><span class="n">raw</span><span class="p">,</span><span class="k">if</span><span class="o">=</span><span class="n">none</span><span class="w"> </span>\<span class="w">       </span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">virtio</span><span class="o">-</span><span class="n">blk</span><span class="o">-</span><span class="n">device</span><span class="p">,</span><span class="n">drive</span><span class="o">=</span><span class="n">test</span><span class="w"> </span>\<span class="w">                                      </span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">pci</span><span class="o">-</span><span class="n">bridge</span><span class="p">,</span><span class="n">chassis_nr</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span><span class="n">bus</span><span class="o">=</span><span class="n">pcie</span><span class="o">.</span><span class="mi">0</span><span class="w"> </span>\<span class="w">                                                      </span>
+<span class="w">    </span><span class="o">-</span><span class="n">append</span><span class="w"> </span><span class="s1">&#39;console=ttyAMA0 root=/dev/vda&#39;</span><span class="w"> </span>\<span class="w">                                   </span>
+<span class="w">    </span><span class="o">-</span><span class="n">qmp</span><span class="w"> </span><span class="n">unix</span><span class="p">:</span><span class="o">/</span><span class="n">tmp</span><span class="o">/</span><span class="n">qemu</span><span class="o">.</span><span class="n">sock</span><span class="p">,</span><span class="n">server</span><span class="p">,</span><span class="n">nowait</span><span class="w"> </span>\<span class="w">                                    </span>
+<span class="w">    </span><span class="o">-</span><span class="n">trace</span><span class="w"> </span><span class="n">events</span><span class="o">=/</span><span class="n">tmp</span><span class="o">/</span><span class="n">events</span><span class="w"> </span>\<span class="w">                                                 </span>
+<span class="w">    </span><span class="o">-</span><span class="n">D</span><span class="w"> </span><span class="o">/</span><span class="k">var</span><span class="o">/</span><span class="nb">log</span><span class="o">/</span><span class="n">qemu</span><span class="o">.</span><span class="n">log</span><span class="w"> </span>
+</code></pre></div>
+
+<h2>x86 Direct Boot microvm</h2>
+<div class="highlight"><pre><span></span><code><span class="nv">qemu</span><span class="o">-</span><span class="nv">system</span><span class="o">-</span><span class="nv">x86_64</span> \
+   <span class="o">-</span><span class="nv">M</span> <span class="nv">microvm</span>,<span class="nv">x</span><span class="o">-</span><span class="nv">option</span><span class="o">-</span><span class="nv">roms</span><span class="o">=</span><span class="nv">off</span>,<span class="nv">pit</span><span class="o">=</span><span class="nv">off</span>,<span class="nv">pic</span><span class="o">=</span><span class="nv">off</span>,<span class="nv">isa</span><span class="o">-</span><span class="nv">serial</span><span class="o">=</span><span class="nv">off</span>,<span class="nv">rtc</span><span class="o">=</span><span class="nv">off</span> \
+   <span class="o">-</span><span class="nv">enable</span><span class="o">-</span><span class="nv">kvm</span> <span class="o">-</span><span class="nv">cpu</span> <span class="nv">host</span> <span class="o">-</span><span class="nv">m</span> <span class="mi">512</span><span class="nv">m</span> <span class="o">-</span><span class="nv">smp</span> <span class="mi">2</span> \
+   <span class="o">-</span><span class="nv">kernel</span> <span class="nv">vmlinux</span> <span class="o">-</span><span class="nv">append</span> <span class="s2">&quot;</span><span class="s">console=hvc0 root=/dev/vda</span><span class="s2">&quot;</span> \
+   <span class="o">-</span><span class="nv">nodefaults</span> <span class="o">-</span><span class="nv">no</span><span class="o">-</span><span class="nv">user</span><span class="o">-</span><span class="nv">config</span> <span class="o">-</span><span class="nv">nographic</span> \
+   <span class="o">-</span><span class="nv">chardev</span> <span class="nv">stdio</span>,<span class="nv">id</span><span class="o">=</span><span class="nv">virtiocon0</span> \
+   <span class="o">-</span><span class="nv">device</span> <span class="nv">virtio</span><span class="o">-</span><span class="nv">serial</span><span class="o">-</span><span class="nv">device</span> \
+   <span class="o">-</span><span class="nv">device</span> <span class="nv">virtconsole</span>,<span class="nv">chardev</span><span class="o">=</span><span class="nv">virtiocon0</span> \
+   <span class="o">-</span><span class="nv">drive</span> <span class="nv">id</span><span class="o">=</span><span class="nv">test</span>,<span class="nv">file</span><span class="o">=</span><span class="nv">test</span>.<span class="nv">img</span>,<span class="nv">format</span><span class="o">=</span><span class="nv">raw</span>,<span class="k">if</span><span class="o">=</span><span class="nv">none</span> \
+   <span class="o">-</span><span class="nv">device</span> <span class="nv">virtio</span><span class="o">-</span><span class="nv">blk</span><span class="o">-</span><span class="nv">device</span>,<span class="nv">drive</span><span class="o">=</span><span class="nv">test</span> \
+   <span class="o">-</span><span class="nv">netdev</span> <span class="nv">tap</span>,<span class="nv">id</span><span class="o">=</span><span class="nv">tap0</span>,<span class="nv">script</span><span class="o">=</span><span class="nv">no</span>,<span class="nv">downscript</span><span class="o">=</span><span class="nv">no</span> \
+   <span class="o">-</span><span class="nv">device</span> <span class="nv">virtio</span><span class="o">-</span><span class="nv">net</span><span class="o">-</span><span class="nv">device</span>,<span class="nv">netdev</span><span class="o">=</span><span class="nv">tap0</span>
+</code></pre></div>
+
+<h3>Rust调试</h3>
+<p>运行Rust程序传入RUST_BACKTRACE=full</p>
+<div class="highlight"><pre><span></span><code>RUST_BACKTRACE=full cargo run ...
+</code></pre></div>
+
+<h3>Libvirt增加外部接口</h3>
+<div class="highlight"><pre><span></span><code>scripts/check-aclrules.py 白名单
+driver-hypervisor.h 定义声明
+src/libvirt-domain.c 接口定义实现
+src/qemu/qemu-driver.c driver接口实现
+remote_driver.c增加定义
+src/libvirt_public.syms 增加定义
+</code></pre></div>
+
+<h3>虚拟机使用spice协议</h3>
+<div class="highlight"><pre><span></span><code>    <span class="nt">&lt;channel</span> <span class="na">type=</span><span class="s">&#39;spicevmc&#39;</span><span class="nt">&gt;</span>                                                                         
+     <span class="nt">&lt;target</span> <span class="na">type=</span><span class="s">&#39;virtio&#39;</span> <span class="na">name=</span><span class="s">&#39;com.redhat.spice.0&#39;</span> <span class="na">state=</span><span class="s">&#39;connected&#39;</span><span class="nt">/&gt;</span>       
+     <span class="nt">&lt;alias</span> <span class="na">name=</span><span class="s">&#39;channel4&#39;</span><span class="nt">/&gt;</span>                                                  
+     <span class="nt">&lt;address</span> <span class="na">type=</span><span class="s">&#39;virtio-serial&#39;</span> <span class="na">controller=</span><span class="s">&#39;0&#39;</span> <span class="na">bus=</span><span class="s">&#39;0&#39;</span> <span class="na">port=</span><span class="s">&#39;5&#39;</span><span class="nt">/&gt;</span>           
+    <span class="nt">&lt;/channel&gt;</span>                                                                  
+    <span class="nt">&lt;input</span> <span class="na">type=</span><span class="s">&#39;tablet&#39;</span> <span class="na">bus=</span><span class="s">&#39;usb&#39;</span><span class="nt">&gt;</span>                                             
+     <span class="nt">&lt;alias</span> <span class="na">name=</span><span class="s">&#39;input0&#39;</span><span class="nt">/&gt;</span>                                                    
+     <span class="nt">&lt;address</span> <span class="na">type=</span><span class="s">&#39;usb&#39;</span> <span class="na">bus=</span><span class="s">&#39;0&#39;</span> <span class="na">port=</span><span class="s">&#39;1&#39;</span><span class="nt">/&gt;</span>                                    
+    <span class="nt">&lt;/input&gt;</span>                                                                    
+    <span class="nt">&lt;input</span> <span class="na">type=</span><span class="s">&#39;keyboard&#39;</span> <span class="na">bus=</span><span class="s">&#39;usb&#39;</span><span class="nt">&gt;</span>                                           
+     <span class="nt">&lt;alias</span> <span class="na">name=</span><span class="s">&#39;input1&#39;</span><span class="nt">/&gt;</span>                                                    
+     <span class="nt">&lt;address</span> <span class="na">type=</span><span class="s">&#39;usb&#39;</span> <span class="na">bus=</span><span class="s">&#39;0&#39;</span> <span class="na">port=</span><span class="s">&#39;2&#39;</span><span class="nt">/&gt;</span>                                    
+    <span class="nt">&lt;/input&gt;</span>                                                                    
+    <span class="nt">&lt;graphics</span> <span class="na">type=</span><span class="s">&#39;spice&#39;</span> <span class="na">port=</span><span class="s">&#39;5900&#39;</span> <span class="na">autoport=</span><span class="s">&#39;yes&#39;</span> <span class="na">listen=</span><span class="s">&#39;0.0.0.0&#39;</span><span class="nt">&gt;</span>         
+    <span class="nt">&lt;listen</span> <span class="na">type=</span><span class="s">&#39;address&#39;</span> <span class="na">address=</span><span class="s">&#39;0.0.0.0&#39;</span><span class="nt">/&gt;</span>                                
+    <span class="nt">&lt;/graphics&gt;</span>                                                                 
+    <span class="nt">&lt;video&gt;</span>                                                                     
+     <span class="nt">&lt;model</span> <span class="na">type=</span><span class="s">&#39;virtio&#39;</span> <span class="na">vram=</span><span class="s">&#39;16384&#39;</span> <span class="na">heads=</span><span class="s">&#39;1&#39;</span> <span class="na">primary=</span><span class="s">&#39;yes&#39;</span><span class="nt">/&gt;</span>               
+     <span class="nt">&lt;alias</span> <span class="na">name=</span><span class="s">&#39;video0&#39;</span><span class="nt">/&gt;</span>                                                    
+     <span class="nt">&lt;address</span> <span class="na">type=</span><span class="s">&#39;pci&#39;</span> <span class="na">domain=</span><span class="s">&#39;0x0000&#39;</span> <span class="na">bus=</span><span class="s">&#39;0x03&#39;</span> <span class="na">slot=</span><span class="s">&#39;0x04&#39;</span> <span class="na">function=</span><span class="s">&#39;0x0&#39;</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;/video&gt;</span>   
+</code></pre></div>
+
+<h2>一个较为完整的虚拟机</h2>
+<div class="highlight"><pre><span></span><code><span class="o">/</span><span class="n">usr</span><span class="o">/</span><span class="n">bin</span><span class="o">/</span><span class="n">qemu</span><span class="o">-</span><span class="n">system</span><span class="o">-</span><span class="n">x86_64</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">name</span><span class="w"> </span><span class="n">guest</span><span class="o">=</span><span class="n">fangying_uefi</span><span class="p">,</span><span class="n">debug</span><span class="o">-</span><span class="n">threads</span><span class="o">=</span><span class="n">on</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">S</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">object</span><span class="w"> </span><span class="n">secret</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">masterKey0</span><span class="p">,</span><span class="n">format</span><span class="o">=</span><span class="n">raw</span><span class="p">,</span><span class="n">file</span><span class="o">=/</span><span class="k">var</span><span class="o">/</span><span class="n">lib</span><span class="o">/</span><span class="n">libvirt</span><span class="o">/</span><span class="n">qemu</span><span class="o">/</span><span class="n">domain</span><span class="o">-</span><span class="mi">2</span><span class="o">-</span><span class="n">fangying_uefi</span><span class="o">/</span><span class="k">master</span><span class="o">-</span><span class="n">key</span><span class="o">.</span><span class="n">aes</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">machine</span><span class="w"> </span><span class="n">pc</span><span class="o">-</span><span class="n">i440fx</span><span class="o">-</span><span class="mf">4.1</span><span class="p">,</span><span class="n">accel</span><span class="o">=</span><span class="n">kvm</span><span class="p">,</span><span class="n">usb</span><span class="o">=</span><span class="n">off</span><span class="p">,</span><span class="n">dump</span><span class="o">-</span><span class="n">guest</span><span class="o">-</span><span class="n">core</span><span class="o">=</span><span class="n">off</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">cpu</span><span class="w"> </span><span class="n">host</span><span class="p">,</span><span class="n">kvm</span><span class="o">-</span><span class="n">pv</span><span class="o">-</span><span class="n">eoi</span><span class="o">=</span><span class="n">on</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">drive</span><span class="w"> </span><span class="n">file</span><span class="o">=/</span><span class="n">usr</span><span class="o">/</span><span class="n">share</span><span class="o">/</span><span class="n">edk2</span><span class="o">/</span><span class="n">ovmf</span><span class="o">/</span><span class="n">OVMF</span><span class="o">.</span><span class="n">fd</span><span class="p">,</span><span class="k">if</span><span class="o">=</span><span class="n">pflash</span><span class="p">,</span><span class="n">format</span><span class="o">=</span><span class="n">raw</span><span class="p">,</span><span class="n">unit</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span><span class="n">readonly</span><span class="o">=</span><span class="n">on</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">drive</span><span class="w"> </span><span class="n">file</span><span class="o">=/</span><span class="n">usr</span><span class="o">/</span><span class="n">share</span><span class="o">/</span><span class="n">edk2</span><span class="o">/</span><span class="n">ovmf</span><span class="o">/</span><span class="n">OVMF_VARS</span><span class="o">.</span><span class="n">fd</span><span class="p">,</span><span class="k">if</span><span class="o">=</span><span class="n">pflash</span><span class="p">,</span><span class="n">format</span><span class="o">=</span><span class="n">raw</span><span class="p">,</span><span class="n">unit</span><span class="o">=</span><span class="mi">1</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">m</span><span class="w"> </span><span class="mi">16384</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">overcommit</span><span class="w"> </span><span class="n">mem</span><span class="o">-</span><span class="n">lock</span><span class="o">=</span><span class="n">off</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">smp</span><span class="w"> </span><span class="mi">16</span><span class="p">,</span><span class="n">sockets</span><span class="o">=</span><span class="mi">16</span><span class="p">,</span><span class="n">cores</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span><span class="n">threads</span><span class="o">=</span><span class="mi">1</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">uuid</span><span class="w"> </span><span class="n">a1f00325</span><span class="o">-</span><span class="mi">9972</span><span class="o">-</span><span class="mi">486</span><span class="n">e</span><span class="o">-</span><span class="n">a127</span><span class="o">-</span><span class="mi">6</span><span class="n">f0b14b44a3f</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">no</span><span class="o">-</span><span class="n">user</span><span class="o">-</span><span class="n">config</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">nodefaults</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">chardev</span><span class="w"> </span><span class="n">socket</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">charmonitor</span><span class="p">,</span><span class="n">fd</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span><span class="n">server</span><span class="p">,</span><span class="n">nowait</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">mon</span><span class="w"> </span><span class="n">chardev</span><span class="o">=</span><span class="n">charmonitor</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">monitor</span><span class="p">,</span><span class="n">mode</span><span class="o">=</span><span class="n">control</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">rtc</span><span class="w"> </span><span class="n">base</span><span class="o">=</span><span class="n">utc</span><span class="p">,</span><span class="n">clock</span><span class="o">=</span><span class="n">vm</span><span class="p">,</span><span class="n">driftfix</span><span class="o">=</span><span class="n">slew</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">no</span><span class="o">-</span><span class="n">hpet</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">global</span><span class="w"> </span><span class="n">kvm</span><span class="o">-</span><span class="n">pit</span><span class="o">.</span><span class="n">lost_tick_policy</span><span class="o">=</span><span class="n">delay</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">no</span><span class="o">-</span><span class="n">shutdown</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">boot</span><span class="w"> </span><span class="n">strict</span><span class="o">=</span><span class="n">on</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">piix3</span><span class="o">-</span><span class="n">usb</span><span class="o">-</span><span class="n">uhci</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">usb</span><span class="p">,</span><span class="n">bus</span><span class="o">=</span><span class="n">pci</span><span class="o">.</span><span class="mi">0</span><span class="p">,</span><span class="n">addr</span><span class="o">=</span><span class="mh">0x1</span><span class="o">.</span><span class="mh">0x2</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">usb</span><span class="o">-</span><span class="n">ehci</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">usb1</span><span class="p">,</span><span class="n">bus</span><span class="o">=</span><span class="n">pci</span><span class="o">.</span><span class="mi">0</span><span class="p">,</span><span class="n">addr</span><span class="o">=</span><span class="mh">0x4</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">nec</span><span class="o">-</span><span class="n">usb</span><span class="o">-</span><span class="n">xhci</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">usb2</span><span class="p">,</span><span class="n">bus</span><span class="o">=</span><span class="n">pci</span><span class="o">.</span><span class="mi">0</span><span class="p">,</span><span class="n">addr</span><span class="o">=</span><span class="mh">0x5</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">virtio</span><span class="o">-</span><span class="n">scsi</span><span class="o">-</span><span class="n">pci</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">scsi0</span><span class="p">,</span><span class="n">bus</span><span class="o">=</span><span class="n">pci</span><span class="o">.</span><span class="mi">0</span><span class="p">,</span><span class="n">addr</span><span class="o">=</span><span class="mh">0x6</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">virtio</span><span class="o">-</span><span class="n">serial</span><span class="o">-</span><span class="n">pci</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">virtio</span><span class="o">-</span><span class="n">serial0</span><span class="p">,</span><span class="n">bus</span><span class="o">=</span><span class="n">pci</span><span class="o">.</span><span class="mi">0</span><span class="p">,</span><span class="n">addr</span><span class="o">=</span><span class="mh">0x7</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">drive</span><span class="w"> </span><span class="n">file</span><span class="o">=/</span><span class="n">mnt</span><span class="o">/</span><span class="n">sdc</span><span class="o">/</span><span class="n">fangying</span><span class="o">/</span><span class="n">x86</span><span class="o">/</span><span class="n">fangying_uefi</span><span class="o">.</span><span class="n">qcow2</span><span class="p">,</span><span class="n">format</span><span class="o">=</span><span class="n">qcow2</span><span class="p">,</span><span class="k">if</span><span class="o">=</span><span class="n">none</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">drive</span><span class="o">-</span><span class="n">virtio</span><span class="o">-</span><span class="n">disk0</span><span class="p">,</span><span class="n">cache</span><span class="o">=</span><span class="n">none</span><span class="p">,</span><span class="n">aio</span><span class="o">=</span><span class="n">native</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">virtio</span><span class="o">-</span><span class="n">blk</span><span class="o">-</span><span class="n">pci</span><span class="p">,</span><span class="n">scsi</span><span class="o">=</span><span class="n">off</span><span class="p">,</span><span class="n">bus</span><span class="o">=</span><span class="n">pci</span><span class="o">.</span><span class="mi">0</span><span class="p">,</span><span class="n">addr</span><span class="o">=</span><span class="mh">0x9</span><span class="p">,</span><span class="n">drive</span><span class="o">=</span><span class="n">drive</span><span class="o">-</span><span class="n">virtio</span><span class="o">-</span><span class="n">disk0</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">virtio</span><span class="o">-</span><span class="n">disk0</span><span class="p">,</span><span class="n">bootindex</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span><span class="n">write</span><span class="o">-</span><span class="n">cache</span><span class="o">=</span><span class="n">on</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">netdev</span><span class="w"> </span><span class="n">tap</span><span class="p">,</span><span class="n">fd</span><span class="o">=</span><span class="mi">33</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">hostnet0</span><span class="p">,</span><span class="n">vhost</span><span class="o">=</span><span class="n">on</span><span class="p">,</span><span class="n">vhostfd</span><span class="o">=</span><span class="mi">34</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">virtio</span><span class="o">-</span><span class="n">net</span><span class="o">-</span><span class="n">pci</span><span class="p">,</span><span class="n">netdev</span><span class="o">=</span><span class="n">hostnet0</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">net0</span><span class="p">,</span><span class="n">mac</span><span class="o">=</span><span class="mi">52</span><span class="p">:</span><span class="mi">24</span><span class="p">:</span><span class="mi">01</span><span class="p">:</span><span class="n">d9</span><span class="p">:</span><span class="n">dc</span><span class="p">:</span><span class="mi">53</span><span class="p">,</span><span class="n">bus</span><span class="o">=</span><span class="n">pci</span><span class="o">.</span><span class="mi">0</span><span class="p">,</span><span class="n">addr</span><span class="o">=</span><span class="mh">0x3</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">chardev</span><span class="w"> </span><span class="n">pty</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">charserial0</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">isa</span><span class="o">-</span><span class="n">serial</span><span class="p">,</span><span class="n">chardev</span><span class="o">=</span><span class="n">charserial0</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">serial0</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">vnc</span><span class="w"> </span><span class="mf">0.0</span><span class="o">.</span><span class="mf">0.0</span><span class="p">:</span><span class="mi">0</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">cirrus</span><span class="o">-</span><span class="n">vga</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">video0</span><span class="p">,</span><span class="n">bus</span><span class="o">=</span><span class="n">pci</span><span class="o">.</span><span class="mi">0</span><span class="p">,</span><span class="n">addr</span><span class="o">=</span><span class="mh">0x2</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">virtio</span><span class="o">-</span><span class="n">balloon</span><span class="o">-</span><span class="n">pci</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">balloon0</span><span class="p">,</span><span class="n">bus</span><span class="o">=</span><span class="n">pci</span><span class="o">.</span><span class="mi">0</span><span class="p">,</span><span class="n">addr</span><span class="o">=</span><span class="mh">0x8</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">sandbox</span><span class="w"> </span><span class="n">on</span><span class="p">,</span><span class="n">obsolete</span><span class="o">=</span><span class="n">deny</span><span class="p">,</span><span class="n">elevateprivileges</span><span class="o">=</span><span class="n">deny</span><span class="p">,</span><span class="n">spawn</span><span class="o">=</span><span class="n">deny</span><span class="p">,</span><span class="n">resourcecontrol</span><span class="o">=</span><span class="n">deny</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">msg</span><span class="w"> </span><span class="n">timestamp</span><span class="o">=</span><span class="n">on</span><span class="w"></span>
+</code></pre></div>
+
+<h3>cpu topology</h3>
+<div class="highlight"><pre><span></span><code><span class="n">QEMU_BIN</span><span class="o">=/</span><span class="n">root</span><span class="o">/</span><span class="n">fangying</span><span class="o">/</span><span class="n">opensrc</span><span class="o">/</span><span class="n">qemu</span><span class="o">-</span><span class="n">fangying</span><span class="o">/</span><span class="n">build</span><span class="o">/</span><span class="n">aarch64</span><span class="o">-</span><span class="n">softmmu</span><span class="o">/</span><span class="n">qemu</span><span class="o">-</span><span class="n">system</span><span class="o">-</span><span class="n">aarch64</span><span class="w"></span>
+<span class="o">$</span><span class="n">QEMU_BIN</span><span class="w"> </span>\<span class="w">                                                                     </span>
+<span class="w">    </span><span class="o">-</span><span class="n">machine</span><span class="w"> </span><span class="n">virt</span><span class="o">-</span><span class="mf">4.1</span><span class="p">,</span><span class="n">accel</span><span class="o">=</span><span class="n">kvm</span><span class="p">,</span><span class="n">usb</span><span class="o">=</span><span class="n">off</span><span class="p">,</span><span class="n">dump</span><span class="o">-</span><span class="n">guest</span><span class="o">-</span><span class="n">core</span><span class="o">=</span><span class="n">off</span><span class="p">,</span><span class="n">gic</span><span class="o">-</span><span class="n">version</span><span class="o">=</span><span class="mi">3</span><span class="w"> </span>\<span class="w">     </span>
+<span class="w">    </span><span class="o">-</span><span class="n">cpu</span><span class="w"> </span><span class="n">host</span><span class="w"> </span>\<span class="w">                                                                 </span>
+<span class="w">    </span><span class="o">-</span><span class="n">drive</span><span class="w"> </span><span class="n">file</span><span class="o">=/</span><span class="n">usr</span><span class="o">/</span><span class="n">share</span><span class="o">/</span><span class="n">edk2</span><span class="o">/</span><span class="n">aarch64</span><span class="o">/</span><span class="n">QEMU_EFI</span><span class="o">-</span><span class="n">pflash</span><span class="o">.</span><span class="n">raw</span><span class="p">,</span><span class="k">if</span><span class="o">=</span><span class="n">pflash</span><span class="p">,</span><span class="n">format</span><span class="o">=</span><span class="n">raw</span><span class="p">,</span><span class="n">unit</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span><span class="n">readonly</span><span class="o">=</span><span class="n">on</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">drive</span><span class="w"> </span><span class="n">file</span><span class="o">=/</span><span class="k">var</span><span class="o">/</span><span class="n">lib</span><span class="o">/</span><span class="n">libvirt</span><span class="o">/</span><span class="n">qemu</span><span class="o">/</span><span class="n">nvram</span><span class="o">/</span><span class="n">fangying_openeuler_VARS</span><span class="o">.</span><span class="n">fd</span><span class="p">,</span><span class="k">if</span><span class="o">=</span><span class="n">pflash</span><span class="p">,</span><span class="n">format</span><span class="o">=</span><span class="n">raw</span><span class="p">,</span><span class="n">unit</span><span class="o">=</span><span class="mi">1</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">m</span><span class="w"> </span><span class="mi">8192</span><span class="w"> </span>\<span class="w">                                                                   </span>
+<span class="w">    </span><span class="o">-</span><span class="n">smp</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span><span class="n">sockets</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span><span class="n">dies</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span><span class="n">cores</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span><span class="n">threads</span><span class="o">=</span><span class="mi">1</span><span class="w"> </span>\<span class="w">                                 </span>
+<span class="w">    </span><span class="o">-</span><span class="n">no</span><span class="o">-</span><span class="n">user</span><span class="o">-</span><span class="n">config</span><span class="w"> </span>\<span class="w">                                                           </span>
+<span class="w">    </span><span class="o">-</span><span class="n">nodefaults</span><span class="w"> </span>\<span class="w">                                                               </span>
+<span class="w">    </span><span class="o">-</span><span class="n">rtc</span><span class="w"> </span><span class="n">base</span><span class="o">=</span><span class="n">utc</span><span class="w"> </span>\<span class="w">                                                             </span>
+<span class="w">    </span><span class="o">-</span><span class="n">no</span><span class="o">-</span><span class="n">shutdown</span><span class="w"> </span>\<span class="w">                                                              </span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">pcie</span><span class="o">-</span><span class="n">root</span><span class="o">-</span><span class="n">port</span><span class="p">,</span><span class="n">port</span><span class="o">=</span><span class="mh">0x8</span><span class="p">,</span><span class="n">chassis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">pci</span><span class="o">.</span><span class="mi">1</span><span class="p">,</span><span class="n">bus</span><span class="o">=</span><span class="n">pcie</span><span class="o">.</span><span class="mi">0</span><span class="p">,</span><span class="n">multifunction</span><span class="o">=</span><span class="n">on</span><span class="p">,</span><span class="n">addr</span><span class="o">=</span><span class="mh">0x1</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">pcie</span><span class="o">-</span><span class="n">root</span><span class="o">-</span><span class="n">port</span><span class="p">,</span><span class="n">port</span><span class="o">=</span><span class="mh">0x9</span><span class="p">,</span><span class="n">chassis</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">pci</span><span class="o">.</span><span class="mi">2</span><span class="p">,</span><span class="n">bus</span><span class="o">=</span><span class="n">pcie</span><span class="o">.</span><span class="mi">0</span><span class="p">,</span><span class="n">addr</span><span class="o">=</span><span class="mh">0x1</span><span class="o">.</span><span class="mh">0x1</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">pcie</span><span class="o">-</span><span class="n">pci</span><span class="o">-</span><span class="n">bridge</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">pci</span><span class="o">.</span><span class="mi">3</span><span class="p">,</span><span class="n">bus</span><span class="o">=</span><span class="n">pci</span><span class="o">.</span><span class="mi">1</span><span class="p">,</span><span class="n">addr</span><span class="o">=</span><span class="mh">0x0</span><span class="w"> </span>\<span class="w">                       </span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">pcie</span><span class="o">-</span><span class="n">root</span><span class="o">-</span><span class="n">port</span><span class="p">,</span><span class="n">port</span><span class="o">=</span><span class="mh">0xa</span><span class="p">,</span><span class="n">chassis</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">pci</span><span class="o">.</span><span class="mi">4</span><span class="p">,</span><span class="n">bus</span><span class="o">=</span><span class="n">pcie</span><span class="o">.</span><span class="mi">0</span><span class="p">,</span><span class="n">addr</span><span class="o">=</span><span class="mh">0x1</span><span class="o">.</span><span class="mh">0x2</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">pcie</span><span class="o">-</span><span class="n">root</span><span class="o">-</span><span class="n">port</span><span class="p">,</span><span class="n">port</span><span class="o">=</span><span class="mh">0xb</span><span class="p">,</span><span class="n">chassis</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">pci</span><span class="o">.</span><span class="mi">5</span><span class="p">,</span><span class="n">bus</span><span class="o">=</span><span class="n">pcie</span><span class="o">.</span><span class="mi">0</span><span class="p">,</span><span class="n">addr</span><span class="o">=</span><span class="mh">0x1</span><span class="o">.</span><span class="mh">0x3</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">pcie</span><span class="o">-</span><span class="n">root</span><span class="o">-</span><span class="n">port</span><span class="p">,</span><span class="n">port</span><span class="o">=</span><span class="mh">0xc</span><span class="p">,</span><span class="n">chassis</span><span class="o">=</span><span class="mi">6</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">pci</span><span class="o">.</span><span class="mi">6</span><span class="p">,</span><span class="n">bus</span><span class="o">=</span><span class="n">pcie</span><span class="o">.</span><span class="mi">0</span><span class="p">,</span><span class="n">addr</span><span class="o">=</span><span class="mh">0x1</span><span class="o">.</span><span class="mh">0x4</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">pcie</span><span class="o">-</span><span class="n">root</span><span class="o">-</span><span class="n">port</span><span class="p">,</span><span class="n">port</span><span class="o">=</span><span class="mh">0xd</span><span class="p">,</span><span class="n">chassis</span><span class="o">=</span><span class="mi">7</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">pci</span><span class="o">.</span><span class="mi">7</span><span class="p">,</span><span class="n">bus</span><span class="o">=</span><span class="n">pcie</span><span class="o">.</span><span class="mi">0</span><span class="p">,</span><span class="n">addr</span><span class="o">=</span><span class="mh">0x1</span><span class="o">.</span><span class="mh">0x5</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">pcie</span><span class="o">-</span><span class="n">root</span><span class="o">-</span><span class="n">port</span><span class="p">,</span><span class="n">port</span><span class="o">=</span><span class="mh">0xe</span><span class="p">,</span><span class="n">chassis</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">pci</span><span class="o">.</span><span class="mi">8</span><span class="p">,</span><span class="n">bus</span><span class="o">=</span><span class="n">pcie</span><span class="o">.</span><span class="mi">0</span><span class="p">,</span><span class="n">addr</span><span class="o">=</span><span class="mh">0x1</span><span class="o">.</span><span class="mh">0x6</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">pcie</span><span class="o">-</span><span class="n">root</span><span class="o">-</span><span class="n">port</span><span class="p">,</span><span class="n">port</span><span class="o">=</span><span class="mh">0xf</span><span class="p">,</span><span class="n">chassis</span><span class="o">=</span><span class="mi">9</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">pci</span><span class="o">.</span><span class="mi">9</span><span class="p">,</span><span class="n">bus</span><span class="o">=</span><span class="n">pcie</span><span class="o">.</span><span class="mi">0</span><span class="p">,</span><span class="n">addr</span><span class="o">=</span><span class="mh">0x1</span><span class="o">.</span><span class="mh">0x7</span><span class="w"> </span>\<span class="w"></span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">usb</span><span class="o">-</span><span class="n">ehci</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">usb</span><span class="p">,</span><span class="n">bus</span><span class="o">=</span><span class="n">pci</span><span class="o">.</span><span class="mi">3</span><span class="p">,</span><span class="n">addr</span><span class="o">=</span><span class="mh">0x1</span><span class="w"> </span>\<span class="w">                                </span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">virtio</span><span class="o">-</span><span class="n">scsi</span><span class="o">-</span><span class="n">pci</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">scsi0</span><span class="p">,</span><span class="n">bus</span><span class="o">=</span><span class="n">pci</span><span class="o">.</span><span class="mi">4</span><span class="p">,</span><span class="n">addr</span><span class="o">=</span><span class="mh">0x0</span><span class="w"> </span>\<span class="w">                       </span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">virtio</span><span class="o">-</span><span class="n">serial</span><span class="o">-</span><span class="n">pci</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">virtio</span><span class="o">-</span><span class="n">serial0</span><span class="p">,</span><span class="n">bus</span><span class="o">=</span><span class="n">pci</span><span class="o">.</span><span class="mi">3</span><span class="p">,</span><span class="n">addr</span><span class="o">=</span><span class="mh">0x2</span><span class="w"> </span>\<span class="w">            </span>
+<span class="w">    </span><span class="o">-</span><span class="n">chardev</span><span class="w"> </span><span class="n">pty</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">charserial0</span><span class="w"> </span>\<span class="w">                                               </span>
+<span class="w">    </span><span class="o">-</span><span class="n">serial</span><span class="w"> </span><span class="n">chardev</span><span class="p">:</span><span class="n">charserial0</span><span class="w"> </span>\<span class="w">                                               </span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">usb</span><span class="o">-</span><span class="n">tablet</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">input0</span><span class="p">,</span><span class="n">bus</span><span class="o">=</span><span class="n">usb</span><span class="o">.</span><span class="mi">0</span><span class="p">,</span><span class="n">port</span><span class="o">=</span><span class="mi">1</span><span class="w"> </span>\<span class="w">                             </span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">usb</span><span class="o">-</span><span class="n">kbd</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">input1</span><span class="p">,</span><span class="n">bus</span><span class="o">=</span><span class="n">usb</span><span class="o">.</span><span class="mi">0</span><span class="p">,</span><span class="n">port</span><span class="o">=</span><span class="mi">2</span><span class="w"> </span>\<span class="w">                                </span>
+<span class="w">    </span><span class="o">-</span><span class="n">vnc</span><span class="w"> </span><span class="mf">0.0</span><span class="o">.</span><span class="mf">0.0</span><span class="p">:</span><span class="mi">99</span><span class="w"> </span>\<span class="w">                                                           </span>
+<span class="w">    </span><span class="o">-</span><span class="n">device</span><span class="w"> </span><span class="n">virtio</span><span class="o">-</span><span class="n">gpu</span><span class="o">-</span><span class="n">pci</span><span class="p">,</span><span class="n">id</span><span class="o">=</span><span class="n">video0</span><span class="p">,</span><span class="n">max_outputs</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span><span class="n">bus</span><span class="o">=</span><span class="n">pci</span><span class="o">.</span><span class="mi">3</span><span class="p">,</span><span class="n">addr</span><span class="o">=</span><span class="mh">0x4</span><span class="w">  </span>
+</code></pre></div>
+
+<h2>x86 UEFI Direct Boot</h2>
+<div class="highlight"><pre><span></span><code><span class="nv">qemu</span><span class="o">-</span><span class="nv">system</span><span class="o">-</span><span class="nv">x86_64</span> \                                                            
+    <span class="o">-</span><span class="nv">M</span> <span class="nv">pc</span> \                                                                     
+    <span class="o">-</span><span class="nv">cpu</span> <span class="nv">host</span> \                                                                 
+    <span class="o">-</span><span class="nv">smp</span> <span class="nv">cpus</span><span class="o">=</span><span class="mi">4</span> \                                                               
+    <span class="o">-</span><span class="nv">enable</span><span class="o">-</span><span class="nv">kvm</span> \                                                               
+    <span class="o">-</span><span class="nv">m</span> <span class="mi">2048</span> \                                                                   
+    <span class="o">-</span><span class="nv">nographic</span> \                                                                
+    <span class="o">-</span><span class="nv">net</span> <span class="nv">none</span> \                                                                 
+    <span class="o">-</span><span class="nv">drive</span> <span class="k">if</span><span class="o">=</span><span class="nv">pflash</span>,<span class="nv">format</span><span class="o">=</span><span class="nv">raw</span>,<span class="nv">unit</span><span class="o">=</span><span class="mi">0</span>,<span class="nv">file</span><span class="o">=/</span><span class="nv">home</span><span class="o">/</span><span class="nv">fang</span><span class="o">/</span><span class="nv">code</span><span class="o">/</span><span class="nv">opensrc</span><span class="o">/</span><span class="nv">edk2</span><span class="o">/</span><span class="nv">Build</span><span class="o">/</span><span class="nv">OvmfX64</span><span class="o">/</span><span class="nv">DEBUG_GCC5</span><span class="o">/</span><span class="nv">FV</span><span class="o">/</span><span class="nv">OVMF_CODE</span>.<span class="nv">fd</span>,<span class="nv">readonly</span><span class="o">=</span><span class="nv">on</span> \                                   
+    <span class="o">-</span><span class="nv">drive</span> <span class="k">if</span><span class="o">=</span><span class="nv">pflash</span>,<span class="nv">format</span><span class="o">=</span><span class="nv">raw</span>,<span class="nv">unit</span><span class="o">=</span><span class="mi">1</span>,<span class="nv">file</span><span class="o">=/</span><span class="nv">home</span><span class="o">/</span><span class="nv">fang</span><span class="o">/</span><span class="nv">code</span><span class="o">/</span><span class="nv">opensrc</span><span class="o">/</span><span class="nv">edk2</span><span class="o">/</span><span class="nv">Build</span><span class="o">/</span><span class="nv">OvmfX64</span><span class="o">/</span><span class="nv">DEBUG_GCC5</span><span class="o">/</span><span class="nv">FV</span><span class="o">/</span><span class="nv">OVMF_VARS</span>.<span class="nv">fd</span> \
+    <span class="o">-</span><span class="nv">device</span> <span class="nv">virtio</span><span class="o">-</span><span class="nv">blk</span><span class="o">-</span><span class="nv">pci</span>,<span class="nv">id</span><span class="o">=</span><span class="nv">blk0</span>,<span class="nv">drive</span><span class="o">=</span><span class="nv">image</span> \                                
+    <span class="o">-</span><span class="nv">device</span> <span class="nv">piix3</span><span class="o">-</span><span class="nv">usb</span><span class="o">-</span><span class="nv">uhci</span>,<span class="nv">id</span><span class="o">=</span><span class="nv">uhci</span> \                                            
+    <span class="o">-</span><span class="nv">device</span> <span class="nv">usb</span><span class="o">-</span><span class="nv">tablet</span> \                                                        
+    <span class="o">-</span><span class="nv">drive</span> <span class="k">if</span><span class="o">=</span><span class="nv">none</span>,<span class="nv">id</span><span class="o">=</span><span class="nv">image</span>,<span class="nv">file</span><span class="o">=</span>$<span class="nv">PWD</span><span class="o">/</span><span class="nv">dummy</span>.<span class="nv">raw</span>,<span class="nv">format</span><span class="o">=</span><span class="nv">raw</span> \                    
+    <span class="o">-</span><span class="nv">monitor</span> <span class="nv">telnet</span>::<span class="mi">12345</span>,<span class="nv">server</span>,<span class="nv">nowait</span> \                                      
+    <span class="o">-</span><span class="nv">serial</span> <span class="nv">stdio</span>
+</code></pre></div>
+
+<h2>Make rootfs using installroot</h2>
+<div class="highlight"><pre><span></span><code>sudo dnf --releasever 33 --nogpgcheck --installroot /mnt/rootfs install systemd yum passwd dnf fedora-release --noplugins
+sed -i &quot;s|root:x|root:|&quot; etc/password
+</code></pre></div>
+
+<h2>QOM qmp example</h2>
+<div class="highlight"><pre><span></span><code>virsh qemu-monitor-command vmname &#39;{&quot;execute&quot;: &quot;qom-list-types}&quot;&#39; --pretty
+virsh qemu-monitor-command vmname &#39;{&quot;execute&quot;: &quot;qom-list&quot;, &quot;arguments&quot;: {&quot;path&quot;: &quot;/machine/&quot;}}&#39; --pretty
+virsh qemu-monitor-command vmname &#39;{&quot;execute&quot;: &quot;qom-list&quot;, &quot;arguments&quot;: {&quot;path&quot;: &quot;/machine/peripheral&quot;}}&#39; --pretty
+virsh qemu-monitor-command vmname &#39;{&quot;execute&quot;: &quot;qom-list&quot;, &quot;arguments&quot;: {&quot;path&quot;: &quot;/machine/unattached&quot;}}&#39; --pretty
+virsh qemu-monitor-command vmname &#39;{&quot;execute&quot;: &quot;device-list-properities, &quot;arguments&quot;: {&quot;typename&quot;: &quot;virtio-serial-pci&quot;}}&#39; --pretty
+</code></pre></div>
+
+<h2>使用 Virsh console 登陆虚拟机</h2>
+<p>需要给虚拟机启用一个服务：</p>
+<div class="highlight"><pre><span></span><code><span class="n">grubby</span><span class="w"> </span><span class="o">--</span><span class="k">update</span><span class="o">-</span><span class="n">kernel</span><span class="o">=</span><span class="ow">ALL</span><span class="w"> </span><span class="o">--</span><span class="n">args</span><span class="o">=</span><span class="n">console</span><span class="o">=</span><span class="n">ttyS0</span><span class="p">,</span><span class="mi">115200</span><span class="w"></span>
+<span class="n">systemctl</span><span class="w"> </span><span class="k">start</span><span class="w"> </span><span class="n">serial</span><span class="o">-</span><span class="n">getty</span><span class="nv">@ttyS0</span><span class="p">.</span><span class="n">service</span><span class="w"></span>
+</code></pre></div>
+
+<h2>配置SRIOV网卡</h2>
+<p>注意：virtio-net网卡的mac地址是通过virtio_net_config配置给虚拟机的。·</p>
+<div class="highlight"><pre><span></span><code>...
+ <span class="nt">&lt;devices&gt;</span>
+   ...
+   <span class="nt">&lt;interface</span> <span class="na">type=</span><span class="s">&#39;hostdev&#39;</span> <span class="na">managed=</span><span class="s">&#39;yes&#39;</span><span class="nt">&gt;</span>
+     <span class="nt">&lt;source&gt;</span>
+       <span class="nt">&lt;address</span> <span class="na">type=</span><span class="s">&#39;pci&#39;</span> <span class="na">domain=</span><span class="s">&#39;0&#39;</span> <span class="na">bus=</span><span class="s">&#39;11&#39;</span> <span class="na">slot=</span><span class="s">&#39;16&#39;</span> <span class="na">function=</span><span class="s">&#39;0&#39;</span><span class="nt">/&gt;</span>
+     <span class="nt">&lt;/source&gt;</span>
+     <span class="nt">&lt;mac</span> <span class="na">address=</span><span class="s">&#39;52:54:00:6d:90:02&#39;</span><span class="nt">&gt;</span>
+     <span class="nt">&lt;vlan&gt;</span>
+        <span class="nt">&lt;tag</span> <span class="na">id=</span><span class="s">&#39;42&#39;</span><span class="nt">/&gt;</span>
+     <span class="nt">&lt;/vlan&gt;</span>
+     <span class="nt">&lt;virtualport</span> <span class="na">type=</span><span class="s">&#39;802.1Qbh&#39;</span><span class="nt">&gt;</span>
+       <span class="nt">&lt;parameters</span> <span class="na">profileid=</span><span class="s">&#39;finance&#39;</span><span class="nt">/&gt;</span>
+     <span class="nt">&lt;/virtualport&gt;</span>
+   <span class="nt">&lt;/interface&gt;</span>
+   ...
+ <span class="nt">&lt;/devices&gt;</span>
+</code></pre></div>
+
+
+             
+ 
+                <p id="post-share-links">
+    Share on:
+      <a href="https://twitter.com/intent/tweet?text=Tips%20on%20Linux&url=https%3A//kernelgo.org/linux-tips.html&hashtags=x86" target="_blank" rel="nofollow noopener noreferrer" title="Share on Twitter">Twitter</a>
+ ❄       <a href="https://www.facebook.com/sharer/sharer.php?u=https%3A//kernelgo.org/linux-tips.html" target="_blank" rel="nofollow noopener noreferrer" title="Share on Facebook">Facebook</a>
+ ❄       <a href="mailto:?subject=Tips%20on%20Linux&amp;body=https%3A//kernelgo.org/linux-tips.html" target="_blank" rel="nofollow noopener noreferrer" title="Share via Email">Email</a>
+
+            
+            
+
+
+
+
+
+
+
+<section>
+    <h6 style="display:none;">Comments</h6>
+    <p id="comment-message"> </p>
+
+    <div class="accordion" id="accordion2">
+        <div class="accordion-group">
+            <div class="accordion-heading">
+                <a class="accordion-toggle disqus-comment-count comment-count collapsed"
+                   data-toggle="collapse"
+                   data-parent="#accordion2"
+                   data-disqus-identifier="https://kernelgo.org/linux-tips.html"
+                   href="https://kernelgo.org/linux-tips.html#comment_thread"
+                   id="comment-accordion-toggle">
+                    Comments
+                </a>
+            </div>
+            <div id="comment_thread" class="accordion-body collapse">
+                <div class="accordion-inner">
+                    <div class="comments">
+                        <div id="disqus_thread"></div>
+                        <script>
+    var disqus_shortname = 'kernelgo';
+    (function () {
+        var s = document.createElement('script'); s.async = true;
+        s.type = 'text/javascript';
+        s.src = '//' + disqus_shortname + '.disqus.com/count.js';
+        (document.getElementsByTagName('HEAD')[0] || document.getElementsByTagName('BODY')[0]).appendChild(s);
+    }());
+
+    var disqus_identifier = 'https://kernelgo.org/linux-tips.html';
+    var disqus_url = 'https://kernelgo.org/linux-tips.html';
+
+    (function() {
+        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    })();
+</script>
+
+<noscript>Please enable JavaScript to view the <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+            <hr/>
+            <aside>
+            <nav>
+            <ul class="articles-timeline">
+                <li class="previous-article">« <a href="https://kernelgo.org/vfio-insight.html" title="Previous: Insight Into VFIO">Insight Into VFIO</a></li>
+                <li class="next-article"><a href="https://kernelgo.org/kernel-debug-using-qemu.html" title="Next: Debug Linux Kernel Using QEMU and GDB">Debug Linux Kernel Using QEMU and GDB</a> »</li>
+            </ul>
+            </nav>
+            </aside>
+        </div>
+        <section id="article-sidebar" class="span2">
+            <h4>Published</h4>
+            <time itemprop="dateCreated" datetime="2018-06-12T23:00:00+08:00">Tue 12 June 2018</time>
+
+            <h4>Category</h4>
+            <a class="category-link" href="https://kernelgo.org/categories.html#linux-ref">linux</a>
+            <h4>Tags</h4>
+            <ul class="list-of-tags tags-in-article">
+                <li><a href="https://kernelgo.org/tags.html#x86-ref">x86
+                    <span class="superscript">1</span>
+</a></li>
+            </ul>
+<h4>Contact</h4>
+<div id="sidebar-social-link">
+    <a href="https://github.com/fangying" title="" target="_blank" rel="nofollow noopener noreferrer">
+        <svg xmlns="http://www.w3.org/2000/svg" aria-label="GitHub" role="img" viewBox="0 0 512 512"><rect width="512" height="512" rx="15%" fill="#1B1817"/><path fill="#fff" d="M335 499c14 0 12 17 12 17H165s-2-17 12-17c13 0 16-6 16-12l-1-50c-71 16-86-28-86-28-12-30-28-37-28-37-24-16 1-16 1-16 26 2 40 26 40 26 22 39 59 28 74 22 2-17 9-28 16-35-57-6-116-28-116-126 0-28 10-51 26-69-3-6-11-32 3-67 0 0 21-7 70 26 42-12 86-12 128 0 49-33 70-26 70-26 14 35 6 61 3 67 16 18 26 41 26 69 0 98-60 120-117 126 10 8 18 24 18 48l-1 70c0 6 3 12 16 12z"/></svg>
+    </a>
+</div>
+            
+
+
+
+
+
+            
+
+
+
+
+
+        </section>
+</div>
+</article>
+<!-- Root element of PhotoSwipe. Must have class pswp. -->
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    <!-- Background of PhotoSwipe.
+         It's a separate element as animating opacity is faster than rgba(). -->
+    <div class="pswp__bg"></div>
+
+    <!-- Slides wrapper with overflow:hidden. -->
+    <div class="pswp__scroll-wrap">
+
+        <!-- Container that holds slides.
+            PhotoSwipe keeps only 3 of them in the DOM to save memory.
+            Don't modify these 3 pswp__item elements, data is added later on. -->
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        <!-- Default (PhotoSwipeUI_Default) interface on top of sliding area. Can be changed. -->
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                <!--  Controls are self-explanatory. Order can be changed. -->
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                <!-- Preloader demo https://codepen.io/dimsemenov/pen/yyBWoR -->
+                <!-- element will get class pswp__preloader--active when preloader is running -->
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                      <div class="pswp__preloader__cut">
+                        <div class="pswp__preloader__donut"></div>
+                      </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>                    </div>
+                    <div class="span1"></div>
+                </div>
+            </div>
+        </div>
+<footer>
+    <div>
+        <span xmlns:dct="http://purl.org/dc/terms/" property="dct:title"> kernelgo"</span> by <a xmlns:cc="http://creativecommons.org/ns#" href="https://kernelgo.org" property="cc:attributionName" rel="cc:attributionURL">Yori Fang</a> is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/3.0/deed.en_US">Creative Commons Attribution-ShareAlike 3.0 Unported License</a>.
+    </div>
+
+
+
+
+    <div id="fpowered">
+        Powered by: <a href="http://getpelican.com/" title="Pelican Home Page" target="_blank" rel="nofollow noopener noreferrer">Pelican</a>
+        Theme: <a href="https://elegant.oncrashreboot.com/" title="Theme Elegant Home Page" target="_blank" rel="nofollow noopener noreferrer">Elegant</a>
+    </div>
+</footer>            <script src="//code.jquery.com/jquery.min.js"></script>
+        <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/js/bootstrap.min.js"></script>
+        <script src="https://kernelgo.org/theme/js/elegant.prod.9e9d5ce754.js"></script>
+        <script>
+            function validateForm(query)
+            {
+                return (query.length > 0);
+            }
+        </script>
+
+    <script>
+    (function () {
+        if (window.location.hash.match(/^#comment-\d+$/)) {
+            $('#comment_thread').collapse('show');
+        }
+    })();
+    window.onhashchange=function(){
+        if (window.location.hash.match(/^#comment-\d+$/))
+            window.location.reload(true);
+    }
+    $('#comment_thread').on('shown', function () {
+        var link = document.getElementById('comment-accordion-toggle');
+        var old_innerHTML = link.innerHTML;
+        $(link).fadeOut(200, function() {
+            $(this).text('Click here to hide comments').fadeIn(200);
+        });
+        $('#comment_thread').on('hidden', function () {
+            $(link).fadeOut(200, function() {
+                $(this).text(old_innerHTML).fadeIn(200);
+            });
+        })
+    })
+</script>
+
+    </body>
+    <!-- Theme: Elegant built for Pelican
+        License : MIT -->
+</html>

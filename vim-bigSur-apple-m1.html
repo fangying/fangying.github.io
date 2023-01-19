@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://kernelgo.org/theme/css/style.min.css?fc5adb95">
+
+        <link rel="dns-prefetch" href="//fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin>
+
+        <meta name="author" content="Yori Fang" />
+
+        <meta name="description" content="Use vim8 on Apple M1 MacOS bigSur
+" />
+        <meta property="og:type" content="article" />
+        <meta name="twitter:card" content="summary">
+
+<meta name="keywords" content="vim8, misc, " />
+
+<meta property="og:title" content="Use vim8 on Apple M1 MacOS bigSur "/>
+<meta property="og:url" content="https://kernelgo.org/vim-bigSur-apple-m1.html" />
+<meta property="og:description" content="Use vim8 on Apple M1 MacOS bigSur" />
+<meta property="og:site_name" content="kernelgo" />
+<meta property="og:article:author" content="Yori Fang" />
+<meta property="og:article:published_time" content="2021-02-08T23:00:00+08:00" />
+<meta property="og:article:modified_time" content="2021-02-08T23:00:00+08:00" />
+<meta name="twitter:title" content="Use vim8 on Apple M1 MacOS bigSur ">
+<meta name="twitter:description" content="Use vim8 on Apple M1 MacOS bigSur">
+
+        <title>Use vim8 on Apple M1 MacOS bigSur  · kernelgo
+</title>
+<script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+     (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+     m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+     })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+    ga('create', 'UA-107392039-1', 'auto');
+    ga('send', 'pageview');
+</script>
+
+
+    </head>
+    <body>
+        <div id="content">
+            <div class="navbar navbar-static-top">
+                <div class="navbar-inner">
+                    <div class="container-fluid">
+                        <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                        </a>
+                        <a class="brand" href="https://kernelgo.org/"><span class=site-name>kernelgo</span></a>
+                        <div class="nav-collapse collapse">
+                            <ul class="nav pull-right top-menu">
+                                <li >
+                                    <a href=
+                                       https://kernelgo.org
+                                    >Home</a>
+                                </li>
+                                <li ><a href="https://kernelgo.org/pages/about.html">About</a></li>
+                                <li ><a href="https://kernelgo.org/categories.html">Categories</a></li>
+                                <li ><a href="https://kernelgo.org/tags.html">Tags</a></li>
+                                <li ><a href="https://kernelgo.org/archives.html">Archives</a></li>
+                                <li><form class="navbar-search" action="https://kernelgo.org/search.html" onsubmit="return validateForm(this.elements['q'].value);"> <input type="text" class="search-query" placeholder="Search" name="q" id="tipue_search_input"></form></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="container-fluid">
+                <div class="row-fluid">
+                    <div class="span1"></div>
+                    <div class="span10">
+<article itemscope>
+<div class="row-fluid">
+    <header class="page-header span10 offset2">
+        <h1>
+            <a href="https://kernelgo.org/vim-bigSur-apple-m1.html">
+                Use vim8 on Apple M1 MacOS bigSur
+            </a>
+        </h1>
+    </header>
+</div>
+
+<div class="row-fluid">
+        <div class="span8 offset2 article-content">
+            
+            <p>年前入手了Apple M1 MacBookPro，这是Apple第一款自研芯片的MBP，大小是13寸相对较为实用。
+由于是ARM64架构，在刚上来的时候很多研发工具软件对系统的支持还不是太完善，但经过几个月的
+发展目前已经基本能够满足日常开发需求。</p>
+<p>安利3个传送门，可以方便地查询到各种生态软件对Apple M1的支持最新进展情况。</p>
+<ul>
+<li>传送门1：</li>
+</ul>
+<p>https://isapplesiliconready.com/zh</p>
+<ul>
+<li>传送门2：</li>
+</ul>
+<p>https://github.com/ThatGuySam/doesitarm</p>
+<ul>
+<li>传送门3：</li>
+</ul>
+<p>https://doesitarm.com/</p>
+<p>由于我们是从事系统开发的软件行业，vim成为了日常看代码的必备工具，为此有必要设置一下Apple M1下的vim8工作环境。</p>
+<h2>配置vim8</h2>
+<p>M1上默认安装了vim 8.2版本，编译特性也很全：</p>
+<div class="highlight"><pre><span></span><code>vim --version
+VIM - Vi IMproved <span class="m">8</span>.2 <span class="o">(</span><span class="m">2019</span> Dec <span class="m">12</span>, compiled Dec <span class="m">21</span> <span class="m">2020</span> <span class="m">20</span>:40:21<span class="o">)</span>
+macOS version
+Included patches: <span class="m">1</span>-850, <span class="m">1972</span>
+Compiled by root@apple.com
+</code></pre></div>
+
+<p>vim插件配置可以参考:<a href="https://kernelgo.org/vim8">https://kernelgo.org/vim8</a>
+请自行阅读，这里不再详述。
+在新的Apple M1上主要遇到了2个问题，导致vim8无法很好正常工作。</p>
+<h2>编译gnu global</h2>
+<p>由于要使用global来查看函数调用关系，所以我们要自己编译global来完成这个重要功能。
+但是编译的时候会报错无法找到'realpath'。问题社区已经有报告:</p>
+<p>https://lists.gnu.org/archive/html/bug-global/2021-01/msg00001.html</p>
+<div class="highlight"><pre><span></span><code><span class="nv">checking</span> <span class="k">for</span> <span class="nv">dirent</span>.<span class="nv">h</span> <span class="nv">that</span> <span class="nv">defines</span> <span class="nv">DIR</span>... <span class="nv">yes</span>
+<span class="nv">checking</span> <span class="k">for</span> <span class="nv">library</span> <span class="nv">containing</span> <span class="nv">opendir</span>... <span class="nv">none</span> <span class="nv">required</span>
+<span class="nv">checking</span> <span class="nv">whether</span> <span class="nv">POSIX</span>.<span class="mi">1</span><span class="o">-</span><span class="mi">2008</span> <span class="nv">realpath</span> <span class="nv">is</span> <span class="nv">equipped</span>... <span class="nv">no</span>
+<span class="nv">configure</span>: <span class="nv">error</span>: <span class="nv">POSIX</span>.<span class="mi">1</span><span class="o">-</span><span class="mi">2008</span> <span class="nv">realpath</span><span class="ss">(</span><span class="mi">3</span><span class="ss">)</span> <span class="nv">is</span> <span class="nv">required</span>.
+</code></pre></div>
+
+<p>原因是configure脚本还没有适配好M1版本，这里提供一种规避方案：</p>
+<div class="highlight"><pre><span></span><code><span class="n">diff</span><span class="w"> </span><span class="o">--</span><span class="n">git</span><span class="w"> </span><span class="n">a</span><span class="o">/</span><span class="n">configure</span><span class="w"> </span><span class="n">b</span><span class="o">/</span><span class="n">configure</span><span class="w"></span>
+<span class="n">index</span><span class="w"> </span><span class="mi">100</span><span class="n">a690</span><span class="p">.</span><span class="mf">.4e54</span><span class="n">a52</span><span class="w"> </span><span class="mi">100755</span><span class="w"></span>
+<span class="o">---</span><span class="w"> </span><span class="n">a</span><span class="o">/</span><span class="n">configure</span><span class="w"></span>
+<span class="o">+++</span><span class="w"> </span><span class="n">b</span><span class="o">/</span><span class="n">configure</span><span class="w"></span>
+<span class="err">@@</span><span class="w"> </span><span class="mi">-14273</span><span class="p">,</span><span class="mi">33</span><span class="w"> </span><span class="o">+</span><span class="mi">14273</span><span class="p">,</span><span class="mi">6</span><span class="w"> </span><span class="err">@@</span><span class="w"> </span><span class="k">case</span><span class="w"> </span><span class="s">&quot;$host_os&quot;</span><span class="w"> </span><span class="n">in</span><span class="w"></span>
+<span class="w">    </span><span class="n">mingw</span><span class="o">*|*</span><span class="n">djgpp</span><span class="o">*</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="p">;;</span><span class="w"></span>
+<span class="w">    </span><span class="o">*</span><span class="p">)</span><span class="w"></span>
+<span class="o">-</span><span class="p">{</span><span class="w"> </span><span class="n">$as_echo</span><span class="w"> </span><span class="s">&quot;$as_me:${as_lineno-$LINENO}: checking whether POSIX.1-2008 realpath is equipped&quot;</span><span class="w"> </span><span class="o">&gt;&amp;</span><span class="mi">5</span><span class="w"></span>
+<span class="o">-</span><span class="n">$as_echo_n</span><span class="w"> </span><span class="s">&quot;checking whether POSIX.1-2008 realpath is equipped... &quot;</span><span class="w"> </span><span class="o">&gt;&amp;</span><span class="mi">6</span><span class="p">;</span><span class="w"> </span><span class="p">}</span><span class="w"></span>
+<span class="o">-</span><span class="k">if</span><span class="w"> </span><span class="n">$</span><span class="p">{</span><span class="n">ac_cv_posix1_2008_realpath</span><span class="o">+:</span><span class="p">}</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span><span class="w"> </span><span class="n">then</span><span class="w"> </span><span class="o">:</span><span class="w"></span>
+<span class="o">-</span><span class="w">  </span><span class="n">$as_echo_n</span><span class="w"> </span><span class="s">&quot;(cached) &quot;</span><span class="w"> </span><span class="o">&gt;&amp;</span><span class="mi">6</span><span class="w"></span>
+<span class="o">-</span><span class="k">else</span><span class="w"></span>
+<span class="o">-</span><span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="n">test</span><span class="w"> </span><span class="s">&quot;$cross_compiling&quot;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">yes</span><span class="p">;</span><span class="w"> </span><span class="n">then</span><span class="w"> </span><span class="o">:</span><span class="w"></span>
+<span class="o">-</span><span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">$as_echo</span><span class="w"> </span><span class="s">&quot;$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd&#39;:&quot;</span><span class="w"> </span><span class="o">&gt;&amp;</span><span class="mi">5</span><span class="w"></span>
+<span class="o">-</span><span class="n">$as_echo</span><span class="w"> </span><span class="s">&quot;$as_me: error: in \`$ac_pwd&#39;:&quot;</span><span class="w"> </span><span class="o">&gt;&amp;</span><span class="mi">2</span><span class="p">;}</span><span class="w"></span>
+<span class="o">-</span><span class="n">as_fn_error</span><span class="w"> </span><span class="n">$</span><span class="o">?</span><span class="w"> </span><span class="s">&quot;cannot run test program while cross compiling</span>
+<span class="o">-</span><span class="n">See</span><span class="w"> </span><span class="err">\`</span><span class="n">config</span><span class="p">.</span><span class="n">log</span><span class="err">&#39;</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">more</span><span class="w"> </span><span class="n">details</span><span class="s">&quot; &quot;</span><span class="n">$LINENO</span><span class="s">&quot; 5; }</span>
+<span class="o">-</span><span class="k">else</span><span class="w"></span>
+<span class="o">-</span><span class="w">  </span><span class="n">cat</span><span class="w"> </span><span class="n">confdefs</span><span class="p">.</span><span class="n">h</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="n">_ACEOF</span><span class="w"> </span><span class="o">&gt;</span><span class="n">conftest</span><span class="p">.</span><span class="n">$ac_ext</span><span class="w"></span>
+<span class="o">-</span><span class="cm">/* end confdefs.h.  */</span><span class="w"></span>
+<span class="o">-</span><span class="w"></span>
+<span class="o">-</span><span class="n">main</span><span class="p">(){</span><span class="w"> </span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="n">realpath</span><span class="p">(</span><span class="s">&quot;/./tmp&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="mi">0</span><span class="p">);</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="p">}</span><span class="w"></span>
+<span class="o">-</span><span class="w"></span>
+<span class="o">-</span><span class="n">_ACEOF</span><span class="w"></span>
+<span class="o">-</span><span class="k">if</span><span class="w"> </span><span class="n">ac_fn_c_try_run</span><span class="w"> </span><span class="s">&quot;$LINENO&quot;</span><span class="p">;</span><span class="w"> </span><span class="n">then</span><span class="w"> </span><span class="o">:</span><span class="w"></span>
+<span class="o">-</span><span class="w">  </span><span class="n">ac_cv_posix1_2008_realpath</span><span class="o">=</span><span class="n">yes</span><span class="w"></span>
+<span class="o">-</span><span class="k">else</span><span class="w"></span>
+<span class="o">-</span><span class="w">  </span><span class="n">ac_cv_posix1_2008_realpath</span><span class="o">=</span><span class="n">no</span><span class="w"></span>
+<span class="o">-</span><span class="n">fi</span><span class="w"></span>
+<span class="o">-</span><span class="n">rm</span><span class="w"> </span><span class="o">-</span><span class="n">f</span><span class="w"> </span><span class="n">core</span><span class="w"> </span><span class="o">*</span><span class="p">.</span><span class="n">core</span><span class="w"> </span><span class="n">core</span><span class="p">.</span><span class="n">conftest</span><span class="p">.</span><span class="o">*</span><span class="w"> </span><span class="n">gmon</span><span class="p">.</span><span class="n">out</span><span class="w"> </span><span class="n">bb</span><span class="p">.</span><span class="n">out</span><span class="w"> </span><span class="n">conftest$ac_exeext</span><span class="w"> </span>\
+<span class="o">-</span><span class="w">  </span><span class="n">conftest</span><span class="p">.</span><span class="n">$ac_objext</span><span class="w"> </span><span class="n">conftest</span><span class="p">.</span><span class="n">beam</span><span class="w"> </span><span class="n">conftest</span><span class="p">.</span><span class="n">$ac_ext</span><span class="w"></span>
+<span class="o">-</span><span class="n">fi</span><span class="w"></span>
+<span class="o">-</span><span class="w"></span>
+<span class="o">-</span><span class="n">fi</span><span class="w"></span>
+
+<span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">$as_echo</span><span class="w"> </span><span class="s">&quot;$as_me:${as_lineno-$LINENO}: result: $ac_cv_posix1_2008_realpath&quot;</span><span class="w"> </span><span class="o">&gt;&amp;</span><span class="mi">5</span><span class="w"></span>
+<span class="w"> </span><span class="n">$as_echo</span><span class="w"> </span><span class="s">&quot;$ac_cv_posix1_2008_realpath&quot;</span><span class="w"> </span><span class="o">&gt;&amp;</span><span class="mi">6</span><span class="p">;</span><span class="w"> </span><span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>打上这个补丁之后，再次编译就能够顺利编译通过了。</p>
+<div class="highlight"><pre><span></span><code>./configure --with-universal-ctags=/usr/local/bin/ctags
+make -j
+sudo make install
+</code></pre></div>
+
+<h2>修改gutentags配置参数</h2>
+<p>我们用universal-ctags来帮我们生成形系统符号表，这样我们可以用ctrl + ]来实现符号跳转。
+在M1上需要注意的是，默认安装后可能会出现E433错误。</p>
+<div class="highlight"><pre><span></span><code><span class="n">E433</span><span class="o">:</span><span class="w"> </span><span class="n">No</span><span class="w"> </span><span class="n">tags</span><span class="w"> </span><span class="n">file</span><span class="w"></span>
+</code></pre></div>
+
+<p>这里需要打开日志开关，取消下面配置的注释：</p>
+<div class="highlight"><pre><span></span><code>let g:gutentags_trace = 1
+</code></pre></div>
+
+<p>这样再次出现E433错误后，输入":messages"命令，可以看到错误的原因：</p>
+<div class="highlight"><pre><span></span><code><span class="nl">gutentags</span><span class="p">:</span><span class="w"> </span><span class="n">Scanning</span><span class="w"> </span><span class="n">buffer</span><span class="w"> </span><span class="err">&#39;&#39;</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">gutentags</span><span class="w"> </span><span class="n">setup</span><span class="p">...</span><span class="w"></span>
+<span class="nl">gutentags</span><span class="p">:</span><span class="w"> </span><span class="n">No</span><span class="w"> </span><span class="n">specific</span><span class="w"> </span><span class="n">project</span><span class="w"> </span><span class="n">type</span><span class="p">.</span><span class="w"></span>
+<span class="nl">gutentags</span><span class="p">:</span><span class="w"> </span><span class="n">Setting</span><span class="w"> </span><span class="n">gutentags</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">buffer</span><span class="w"> </span><span class="err">&#39;&#39;</span><span class="w"></span>
+<span class="nl">gutentags</span><span class="p">:</span><span class="w"> </span><span class="n">Generating</span><span class="w"> </span><span class="n">missing</span><span class="w"> </span><span class="n">tags</span><span class="w"> </span><span class="n">file</span><span class="o">:</span><span class="w"> </span><span class="o">/</span><span class="n">Users</span><span class="o">/</span><span class="n">yingfang</span><span class="o">/</span><span class="p">.</span><span class="n">cache</span><span class="o">/</span><span class="n">tags</span><span class="o">/</span><span class="n">Users</span><span class="o">-</span><span class="n">yingfang</span><span class="o">-</span><span class="n">Code</span><span class="o">-</span><span class="n">opensrc</span><span class="o">-</span><span class="n">qemu</span><span class="o">-</span><span class="p">.</span><span class="n">tags</span><span class="w"></span>
+<span class="nl">gutentags</span><span class="p">:</span><span class="w"> </span><span class="n">Wildignore</span><span class="w"> </span><span class="n">options</span><span class="w"> </span><span class="n">file</span><span class="w"> </span><span class="n">is</span><span class="w"> </span><span class="n">up</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="n">date</span><span class="p">.</span><span class="w"></span>
+<span class="nl">gutentags</span><span class="p">:</span><span class="w"> </span><span class="n">Running</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="err">&#39;</span><span class="o">/</span><span class="n">Users</span><span class="o">/</span><span class="n">yingfang</span><span class="o">/</span><span class="p">.</span><span class="n">vim</span><span class="o">/</span><span class="n">plugged</span><span class="o">/</span><span class="n">vim</span><span class="o">-</span><span class="n">gutentags</span><span class="o">/</span><span class="n">plat</span><span class="o">/</span><span class="n">unix</span><span class="o">/</span><span class="n">update_tags</span><span class="p">.</span><span class="n">sh</span><span class="err">&#39;</span><span class="p">,</span><span class="w"> </span><span class="err">&#39;</span><span class="o">-</span><span class="n">e</span><span class="err">&#39;</span><span class="p">,</span><span class="w"> </span><span class="err">&#39;</span><span class="n">ctags</span><span class="err">&#39;</span><span class="p">,</span><span class="w"> </span><span class="err">&#39;</span><span class="o">-</span><span class="n">t</span><span class="err">&#39;</span><span class="p">,</span><span class="w"> </span><span class="err">&#39;</span><span class="o">/</span><span class="n">Users</span><span class="o">/</span><span class="n">yingfang</span><span class="o">/</span><span class="p">.</span><span class="n">cache</span><span class="o">/</span><span class="n">tags</span><span class="o">/</span><span class="n">U</span><span class="w"></span>
+<span class="n">sers</span><span class="o">-</span><span class="n">yingfang</span><span class="o">-</span><span class="n">Code</span><span class="o">-</span><span class="n">opensrc</span><span class="o">-</span><span class="n">qemu</span><span class="o">-</span><span class="p">.</span><span class="n">tags</span><span class="err">&#39;</span><span class="p">,</span><span class="w"> </span><span class="err">&#39;</span><span class="o">-</span><span class="n">p</span><span class="err">&#39;</span><span class="p">,</span><span class="w"> </span><span class="err">&#39;</span><span class="o">/</span><span class="n">Users</span><span class="o">/</span><span class="n">yingfang</span><span class="o">/</span><span class="n">Code</span><span class="o">/</span><span class="n">opensrc</span><span class="o">/</span><span class="n">qemu</span><span class="err">&#39;</span><span class="p">,</span><span class="w"> </span><span class="err">&#39;</span><span class="o">-</span><span class="n">o</span><span class="err">&#39;</span><span class="p">,</span><span class="w"> </span><span class="err">&#39;</span><span class="o">/</span><span class="n">Users</span><span class="o">/</span><span class="n">yingfang</span><span class="o">/</span><span class="p">.</span><span class="n">vim</span><span class="o">/</span><span class="n">plugged</span><span class="o">/</span><span class="n">vim</span><span class="o">-</span><span class="n">gutentags</span><span class="o">/</span><span class="n">res</span><span class="o">/</span><span class="n">ctags_</span><span class="w"></span>
+<span class="n">recursive</span><span class="p">.</span><span class="n">options</span><span class="err">&#39;</span><span class="p">,</span><span class="w"> </span><span class="err">&#39;</span><span class="o">-</span><span class="n">O</span><span class="err">&#39;</span><span class="p">,</span><span class="w"> </span><span class="err">&#39;</span><span class="o">--</span><span class="n">fields</span><span class="o">=+</span><span class="n">niazS</span><span class="err">&#39;</span><span class="p">,</span><span class="w"> </span><span class="err">&#39;</span><span class="o">-</span><span class="n">O</span><span class="err">&#39;</span><span class="p">,</span><span class="w"> </span><span class="err">&#39;</span><span class="o">--</span><span class="n">extra</span><span class="o">=+</span><span class="n">q</span><span class="err">&#39;</span><span class="p">,</span><span class="w"> </span><span class="err">&#39;</span><span class="o">-</span><span class="n">O</span><span class="err">&#39;</span><span class="p">,</span><span class="w"> </span><span class="err">&#39;</span><span class="o">--</span><span class="n">c</span><span class="o">++-</span><span class="n">kinds</span><span class="o">=+</span><span class="n">pxI</span><span class="err">&#39;</span><span class="p">,</span><span class="w"> </span><span class="err">&#39;</span><span class="o">-</span><span class="n">O</span><span class="err">&#39;</span><span class="p">,</span><span class="w"> </span><span class="err">&#39;</span><span class="o">--</span><span class="n">c</span><span class="o">-</span><span class="n">kinds</span><span class="o">=+</span><span class="n">px</span><span class="err">&#39;</span><span class="p">,</span><span class="w"> </span><span class="err">&#39;</span><span class="o">-</span><span class="n">O</span><span class="err">&#39;</span><span class="p">,</span><span class="w"> </span><span class="err">&#39;</span><span class="o">--</span><span class="n">output</span><span class="o">-</span><span class="n">format</span><span class="o">=</span><span class="n">e</span><span class="o">-</span><span class="n">ctag</span><span class="w"></span>
+<span class="n">s</span><span class="err">&#39;</span><span class="p">,</span><span class="w"> </span><span class="err">&#39;</span><span class="o">-</span><span class="n">l</span><span class="err">&#39;</span><span class="p">,</span><span class="w"> </span><span class="err">&#39;</span><span class="o">/</span><span class="n">Users</span><span class="o">/</span><span class="n">yingfang</span><span class="o">/</span><span class="p">.</span><span class="n">cache</span><span class="o">/</span><span class="n">tags</span><span class="o">/</span><span class="n">Users</span><span class="o">-</span><span class="n">yingfang</span><span class="o">-</span><span class="n">Code</span><span class="o">-</span><span class="n">opensrc</span><span class="o">-</span><span class="n">qemu</span><span class="o">-</span><span class="p">.</span><span class="n">tags</span><span class="p">.</span><span class="n">log</span><span class="err">&#39;</span><span class="p">]</span><span class="w"></span>
+<span class="nl">gutentags</span><span class="p">:</span><span class="w"> </span><span class="n">In</span><span class="o">:</span><span class="w">      </span><span class="o">/</span><span class="n">Users</span><span class="o">/</span><span class="n">yingfang</span><span class="o">/</span><span class="n">Code</span><span class="o">/</span><span class="n">opensrc</span><span class="o">/</span><span class="n">qemu</span><span class="w"></span>
+<span class="nl">gutentags</span><span class="p">:</span><span class="w"> </span><span class="n">Generating</span><span class="w"> </span><span class="n">tags</span><span class="w"> </span><span class="n">file</span><span class="o">:</span><span class="w"> </span><span class="o">/</span><span class="n">Users</span><span class="o">/</span><span class="n">yingfang</span><span class="o">/</span><span class="p">.</span><span class="n">cache</span><span class="o">/</span><span class="n">tags</span><span class="o">/</span><span class="n">Users</span><span class="o">-</span><span class="n">yingfang</span><span class="o">-</span><span class="n">Code</span><span class="o">-</span><span class="n">opensrc</span><span class="o">-</span><span class="n">qemu</span><span class="o">/</span><span class="n">GTAGS</span><span class="w"></span>
+<span class="nl">gutentags</span><span class="p">:</span><span class="w"> </span><span class="n">Running</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="err">&#39;</span><span class="n">gtags</span><span class="err">&#39;</span><span class="p">,</span><span class="w"> </span><span class="err">&#39;</span><span class="o">--</span><span class="n">incremental</span><span class="err">&#39;</span><span class="p">,</span><span class="w"> </span><span class="err">&#39;</span><span class="o">/</span><span class="n">Users</span><span class="o">/</span><span class="n">yingfang</span><span class="o">/</span><span class="p">.</span><span class="n">cache</span><span class="o">/</span><span class="n">tags</span><span class="o">/</span><span class="n">Users</span><span class="o">-</span><span class="n">yingfang</span><span class="o">-</span><span class="n">Code</span><span class="o">-</span><span class="n">opensrc</span><span class="o">-</span><span class="n">qemu</span><span class="err">&#39;</span><span class="p">]</span><span class="w"></span>
+<span class="nl">gutentags</span><span class="p">:</span><span class="w"> </span><span class="n">In</span><span class="o">:</span><span class="w">      </span><span class="o">/</span><span class="n">Users</span><span class="o">/</span><span class="n">yingfang</span><span class="o">/</span><span class="n">Code</span><span class="o">/</span><span class="n">opensrc</span><span class="o">/</span><span class="n">qemu</span><span class="w"></span>
+<span class="nl">gutentags</span><span class="p">:</span><span class="w"></span>
+<span class="nl">gutentags</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="n">job</span><span class="w"> </span><span class="n">stdout</span><span class="p">]</span><span class="o">:</span><span class="w"> </span><span class="err">&#39;</span><span class="n">Locking</span><span class="w"> </span><span class="n">tags</span><span class="w"> </span><span class="n">file</span><span class="p">...</span><span class="err">&#39;</span><span class="w"></span>
+<span class="nl">gutentags</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="n">job</span><span class="w"> </span><span class="n">stdout</span><span class="p">]</span><span class="o">:</span><span class="w"> </span><span class="err">&#39;</span><span class="n">Running</span><span class="w"> </span><span class="n">ctags</span><span class="w"> </span><span class="n">on</span><span class="w"> </span><span class="n">whole</span><span class="w"> </span><span class="n">project</span><span class="err">&#39;</span><span class="w"></span>
+<span class="nl">gutentags</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="n">job</span><span class="w"> </span><span class="n">stdout</span><span class="p">]</span><span class="o">:</span><span class="w"> </span><span class="err">&#39;</span><span class="n">ctags</span><span class="w"> </span><span class="o">-</span><span class="n">f</span><span class="w"> </span><span class="s">&quot;/Users/yingfang/.cache/tags/Users-yingfang-Code-opensrc-qemu-.tags.temp&quot;</span><span class="w"> </span><span class="s">&quot;--options=/Users/yingfang/.vim/pl</span>
+<span class="n">ugged</span><span class="o">/</span><span class="n">vim</span><span class="o">-</span><span class="n">gutentags</span><span class="o">/</span><span class="n">res</span><span class="o">/</span><span class="n">ctags_recursive</span><span class="p">.</span><span class="n">options</span><span class="s">&quot;  --fields=+niazS --extra=+q --c++-kinds=+pxI --c-kinds=+px --output-format=e-ctags &quot;</span><span class="o">/</span><span class="n">Users</span><span class="o">/</span><span class="n">yin</span><span class="w"></span>
+<span class="n">gfang</span><span class="o">/</span><span class="n">Code</span><span class="o">/</span><span class="n">opensrc</span><span class="o">/</span><span class="n">qemu</span><span class="s">&quot;&#39;</span>
+<span class="nl">gutentags</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="n">job</span><span class="w"> </span><span class="n">stderr</span><span class="p">]</span><span class="o">:</span><span class="w"> </span><span class="err">&#39;</span><span class="n">ctags</span><span class="o">:</span><span class="w"> </span><span class="n">Warning</span><span class="o">:</span><span class="w"> </span><span class="o">--</span><span class="n">extra</span><span class="w"> </span><span class="n">option</span><span class="w"> </span><span class="n">is</span><span class="w"> </span><span class="n">obsolete</span><span class="p">;</span><span class="w"> </span><span class="n">use</span><span class="w"> </span><span class="o">--</span><span class="n">extras</span><span class="w"> </span><span class="n">instead</span><span class="err">&#39;</span><span class="w"></span>
+<span class="nl">gutentags</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="n">job</span><span class="w"> </span><span class="n">stderr</span><span class="p">]</span><span class="o">:</span><span class="w"> </span><span class="err">&#39;</span><span class="n">ctags</span><span class="o">:</span><span class="w"> </span><span class="n">Warning</span><span class="o">:</span><span class="w"> </span><span class="n">Unsupported</span><span class="w"> </span><span class="n">kind</span><span class="o">:</span><span class="w"> </span><span class="err">&#39;</span><span class="sc">&#39;I&#39;</span><span class="err">&#39;</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="o">--</span><span class="n">c</span><span class="o">++-</span><span class="n">kinds</span><span class="w"> </span><span class="n">option</span><span class="err">&#39;</span><span class="w"></span>
+<span class="nl">gutentags</span><span class="p">:</span><span class="w"> </span><span class="n">Finished</span><span class="w"> </span><span class="n">gtags_cscope</span><span class="w"> </span><span class="n">job</span><span class="p">.</span><span class="w"></span>
+</code></pre></div>
+
+<p>原因是在M1上我们编译的ctags支持的参数命令上和X86平台上差异。
+解决办法：修改-extra参数为-extras，去掉c++-kinds上的'I'。
+修改后对应的配置项为:</p>
+<div class="highlight"><pre><span></span><code>let g:gutentags_ctags_extra_args = [&#39;--fields=+niazS&#39;, &#39;--extras=+q&#39;]           
+let g:gutentags_ctags_extra_args += [&#39;--c++-kinds=+px&#39;]                         
+let g:gutentags_ctags_extra_args += [&#39;--c-kinds=+px&#39;]  
+</code></pre></div>
+
+<p>改完之后应该就没有E433错误了。
+到这里就可以在Apple M1上愉快的使用vim8来看代码了。</p>
+<p>Peace.</p>
+
+
+             
+ 
+                <p id="post-share-links">
+    Share on:
+      <a href="https://twitter.com/intent/tweet?text=Use%20vim8%20on%20Apple%20M1%20MacOS%20bigSur&url=https%3A//kernelgo.org/vim-bigSur-apple-m1.html&hashtags=vim8" target="_blank" rel="nofollow noopener noreferrer" title="Share on Twitter">Twitter</a>
+ ❄       <a href="https://www.facebook.com/sharer/sharer.php?u=https%3A//kernelgo.org/vim-bigSur-apple-m1.html" target="_blank" rel="nofollow noopener noreferrer" title="Share on Facebook">Facebook</a>
+ ❄       <a href="mailto:?subject=Use%20vim8%20on%20Apple%20M1%20MacOS%20bigSur&amp;body=https%3A//kernelgo.org/vim-bigSur-apple-m1.html" target="_blank" rel="nofollow noopener noreferrer" title="Share via Email">Email</a>
+
+            
+            
+
+
+
+
+
+
+
+<section>
+    <h6 style="display:none;">Comments</h6>
+    <p id="comment-message"> </p>
+
+    <div class="accordion" id="accordion2">
+        <div class="accordion-group">
+            <div class="accordion-heading">
+                <a class="accordion-toggle disqus-comment-count comment-count collapsed"
+                   data-toggle="collapse"
+                   data-parent="#accordion2"
+                   data-disqus-identifier="https://kernelgo.org/vim-bigSur-apple-m1.html"
+                   href="https://kernelgo.org/vim-bigSur-apple-m1.html#comment_thread"
+                   id="comment-accordion-toggle">
+                    Comments
+                </a>
+            </div>
+            <div id="comment_thread" class="accordion-body collapse">
+                <div class="accordion-inner">
+                    <div class="comments">
+                        <div id="disqus_thread"></div>
+                        <script>
+    var disqus_shortname = 'kernelgo';
+    (function () {
+        var s = document.createElement('script'); s.async = true;
+        s.type = 'text/javascript';
+        s.src = '//' + disqus_shortname + '.disqus.com/count.js';
+        (document.getElementsByTagName('HEAD')[0] || document.getElementsByTagName('BODY')[0]).appendChild(s);
+    }());
+
+    var disqus_identifier = 'https://kernelgo.org/vim-bigSur-apple-m1.html';
+    var disqus_url = 'https://kernelgo.org/vim-bigSur-apple-m1.html';
+
+    (function() {
+        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    })();
+</script>
+
+<noscript>Please enable JavaScript to view the <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+            <hr/>
+            <aside>
+            <nav>
+            <ul class="articles-timeline">
+                <li class="previous-article">« <a href="https://kernelgo.org/memory-model.html" title="Previous: Understanding C11/C++11 Memory Model">Understanding C11/C++11 Memory Model</a></li>
+                <li class="next-article"><a href="https://kernelgo.org/neovim-bigSur-apple-m1.html" title="Next: Use NeoVim on Apple M1 MacOS bigSur">Use NeoVim on Apple M1 MacOS bigSur</a> »</li>
+            </ul>
+            </nav>
+            </aside>
+        </div>
+        <section id="article-sidebar" class="span2">
+            <h4>Published</h4>
+            <time itemprop="dateCreated" datetime="2021-02-08T23:00:00+08:00">Mon 08 February 2021</time>
+
+            <h4>Category</h4>
+            <a class="category-link" href="https://kernelgo.org/categories.html#misc-ref">misc</a>
+            <h4>Tags</h4>
+            <ul class="list-of-tags tags-in-article">
+                <li><a href="https://kernelgo.org/tags.html#vim8-ref">vim8
+                    <span class="superscript">1</span>
+</a></li>
+            </ul>
+<h4>Contact</h4>
+<div id="sidebar-social-link">
+    <a href="https://github.com/fangying" title="" target="_blank" rel="nofollow noopener noreferrer">
+        <svg xmlns="http://www.w3.org/2000/svg" aria-label="GitHub" role="img" viewBox="0 0 512 512"><rect width="512" height="512" rx="15%" fill="#1B1817"/><path fill="#fff" d="M335 499c14 0 12 17 12 17H165s-2-17 12-17c13 0 16-6 16-12l-1-50c-71 16-86-28-86-28-12-30-28-37-28-37-24-16 1-16 1-16 26 2 40 26 40 26 22 39 59 28 74 22 2-17 9-28 16-35-57-6-116-28-116-126 0-28 10-51 26-69-3-6-11-32 3-67 0 0 21-7 70 26 42-12 86-12 128 0 49-33 70-26 70-26 14 35 6 61 3 67 16 18 26 41 26 69 0 98-60 120-117 126 10 8 18 24 18 48l-1 70c0 6 3 12 16 12z"/></svg>
+    </a>
+</div>
+            
+
+
+
+
+
+            
+
+
+
+
+
+        </section>
+</div>
+</article>
+<!-- Root element of PhotoSwipe. Must have class pswp. -->
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    <!-- Background of PhotoSwipe.
+         It's a separate element as animating opacity is faster than rgba(). -->
+    <div class="pswp__bg"></div>
+
+    <!-- Slides wrapper with overflow:hidden. -->
+    <div class="pswp__scroll-wrap">
+
+        <!-- Container that holds slides.
+            PhotoSwipe keeps only 3 of them in the DOM to save memory.
+            Don't modify these 3 pswp__item elements, data is added later on. -->
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        <!-- Default (PhotoSwipeUI_Default) interface on top of sliding area. Can be changed. -->
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                <!--  Controls are self-explanatory. Order can be changed. -->
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                <!-- Preloader demo https://codepen.io/dimsemenov/pen/yyBWoR -->
+                <!-- element will get class pswp__preloader--active when preloader is running -->
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                      <div class="pswp__preloader__cut">
+                        <div class="pswp__preloader__donut"></div>
+                      </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>                    </div>
+                    <div class="span1"></div>
+                </div>
+            </div>
+        </div>
+<footer>
+    <div>
+        <span xmlns:dct="http://purl.org/dc/terms/" property="dct:title"> kernelgo"</span> by <a xmlns:cc="http://creativecommons.org/ns#" href="https://kernelgo.org" property="cc:attributionName" rel="cc:attributionURL">Yori Fang</a> is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/3.0/deed.en_US">Creative Commons Attribution-ShareAlike 3.0 Unported License</a>.
+    </div>
+
+
+
+
+    <div id="fpowered">
+        Powered by: <a href="http://getpelican.com/" title="Pelican Home Page" target="_blank" rel="nofollow noopener noreferrer">Pelican</a>
+        Theme: <a href="https://elegant.oncrashreboot.com/" title="Theme Elegant Home Page" target="_blank" rel="nofollow noopener noreferrer">Elegant</a>
+    </div>
+</footer>            <script src="//code.jquery.com/jquery.min.js"></script>
+        <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/js/bootstrap.min.js"></script>
+        <script src="https://kernelgo.org/theme/js/elegant.prod.9e9d5ce754.js"></script>
+        <script>
+            function validateForm(query)
+            {
+                return (query.length > 0);
+            }
+        </script>
+
+    <script>
+    (function () {
+        if (window.location.hash.match(/^#comment-\d+$/)) {
+            $('#comment_thread').collapse('show');
+        }
+    })();
+    window.onhashchange=function(){
+        if (window.location.hash.match(/^#comment-\d+$/))
+            window.location.reload(true);
+    }
+    $('#comment_thread').on('shown', function () {
+        var link = document.getElementById('comment-accordion-toggle');
+        var old_innerHTML = link.innerHTML;
+        $(link).fadeOut(200, function() {
+            $(this).text('Click here to hide comments').fadeIn(200);
+        });
+        $('#comment_thread').on('hidden', function () {
+            $(link).fadeOut(200, function() {
+                $(this).text(old_innerHTML).fadeIn(200);
+            });
+        })
+    })
+</script>
+
+    </body>
+    <!-- Theme: Elegant built for Pelican
+        License : MIT -->
+</html>
