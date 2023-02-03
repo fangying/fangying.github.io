@@ -109,56 +109,56 @@ Intel SDM, Volume 3, Chapter 6.7 Nonmaskable Interrupt章节指出：
 <h3>2.NMI中断虚拟化</h3>
 <p>我们可以通过virsh inject-nmi VMname命令给虚拟机注入NMI中断。</p>
 <p>QEMU这边的调用栈为：</p>
-<div class="highlight"><pre><span></span><code><span class="n">qmp_inject_nmi</span><span class="w"></span>
-<span class="w">  </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">nmi_monitor_handle</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="n">qmp_inject_nmi</span>
+<span class="w">  </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">nmi_monitor_handle</span>
 <span class="w">    </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">nmi_children</span><span class="w">  </span><span class="c1">//传入了struct do_nmi_s ns</span>
-<span class="w">      </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">do_nmi</span><span class="w"></span>
-<span class="w">        </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">nc</span><span class="o">-&gt;</span><span class="n">nmi_monitor_handler</span><span class="w"></span>
-<span class="w">          </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">x86_nmi</span><span class="w"></span>
-<span class="w">            </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">apic_deliver_nmi</span><span class="w"></span>
-<span class="w">              </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">kvm_apic_external_nmi</span><span class="w"></span>
-<span class="w">                </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">do_inject_external_nmi</span><span class="w"></span>
-<span class="w">                  </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">kvm_vcpu_ioctl</span><span class="p">(</span><span class="n">cpu</span><span class="p">,</span><span class="w"> </span><span class="n">KVM_NMI</span><span class="p">)</span><span class="w"></span>
+<span class="w">      </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">do_nmi</span>
+<span class="w">        </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">nc</span><span class="o">-&gt;</span><span class="n">nmi_monitor_handler</span>
+<span class="w">          </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">x86_nmi</span>
+<span class="w">            </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">apic_deliver_nmi</span>
+<span class="w">              </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">kvm_apic_external_nmi</span>
+<span class="w">                </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">do_inject_external_nmi</span>
+<span class="w">                  </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">kvm_vcpu_ioctl</span><span class="p">(</span><span class="n">cpu</span><span class="p">,</span><span class="w"> </span><span class="n">KVM_NMI</span><span class="p">)</span>
 </code></pre></div>
 
 <p>其中<code>nmi_children</code>的设计比较特别，它调用了一个object_child_foreach函数，
 会沿着QOM对象树往下遍历，遍历的时候调用<code>do_nmi</code>函数。
 值得注意的是这里<code>NMIClass</code>被设计为一个<code>interface</code>类型，而主板类<code>MachineClass</code>实现了这个接口。</p>
-<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">TypeInfo</span><span class="w"> </span><span class="n">pc_machine_info</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="p">.</span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TYPE_PC_MACHINE</span><span class="p">,</span><span class="w"></span>
-<span class="w">    </span><span class="p">.</span><span class="n">parent</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TYPE_MACHINE</span><span class="p">,</span><span class="w"></span>
-<span class="w">    </span><span class="p">.</span><span class="n">abstract</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">true</span><span class="p">,</span><span class="w"></span>
-<span class="w">    </span><span class="p">.</span><span class="n">instance_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">PCMachineState</span><span class="p">),</span><span class="w"></span>
-<span class="w">    </span><span class="p">.</span><span class="n">instance_init</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pc_machine_initfn</span><span class="p">,</span><span class="w"></span>
-<span class="w">    </span><span class="p">.</span><span class="n">class_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">PCMachineClass</span><span class="p">),</span><span class="w"></span>
-<span class="w">    </span><span class="p">.</span><span class="n">class_init</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pc_machine_class_init</span><span class="p">,</span><span class="w"></span>
-<span class="w">    </span><span class="p">.</span><span class="n">interfaces</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">InterfaceInfo</span><span class="p">[])</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">         </span><span class="p">{</span><span class="w"> </span><span class="n">TYPE_HOTPLUG_HANDLER</span><span class="w"> </span><span class="p">},</span><span class="w"></span>
-<span class="w">         </span><span class="p">{</span><span class="w"> </span><span class="n">TYPE_NMI</span><span class="w"> </span><span class="p">},</span><span class="w"></span>
-<span class="w">         </span><span class="p">{</span><span class="w"> </span><span class="p">}</span><span class="w"></span>
-<span class="w">    </span><span class="p">},</span><span class="w"></span>
-<span class="p">};</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">TypeInfo</span><span class="w"> </span><span class="n">pc_machine_info</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="p">.</span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TYPE_PC_MACHINE</span><span class="p">,</span>
+<span class="w">    </span><span class="p">.</span><span class="n">parent</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TYPE_MACHINE</span><span class="p">,</span>
+<span class="w">    </span><span class="p">.</span><span class="n">abstract</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">true</span><span class="p">,</span>
+<span class="w">    </span><span class="p">.</span><span class="n">instance_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">PCMachineState</span><span class="p">),</span>
+<span class="w">    </span><span class="p">.</span><span class="n">instance_init</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pc_machine_initfn</span><span class="p">,</span>
+<span class="w">    </span><span class="p">.</span><span class="n">class_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">PCMachineClass</span><span class="p">),</span>
+<span class="w">    </span><span class="p">.</span><span class="n">class_init</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pc_machine_class_init</span><span class="p">,</span>
+<span class="w">    </span><span class="p">.</span><span class="n">interfaces</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">InterfaceInfo</span><span class="p">[])</span><span class="w"> </span><span class="p">{</span>
+<span class="w">         </span><span class="p">{</span><span class="w"> </span><span class="n">TYPE_HOTPLUG_HANDLER</span><span class="w"> </span><span class="p">},</span>
+<span class="w">         </span><span class="p">{</span><span class="w"> </span><span class="n">TYPE_NMI</span><span class="w"> </span><span class="p">},</span>
+<span class="w">         </span><span class="p">{</span><span class="w"> </span><span class="p">}</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="p">};</span>
 </code></pre></div>
 
 <p>主板类是一个抽象类，实现了<code>TYPE_HOTPLUG_HANDLER</code>和<code>TYPE_NMI</code>接口，有点Java面向对象的意思。</p>
-<div class="highlight"><pre><span></span><code><span class="n">static</span><span class="w"> </span><span class="n">int</span><span class="w"> </span><span class="n">do_nmi</span><span class="p">(</span><span class="n">Object</span><span class="w"> </span><span class="o">*</span><span class="n">o</span><span class="p">,</span><span class="w"> </span><span class="n">void</span><span class="w"> </span><span class="o">*</span><span class="n">opaque</span><span class="p">)</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="n">struct</span><span class="w"> </span><span class="n">do_nmi_s</span><span class="w"> </span><span class="o">*</span><span class="n">ns</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">opaque</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="n">NMIState</span><span class="w"> </span><span class="o">*</span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">NMIState</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="w"> </span><span class="n">object_dynamic_cast</span><span class="p">(</span><span class="n">o</span><span class="p">,</span><span class="w"> </span><span class="n">TYPE_NMI</span><span class="p">);</span><span class="w">  </span><span class="c1">// 对象动态转换</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="n">static</span><span class="w"> </span><span class="n">int</span><span class="w"> </span><span class="n">do_nmi</span><span class="p">(</span><span class="n">Object</span><span class="w"> </span><span class="o">*</span><span class="n">o</span><span class="p">,</span><span class="w"> </span><span class="n">void</span><span class="w"> </span><span class="o">*</span><span class="n">opaque</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">struct</span><span class="w"> </span><span class="n">do_nmi_s</span><span class="w"> </span><span class="o">*</span><span class="n">ns</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">opaque</span><span class="p">;</span>
+<span class="w">    </span><span class="n">NMIState</span><span class="w"> </span><span class="o">*</span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">NMIState</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="w"> </span><span class="n">object_dynamic_cast</span><span class="p">(</span><span class="n">o</span><span class="p">,</span><span class="w"> </span><span class="n">TYPE_NMI</span><span class="p">);</span><span class="w">  </span><span class="c1">// 对象动态转换</span>
 
-<span class="w">    </span><span class="nf">if</span><span class="w"> </span><span class="p">(</span><span class="n">n</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">      </span><span class="c1">// 如果能够成功转换，说明这个对象实现了 NMI 接口，那么可以调用这个对象的处理函数</span><span class="w"></span>
-<span class="w">        </span><span class="n">NMIClass</span><span class="w"> </span><span class="o">*</span><span class="n">nc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">NMI_GET_CLASS</span><span class="p">(</span><span class="n">n</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="nf">if</span><span class="w"> </span><span class="p">(</span><span class="n">n</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">      </span><span class="c1">// 如果能够成功转换，说明这个对象实现了 NMI 接口，那么可以调用这个对象的处理函数</span>
+<span class="w">        </span><span class="n">NMIClass</span><span class="w"> </span><span class="o">*</span><span class="n">nc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">NMI_GET_CLASS</span><span class="p">(</span><span class="n">n</span><span class="p">);</span>
 
-<span class="w">        </span><span class="n">ns</span><span class="o">-&gt;</span><span class="n">handled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kr">true</span><span class="p">;</span><span class="w"></span>
-<span class="w">        </span><span class="n">nc</span><span class="o">-&gt;</span><span class="n">nmi_monitor_handler</span><span class="p">(</span><span class="n">n</span><span class="p">,</span><span class="w"> </span><span class="n">ns</span><span class="o">-&gt;</span><span class="n">cpu_index</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ns</span><span class="o">-&gt;</span><span class="n">err</span><span class="p">);</span><span class="w">   </span><span class="c1">// nmi_monitor_handler 是NMI接口的方法</span><span class="w"></span>
-<span class="w">        </span><span class="nf">if</span><span class="w"> </span><span class="p">(</span><span class="n">ns</span><span class="o">-&gt;</span><span class="n">err</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">            </span><span class="kr">return</span><span class="w"> </span><span class="o">-</span><span class="mi">1</span><span class="p">;</span><span class="w"></span>
-<span class="w">        </span><span class="p">}</span><span class="w"></span>
-<span class="w">    </span><span class="p">}</span><span class="w"></span>
-<span class="w">    </span><span class="n">nmi_children</span><span class="p">(</span><span class="n">o</span><span class="p">,</span><span class="w"> </span><span class="n">ns</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="n">ns</span><span class="o">-&gt;</span><span class="n">handled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kr">true</span><span class="p">;</span>
+<span class="w">        </span><span class="n">nc</span><span class="o">-&gt;</span><span class="n">nmi_monitor_handler</span><span class="p">(</span><span class="n">n</span><span class="p">,</span><span class="w"> </span><span class="n">ns</span><span class="o">-&gt;</span><span class="n">cpu_index</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ns</span><span class="o">-&gt;</span><span class="n">err</span><span class="p">);</span><span class="w">   </span><span class="c1">// nmi_monitor_handler 是NMI接口的方法</span>
+<span class="w">        </span><span class="nf">if</span><span class="w"> </span><span class="p">(</span><span class="n">ns</span><span class="o">-&gt;</span><span class="n">err</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="kr">return</span><span class="w"> </span><span class="o">-</span><span class="mi">1</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="n">nmi_children</span><span class="p">(</span><span class="n">o</span><span class="p">,</span><span class="w"> </span><span class="n">ns</span><span class="p">);</span>
 
-<span class="w">    </span><span class="kr">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="kr">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
 </code></pre></div>
 
 <p><code>nmi_monitor_handle</code>函数中调用了nmi_children(object_get_root(), &amp;ns)，从Root Object对象开始向下遍历，
@@ -167,58 +167,58 @@ Intel SDM, Volume 3, Chapter 6.7 Nonmaskable Interrupt章节指出：
 在看代码的时候，我们可以找到<code>pc_machine_class_init</code>里面注册了<code>mi_monitor_handler</code>。
 这里还不太理解的是x86_nmi里面会遍历所有的CPU，对每个CPU都注了NMI，有这个必要吗？</p>
 <div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">pc_machine_class_init</span><span class="p">(</span><span class="n">ObjectClass</span><span class="w"> </span><span class="o">*</span><span class="n">oc</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">data</span><span class="p">)</span><span class="w"> </span>
-<span class="p">{</span><span class="w"></span>
+<span class="p">{</span>
 <span class="w">  </span><span class="n">NMIClass</span><span class="w"> </span><span class="o">*</span><span class="n">nc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">NMI_CLASS</span><span class="p">(</span><span class="n">oc</span><span class="p">);</span><span class="w">       </span><span class="c1">// 把对象转换为NMIClass类型对象</span>
 <span class="w">  </span><span class="n">nc</span><span class="o">-&gt;</span><span class="n">nmi_monitor_handler</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">x86_nmi</span><span class="p">;</span><span class="w">  </span><span class="c1">// 实现接口方法</span>
-<span class="p">}</span><span class="w"></span>
+<span class="p">}</span>
 </code></pre></div>
 
 <p>QEMU调用完kvm_vcpu_ioctl(cpu, KVM_NMI)之后就开始进入KVM内核进行NMI中断注入，
 毕竟LAPIC和IOAPIC现在都放到KVM模拟来提升中断注入的实时性。</p>
-<div class="highlight"><pre><span></span><code><span class="n">KVM</span><span class="w"> </span><span class="n">x86</span><span class="p">.</span><span class="n">c</span><span class="w"></span>
-<span class="n">kvm_arch_vcpu_ioctl</span><span class="w"></span>
-<span class="w">  </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">kvm_vcpu_ioctl_nmi</span><span class="w"></span>
-<span class="w">    </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">kvm_inject_nmi</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="n">KVM</span><span class="w"> </span><span class="n">x86</span><span class="p">.</span><span class="n">c</span>
+<span class="n">kvm_arch_vcpu_ioctl</span>
+<span class="w">  </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">kvm_vcpu_ioctl_nmi</span>
+<span class="w">    </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">kvm_inject_nmi</span>
 </code></pre></div>
 
 <p>kvm_inject_nmi 里面将nmi_queued加1，然后make KVM_REQ_NMI request。
 为了防止中断嵌套KVM做了一些额外的处理。</p>
-<div class="highlight"><pre><span></span><code><span class="w"> </span><span class="n">void</span><span class="w"> </span><span class="n">kvm_inject_nmi</span><span class="p">(</span><span class="n">struct</span><span class="w"> </span><span class="n">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="p">)</span><span class="w"></span>
-<span class="w">  </span><span class="p">{</span><span class="w"></span>
-<span class="w">          </span><span class="n">atomic_inc</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">nmi_queued</span><span class="p">);</span><span class="w"></span>
-<span class="w">          </span><span class="n">kvm_make_request</span><span class="p">(</span><span class="n">KVM_REQ_NMI</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">);</span><span class="w"></span>
-<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="w"> </span><span class="n">void</span><span class="w"> </span><span class="n">kvm_inject_nmi</span><span class="p">(</span><span class="n">struct</span><span class="w"> </span><span class="n">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="p">)</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">          </span><span class="n">atomic_inc</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">nmi_queued</span><span class="p">);</span>
+<span class="w">          </span><span class="n">kvm_make_request</span><span class="p">(</span><span class="n">KVM_REQ_NMI</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">);</span>
+<span class="w">  </span><span class="p">}</span>
 </code></pre></div>
 
 <p>这样VCPU在下次VM Exit的时候会check标志位，进行NMI注入。 </p>
-<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="nf">vcpu_enter_guest</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="p">)</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_check_request</span><span class="p">(</span><span class="n">KVM_REQ_NMI</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">))</span><span class="w"></span>
-<span class="w">            </span><span class="n">process_nmi</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="nf">vcpu_enter_guest</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_check_request</span><span class="p">(</span><span class="n">KVM_REQ_NMI</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">))</span>
+<span class="w">            </span><span class="n">process_nmi</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
+<span class="p">}</span>
 
 <span class="c1">// 由于NMI中断不能嵌套，这里做了防呆，第一process_nmi的时候limit=2，</span>
-<span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">process_nmi</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="p">)</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="kt">unsigned</span><span class="w"> </span><span class="n">limit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span><span class="p">;</span><span class="w"></span>
+<span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">process_nmi</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="kt">unsigned</span><span class="w"> </span><span class="n">limit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span><span class="p">;</span>
 
 <span class="w">    </span><span class="cm">/*</span>
 <span class="cm">     * x86 is limited to one NMI running, and one NMI pending after it.</span>
 <span class="cm">     * If an NMI is already in progress, limit further NMIs to just one.</span>
 <span class="cm">     * Otherwise, allow two (and we&#39;ll inject the first one immediately).</span>
-<span class="cm">     */</span><span class="w"></span>
-<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_x86_ops</span><span class="o">-&gt;</span><span class="n">get_nmi_mask</span><span class="p">(</span><span class="n">vcpu</span><span class="p">)</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">nmi_injected</span><span class="p">)</span><span class="w"></span>
-<span class="w">        </span><span class="n">limit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w"></span>
+<span class="cm">     */</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_x86_ops</span><span class="o">-&gt;</span><span class="n">get_nmi_mask</span><span class="p">(</span><span class="n">vcpu</span><span class="p">)</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">nmi_injected</span><span class="p">)</span>
+<span class="w">        </span><span class="n">limit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
 
-<span class="w">    </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">nmi_pending</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">atomic_xchg</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">nmi_queued</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span><span class="w"></span>
-<span class="w">    </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">nmi_pending</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">min</span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">nmi_pending</span><span class="p">,</span><span class="w"> </span><span class="n">limit</span><span class="p">);</span><span class="w"></span>
-<span class="w">    </span><span class="n">kvm_make_request</span><span class="p">(</span><span class="n">KVM_REQ_EVENT</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">);</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">nmi_pending</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">atomic_xchg</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">nmi_queued</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span>
+<span class="w">    </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">nmi_pending</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">min</span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">nmi_pending</span><span class="p">,</span><span class="w"> </span><span class="n">limit</span><span class="p">);</span>
+<span class="w">    </span><span class="n">kvm_make_request</span><span class="p">(</span><span class="n">KVM_REQ_EVENT</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">);</span>
+<span class="p">}</span>
 
-<span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="nf">inject_pending_event</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="p">,</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">req_int_win</span><span class="p">)</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
+<span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="nf">inject_pending_event</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="p">,</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">req_int_win</span><span class="p">)</span>
+<span class="p">{</span>
 <span class="w">  </span><span class="n">kvm_x86_ops</span><span class="o">-&gt;</span><span class="n">set_nmi</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span><span class="w">  </span><span class="c1">// call vmx_inject_nmi</span>
-<span class="p">}</span><span class="w"></span>
+<span class="p">}</span>
 </code></pre></div>
 
 <p>最后调用<code>vmx_inject_nmi</code>函数注入NMI中断给虚拟机（也是通过写VMCS VM_ENTRY_INTR_INFO_FIELD域来实现）。</p>

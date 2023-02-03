@@ -97,123 +97,123 @@
 </ol>
 <p>下面举一个最简单的例子，介绍如何使用kprobe来查看<em>inet_bind</em>这个函数的调用情况。
 <em>inet_bind</em>函数是在发生ipv4 socket bind阶段调用的一个内核函数。</p>
-<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/kernel.h&gt;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/module.h&gt;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/sched/clock.h&gt;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/kprobes.h&gt;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/errno.h&gt;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/stddef.h&gt;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/bug.h&gt;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/ptrace.h&gt;</span><span class="cp"></span>
+<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/kernel.h&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/module.h&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/sched/clock.h&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/kprobes.h&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/errno.h&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/stddef.h&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/bug.h&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/ptrace.h&gt;</span>
 
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/socket.h&gt;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/kmod.h&gt;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/sched.h&gt;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/string.h&gt;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/sockios.h&gt;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/net.h&gt;</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/socket.h&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/kmod.h&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/sched.h&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/string.h&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/sockios.h&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/net.h&gt;</span>
 
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/inet.h&gt;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;net/ip.h&gt;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;net/tcp.h&gt;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/skbuff.h&gt;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;net/sock.h&gt;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;net/inet_common.h&gt;</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/inet.h&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;net/ip.h&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;net/tcp.h&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/skbuff.h&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;net/sock.h&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;net/inet_common.h&gt;</span>
 
 
-<span class="cm">/* For each probe you need to allocate a kprobe structure */</span><span class="w"></span>
-<span class="k">static</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">kprobe</span><span class="w"> </span><span class="n">kp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="p">.</span><span class="n">symbol_name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;inet_bind&quot;</span><span class="p">,</span><span class="w"></span>
-<span class="p">};</span><span class="w"></span>
+<span class="cm">/* For each probe you need to allocate a kprobe structure */</span>
+<span class="k">static</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">kprobe</span><span class="w"> </span><span class="n">kp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="p">.</span><span class="n">symbol_name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;inet_bind&quot;</span><span class="p">,</span>
+<span class="p">};</span>
 
-<span class="cm">/* kprobe pre_handler: called just before the probed instruction is executed */</span><span class="w"></span>
-<span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="nf">handler_pre</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kprobe</span><span class="w"> </span><span class="o">*</span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">pt_regs</span><span class="w"> </span><span class="o">*</span><span class="n">regs</span><span class="p">)</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
+<span class="cm">/* kprobe pre_handler: called just before the probed instruction is executed */</span>
+<span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="nf">handler_pre</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kprobe</span><span class="w"> </span><span class="o">*</span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">pt_regs</span><span class="w"> </span><span class="o">*</span><span class="n">regs</span><span class="p">)</span>
+<span class="p">{</span>
 
 <span class="cp">#ifdef CONFIG_ARM64</span>
-<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">socket</span><span class="w"> </span><span class="o">*</span><span class="n">sock</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">regs</span><span class="o">-&gt;</span><span class="n">regs</span><span class="p">[</span><span class="mi">0</span><span class="p">];</span><span class="w"></span>
-<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">sockaddr</span><span class="w"> </span><span class="o">*</span><span class="n">uaddr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">regs</span><span class="o">-&gt;</span><span class="n">regs</span><span class="p">[</span><span class="mi">1</span><span class="p">];</span><span class="w"></span>
+<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">socket</span><span class="w"> </span><span class="o">*</span><span class="n">sock</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">regs</span><span class="o">-&gt;</span><span class="n">regs</span><span class="p">[</span><span class="mi">0</span><span class="p">];</span>
+<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">sockaddr</span><span class="w"> </span><span class="o">*</span><span class="n">uaddr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">regs</span><span class="o">-&gt;</span><span class="n">regs</span><span class="p">[</span><span class="mi">1</span><span class="p">];</span>
 <span class="cp">#endif</span>
 
 <span class="cp">#ifdef CONFIG_X86</span>
-<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">socket</span><span class="w"> </span><span class="o">*</span><span class="n">sock</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">regs</span><span class="o">-&gt;</span><span class="n">di</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">sockaddr</span><span class="w"> </span><span class="o">*</span><span class="n">uaddr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">regs</span><span class="o">-&gt;</span><span class="n">si</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">socket</span><span class="w"> </span><span class="o">*</span><span class="n">sock</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">regs</span><span class="o">-&gt;</span><span class="n">di</span><span class="p">;</span>
+<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">sockaddr</span><span class="w"> </span><span class="o">*</span><span class="n">uaddr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">regs</span><span class="o">-&gt;</span><span class="n">si</span><span class="p">;</span>
 <span class="cp">#endif</span>
 
-<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">sockaddr_in</span><span class="w"> </span><span class="o">*</span><span class="n">addr</span><span class="w"> </span><span class="o">=</span><span class="w">  </span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">sockaddr_in</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="n">uaddr</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">short</span><span class="w"> </span><span class="n">snum</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ntohs</span><span class="p">(</span><span class="n">addr</span><span class="o">-&gt;</span><span class="n">sin_port</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">sockaddr_in</span><span class="w"> </span><span class="o">*</span><span class="n">addr</span><span class="w"> </span><span class="o">=</span><span class="w">  </span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">sockaddr_in</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="n">uaddr</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">short</span><span class="w"> </span><span class="n">snum</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ntohs</span><span class="p">(</span><span class="n">addr</span><span class="o">-&gt;</span><span class="n">sin_port</span><span class="p">);</span>
 
-<span class="w">    </span><span class="n">pr_info</span><span class="p">(</span><span class="s">&quot;%s name:%s pid:%d socket bind port=%d</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"></span>
-<span class="w">            </span><span class="n">p</span><span class="o">-&gt;</span><span class="n">symbol_name</span><span class="p">,</span><span class="w"> </span><span class="n">current</span><span class="o">-&gt;</span><span class="n">comm</span><span class="p">,</span><span class="w"> </span><span class="n">task_pid_nr</span><span class="p">(</span><span class="n">current</span><span class="p">),</span><span class="w"> </span><span class="n">snum</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">pr_info</span><span class="p">(</span><span class="s">&quot;%s name:%s pid:%d socket bind port=%d</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="n">p</span><span class="o">-&gt;</span><span class="n">symbol_name</span><span class="p">,</span><span class="w"> </span><span class="n">current</span><span class="o">-&gt;</span><span class="n">comm</span><span class="p">,</span><span class="w"> </span><span class="n">task_pid_nr</span><span class="p">(</span><span class="n">current</span><span class="p">),</span><span class="w"> </span><span class="n">snum</span><span class="p">);</span>
 
-<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
-<span class="cm">/* kprobe post_handler: called after the probed instruction is executed */</span><span class="w"></span>
-<span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">handler_post</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kprobe</span><span class="w"> </span><span class="o">*</span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">pt_regs</span><span class="w"> </span><span class="o">*</span><span class="n">regs</span><span class="p">,</span><span class="w"></span>
-<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">flags</span><span class="p">)</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="n">pr_info</span><span class="p">(</span><span class="s">&quot;%s called</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">__func__</span><span class="p">);</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+<span class="cm">/* kprobe post_handler: called after the probed instruction is executed */</span>
+<span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">handler_post</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kprobe</span><span class="w"> </span><span class="o">*</span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">pt_regs</span><span class="w"> </span><span class="o">*</span><span class="n">regs</span><span class="p">,</span>
+<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">flags</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">pr_info</span><span class="p">(</span><span class="s">&quot;%s called</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">__func__</span><span class="p">);</span>
+<span class="p">}</span>
 
 <span class="cm">/*</span>
 <span class="cm"> * fault_handler: this is called if an exception is generated for any</span>
 <span class="cm"> * instruction within the pre- or post-handler, or when Kprobes</span>
 <span class="cm"> * single-steps the probed instruction.</span>
-<span class="cm"> */</span><span class="w"></span>
-<span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="nf">handler_fault</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kprobe</span><span class="w"> </span><span class="o">*</span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">pt_regs</span><span class="w"> </span><span class="o">*</span><span class="n">regs</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">trapnr</span><span class="p">)</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="n">printk</span><span class="p">(</span><span class="n">KERN_INFO</span><span class="w"> </span><span class="s">&quot;fault_handler: p-&gt;addr = 0x%p, trap #%dn&quot;</span><span class="p">,</span><span class="w"></span>
-<span class="w">            </span><span class="n">p</span><span class="o">-&gt;</span><span class="n">addr</span><span class="p">,</span><span class="w"> </span><span class="n">trapnr</span><span class="p">);</span><span class="w"></span>
-<span class="w">    </span><span class="cm">/* Return 0 because we don&#39;t handle the fault. */</span><span class="w"></span>
-<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="cm"> */</span>
+<span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="nf">handler_fault</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kprobe</span><span class="w"> </span><span class="o">*</span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">pt_regs</span><span class="w"> </span><span class="o">*</span><span class="n">regs</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">trapnr</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">printk</span><span class="p">(</span><span class="n">KERN_INFO</span><span class="w"> </span><span class="s">&quot;fault_handler: p-&gt;addr = 0x%p, trap #%dn&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="n">p</span><span class="o">-&gt;</span><span class="n">addr</span><span class="p">,</span><span class="w"> </span><span class="n">trapnr</span><span class="p">);</span>
+<span class="w">    </span><span class="cm">/* Return 0 because we don&#39;t handle the fault. */</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
 
-<span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">__init</span><span class="w"> </span><span class="nf">kprobe_init</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">ret</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="n">kp</span><span class="p">.</span><span class="n">pre_handler</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">handler_pre</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="n">kp</span><span class="p">.</span><span class="n">post_handler</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">handler_post</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="n">kp</span><span class="p">.</span><span class="n">fault_handler</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">handler_fault</span><span class="p">;</span><span class="w"></span>
+<span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">__init</span><span class="w"> </span><span class="nf">kprobe_init</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">ret</span><span class="p">;</span>
+<span class="w">    </span><span class="n">kp</span><span class="p">.</span><span class="n">pre_handler</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">handler_pre</span><span class="p">;</span>
+<span class="w">    </span><span class="n">kp</span><span class="p">.</span><span class="n">post_handler</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">handler_post</span><span class="p">;</span>
+<span class="w">    </span><span class="n">kp</span><span class="p">.</span><span class="n">fault_handler</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">handler_fault</span><span class="p">;</span>
 
-<span class="w">    </span><span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">register_kprobe</span><span class="p">(</span><span class="o">&amp;</span><span class="n">kp</span><span class="p">);</span><span class="w"></span>
-<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">ret</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="n">printk</span><span class="p">(</span><span class="n">KERN_INFO</span><span class="w"> </span><span class="s">&quot;register_kprobe failed, returned %d</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">ret</span><span class="p">);</span><span class="w"></span>
-<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">ret</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="p">}</span><span class="w"></span>
-<span class="w">    </span><span class="n">printk</span><span class="p">(</span><span class="n">KERN_INFO</span><span class="w"> </span><span class="s">&quot;Planted kprobe at %p</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">kp</span><span class="p">.</span><span class="n">addr</span><span class="p">);</span><span class="w"></span>
-<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">register_kprobe</span><span class="p">(</span><span class="o">&amp;</span><span class="n">kp</span><span class="p">);</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">ret</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">printk</span><span class="p">(</span><span class="n">KERN_INFO</span><span class="w"> </span><span class="s">&quot;register_kprobe failed, returned %d</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">ret</span><span class="p">);</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">ret</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="n">printk</span><span class="p">(</span><span class="n">KERN_INFO</span><span class="w"> </span><span class="s">&quot;Planted kprobe at %p</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">kp</span><span class="p">.</span><span class="n">addr</span><span class="p">);</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
 
-<span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="n">__exit</span><span class="w"> </span><span class="nf">kprobe_exit</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="n">unregister_kprobe</span><span class="p">(</span><span class="o">&amp;</span><span class="n">kp</span><span class="p">);</span><span class="w"></span>
-<span class="w">    </span><span class="n">printk</span><span class="p">(</span><span class="n">KERN_INFO</span><span class="w"> </span><span class="s">&quot;kprobe at %p unregistered</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">kp</span><span class="p">.</span><span class="n">addr</span><span class="p">);</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="n">__exit</span><span class="w"> </span><span class="nf">kprobe_exit</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">unregister_kprobe</span><span class="p">(</span><span class="o">&amp;</span><span class="n">kp</span><span class="p">);</span>
+<span class="w">    </span><span class="n">printk</span><span class="p">(</span><span class="n">KERN_INFO</span><span class="w"> </span><span class="s">&quot;kprobe at %p unregistered</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">kp</span><span class="p">.</span><span class="n">addr</span><span class="p">);</span>
+<span class="p">}</span>
 
-<span class="n">module_init</span><span class="p">(</span><span class="n">kprobe_init</span><span class="p">)</span><span class="w"></span>
-<span class="n">module_exit</span><span class="p">(</span><span class="n">kprobe_exit</span><span class="p">)</span><span class="w"></span>
-<span class="n">MODULE_LICENSE</span><span class="p">(</span><span class="s">&quot;GPL&quot;</span><span class="p">);</span><span class="w"></span>
+<span class="n">module_init</span><span class="p">(</span><span class="n">kprobe_init</span><span class="p">)</span>
+<span class="n">module_exit</span><span class="p">(</span><span class="n">kprobe_exit</span><span class="p">)</span>
+<span class="n">MODULE_LICENSE</span><span class="p">(</span><span class="s">&quot;GPL&quot;</span><span class="p">);</span>
 </code></pre></div>
 
 <p>值得一提的是，kprobe里面我们在probe某个函数的时候，获取函数参数的时候是和体系结构相关的。</p>
 <p>例如：在x86平台上，根据C ABI <a href="https://elixir.bootlin.com/linux/latest/source/arch/x86/include/asm/ptrace.h">ptrace</a>接口规范，函数的参数和pt_regs的对应关系是：</p>
-<div class="highlight"><pre><span></span><code><span class="k">struct</span><span class="w"> </span><span class="nc">pt_regs</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="k">struct</span><span class="w"> </span><span class="nc">pt_regs</span><span class="w"> </span><span class="p">{</span>
 <span class="cm">/*</span>
 <span class="cm"> * C ABI says these regs are callee-preserved. They aren&#39;t saved on kernel entry</span>
 <span class="cm"> * unless syscall needs a complete, fully filled &quot;struct pt_regs&quot;.</span>
-<span class="cm"> */</span><span class="w"></span>
-<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">r15</span><span class="p">;</span><span class="w"></span>
-<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">r14</span><span class="p">;</span><span class="w"></span>
-<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">r13</span><span class="p">;</span><span class="w"></span>
-<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">r12</span><span class="p">;</span><span class="w"></span>
-<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">bp</span><span class="p">;</span><span class="w"></span>
-<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">bx</span><span class="p">;</span><span class="w"></span>
-<span class="cm">/* These regs are callee-clobbered. Always saved on kernel entry. */</span><span class="w"></span>
-<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">r11</span><span class="p">;</span><span class="w"></span>
-<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">r10</span><span class="p">;</span><span class="w"></span>
-<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">r9</span><span class="p">;</span><span class="w"></span>
-<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">r8</span><span class="p">;</span><span class="w"></span>
-<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">ax</span><span class="p">;</span><span class="w"></span>
+<span class="cm"> */</span>
+<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">r15</span><span class="p">;</span>
+<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">r14</span><span class="p">;</span>
+<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">r13</span><span class="p">;</span>
+<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">r12</span><span class="p">;</span>
+<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">bp</span><span class="p">;</span>
+<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">bx</span><span class="p">;</span>
+<span class="cm">/* These regs are callee-clobbered. Always saved on kernel entry. */</span>
+<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">r11</span><span class="p">;</span>
+<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">r10</span><span class="p">;</span>
+<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">r9</span><span class="p">;</span>
+<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">r8</span><span class="p">;</span>
+<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">ax</span><span class="p">;</span>
 <span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">cx</span><span class="p">;</span><span class="w">   </span><span class="c1">// mapped to arg[3]</span>
 <span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">dx</span><span class="p">;</span><span class="w">   </span><span class="c1">// mapped to arg[2]</span>
 <span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">si</span><span class="p">;</span><span class="w">   </span><span class="c1">// mapped to arg[1]</span>
@@ -221,16 +221,16 @@
 <span class="cm">/*</span>
 <span class="cm"> * On syscall entry, this is syscall#. On CPU exception, this is error code.</span>
 <span class="cm"> * On hw interrupt, it&#39;s IRQ number:</span>
-<span class="cm"> */</span><span class="w"></span>
-<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">orig_ax</span><span class="p">;</span><span class="w"></span>
-<span class="cm">/* Return frame for iretq */</span><span class="w"></span>
-<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">ip</span><span class="p">;</span><span class="w"></span>
-<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">cs</span><span class="p">;</span><span class="w"></span>
-<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">flags</span><span class="p">;</span><span class="w"></span>
-<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">sp</span><span class="p">;</span><span class="w"></span>
-<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">ss</span><span class="p">;</span><span class="w"></span>
-<span class="cm">/* top of stack page */</span><span class="w"></span>
-<span class="p">};</span><span class="w"></span>
+<span class="cm"> */</span>
+<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">orig_ax</span><span class="p">;</span>
+<span class="cm">/* Return frame for iretq */</span>
+<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">ip</span><span class="p">;</span>
+<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">cs</span><span class="p">;</span>
+<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">flags</span><span class="p">;</span>
+<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">sp</span><span class="p">;</span>
+<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">ss</span><span class="p">;</span>
+<span class="cm">/* top of stack page */</span>
+<span class="p">};</span>
 </code></pre></div>
 
 <p>在ARM64平台上，根据C ABI <a href="https://elixir.bootlin.com/linux/v4.19.69/source/arch/arm64/include/asm/ptrace.h">ptrace</a>规范，
@@ -239,41 +239,41 @@
 <span class="cm"> * This struct defines the way the registers are stored on the stack during an</span>
 <span class="cm"> * exception. Note that sizeof(struct pt_regs) has to be a multiple of 16 (for</span>
 <span class="cm"> * stack alignment). struct user_pt_regs must form a prefix of struct pt_regs.</span>
-<span class="cm"> */</span><span class="w"></span>
-<span class="k">struct</span><span class="w"> </span><span class="nc">pt_regs</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="k">union</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">                </span><span class="k">struct</span><span class="w"> </span><span class="nc">user_pt_regs</span><span class="w"> </span><span class="n">user_regs</span><span class="p">;</span><span class="w"></span>
-<span class="w">                </span><span class="k">struct</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">                        </span><span class="n">u64</span><span class="w"> </span><span class="n">regs</span><span class="p">[</span><span class="mi">31</span><span class="p">];</span><span class="w"></span>
-<span class="w">                        </span><span class="n">u64</span><span class="w"> </span><span class="n">sp</span><span class="p">;</span><span class="w"></span>
-<span class="w">                        </span><span class="n">u64</span><span class="w"> </span><span class="n">pc</span><span class="p">;</span><span class="w"></span>
-<span class="w">                        </span><span class="n">u64</span><span class="w"> </span><span class="n">pstate</span><span class="p">;</span><span class="w"></span>
-<span class="w">                </span><span class="p">};</span><span class="w"></span>
-<span class="w">        </span><span class="p">};</span><span class="w"></span>
-<span class="w">        </span><span class="n">u64</span><span class="w"> </span><span class="n">orig_x0</span><span class="p">;</span><span class="w"></span>
+<span class="cm"> */</span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">pt_regs</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">union</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="k">struct</span><span class="w"> </span><span class="nc">user_pt_regs</span><span class="w"> </span><span class="n">user_regs</span><span class="p">;</span>
+<span class="w">                </span><span class="k">struct</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                        </span><span class="n">u64</span><span class="w"> </span><span class="n">regs</span><span class="p">[</span><span class="mi">31</span><span class="p">];</span>
+<span class="w">                        </span><span class="n">u64</span><span class="w"> </span><span class="n">sp</span><span class="p">;</span>
+<span class="w">                        </span><span class="n">u64</span><span class="w"> </span><span class="n">pc</span><span class="p">;</span>
+<span class="w">                        </span><span class="n">u64</span><span class="w"> </span><span class="n">pstate</span><span class="p">;</span>
+<span class="w">                </span><span class="p">};</span>
+<span class="w">        </span><span class="p">};</span>
+<span class="w">        </span><span class="n">u64</span><span class="w"> </span><span class="n">orig_x0</span><span class="p">;</span>
 <span class="cp">#ifdef __AARCH64EB__</span>
-<span class="w">        </span><span class="n">u32</span><span class="w"> </span><span class="n">unused2</span><span class="p">;</span><span class="w"></span>
-<span class="w">        </span><span class="n">s32</span><span class="w"> </span><span class="n">syscallno</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="n">u32</span><span class="w"> </span><span class="n">unused2</span><span class="p">;</span>
+<span class="w">        </span><span class="n">s32</span><span class="w"> </span><span class="n">syscallno</span><span class="p">;</span>
 <span class="cp">#else</span>
-<span class="w">        </span><span class="n">s32</span><span class="w"> </span><span class="n">syscallno</span><span class="p">;</span><span class="w"></span>
-<span class="w">        </span><span class="n">u32</span><span class="w"> </span><span class="n">unused2</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="n">s32</span><span class="w"> </span><span class="n">syscallno</span><span class="p">;</span>
+<span class="w">        </span><span class="n">u32</span><span class="w"> </span><span class="n">unused2</span><span class="p">;</span>
 <span class="cp">#endif</span>
 
-<span class="w">        </span><span class="n">u64</span><span class="w"> </span><span class="n">orig_addr_limit</span><span class="p">;</span><span class="w"></span>
-<span class="w">        </span><span class="cm">/* Only valid when ARM64_HAS_IRQ_PRIO_MASKING is enabled. */</span><span class="w"></span>
-<span class="w">        </span><span class="n">u64</span><span class="w"> </span><span class="n">pmr_save</span><span class="p">;</span><span class="w"></span>
-<span class="w">        </span><span class="n">u64</span><span class="w"> </span><span class="n">stackframe</span><span class="p">[</span><span class="mi">2</span><span class="p">];</span><span class="w"></span>
-<span class="p">};</span><span class="w"></span>
+<span class="w">        </span><span class="n">u64</span><span class="w"> </span><span class="n">orig_addr_limit</span><span class="p">;</span>
+<span class="w">        </span><span class="cm">/* Only valid when ARM64_HAS_IRQ_PRIO_MASKING is enabled. */</span>
+<span class="w">        </span><span class="n">u64</span><span class="w"> </span><span class="n">pmr_save</span><span class="p">;</span>
+<span class="w">        </span><span class="n">u64</span><span class="w"> </span><span class="n">stackframe</span><span class="p">[</span><span class="mi">2</span><span class="p">];</span>
+<span class="p">};</span>
 </code></pre></div>
 
 <p>使用下面的Makefile文件，对其进行编译。</p>
-<div class="highlight"><pre><span></span><code>obj-m :<span class="o">=</span> kprobe_example.o
+<div class="highlight"><pre><span></span><code>obj-m<span class="w"> </span>:<span class="o">=</span><span class="w"> </span>kprobe_example.o
 <span class="nv">CROSS_COMPILE</span><span class="o">=</span><span class="s1">&#39;&#39;</span>
-KDIR :<span class="o">=</span> /lib/modules/<span class="k">$(</span>shell uname -r<span class="k">)</span>/build
-all:  
-    make -C <span class="k">$(</span>KDIR<span class="k">)</span> <span class="nv">M</span><span class="o">=</span><span class="k">$(</span>PWD<span class="k">)</span> modules   
-clean:  
-    rm -f *.ko *.o *.mod.o *.mod.c .*.cmd *.symvers  modul*  
+KDIR<span class="w"> </span>:<span class="o">=</span><span class="w"> </span>/lib/modules/<span class="k">$(</span>shell<span class="w"> </span>uname<span class="w"> </span>-r<span class="k">)</span>/build
+all:<span class="w">  </span>
+<span class="w">    </span>make<span class="w"> </span>-C<span class="w"> </span><span class="k">$(</span>KDIR<span class="k">)</span><span class="w"> </span><span class="nv">M</span><span class="o">=</span><span class="k">$(</span>PWD<span class="k">)</span><span class="w"> </span>modules<span class="w">   </span>
+clean:<span class="w">  </span>
+<span class="w">    </span>rm<span class="w"> </span>-f<span class="w"> </span>*.ko<span class="w"> </span>*.o<span class="w"> </span>*.mod.o<span class="w"> </span>*.mod.c<span class="w"> </span>.*.cmd<span class="w"> </span>*.symvers<span class="w">  </span>modul*<span class="w">  </span>
 </code></pre></div>
 
 <p>编译完成后会生产一个名为<em>kprobe_example.ko</em>的内核模块文件，执行<code>insmod kprobe_example.ko</code>后内核模块立即生效，通过<code>dmesg</code>命令可以查看到<em>inet_bind</em>这个函数的调用情况。从dmesg日志可以看到：</p>
@@ -301,111 +301,111 @@ clean:
 <span class="cm"> * You will see the trace data in /var/log/messages and on the console</span>
 <span class="cm"> * whenever the probed function returns. (Some messages may be suppressed</span>
 <span class="cm"> * if syslogd is configured to eliminate duplicate messages.)</span>
-<span class="cm"> */</span><span class="w"></span>
+<span class="cm"> */</span>
 
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/kernel.h&gt;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/module.h&gt;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/kprobes.h&gt;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/ktime.h&gt;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/limits.h&gt;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/sched.h&gt;</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/kernel.h&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/module.h&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/kprobes.h&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/ktime.h&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/limits.h&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;linux/sched.h&gt;</span>
 
-<span class="k">static</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="n">func_name</span><span class="p">[</span><span class="n">NAME_MAX</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;inet_release&quot;</span><span class="p">;</span><span class="w"></span>
-<span class="n">module_param_string</span><span class="p">(</span><span class="n">func</span><span class="p">,</span><span class="w"> </span><span class="n">func_name</span><span class="p">,</span><span class="w"> </span><span class="n">NAME_MAX</span><span class="p">,</span><span class="w"> </span><span class="n">S_IRUGO</span><span class="p">);</span><span class="w"></span>
-<span class="n">MODULE_PARM_DESC</span><span class="p">(</span><span class="n">func</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Function to kretprobe; this module will report the&quot;</span><span class="w"></span>
-<span class="w">                        </span><span class="s">&quot; function&#39;s execution time&quot;</span><span class="p">);</span><span class="w"></span>
+<span class="k">static</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="n">func_name</span><span class="p">[</span><span class="n">NAME_MAX</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;inet_release&quot;</span><span class="p">;</span>
+<span class="n">module_param_string</span><span class="p">(</span><span class="n">func</span><span class="p">,</span><span class="w"> </span><span class="n">func_name</span><span class="p">,</span><span class="w"> </span><span class="n">NAME_MAX</span><span class="p">,</span><span class="w"> </span><span class="n">S_IRUGO</span><span class="p">);</span>
+<span class="n">MODULE_PARM_DESC</span><span class="p">(</span><span class="n">func</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Function to kretprobe; this module will report the&quot;</span>
+<span class="w">                        </span><span class="s">&quot; function&#39;s execution time&quot;</span><span class="p">);</span>
 
-<span class="cm">/* per-instance private data */</span><span class="w"></span>
-<span class="k">struct</span><span class="w"> </span><span class="nc">my_data</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="n">ktime_t</span><span class="w"> </span><span class="n">entry_stamp</span><span class="p">;</span><span class="w"></span>
-<span class="p">};</span><span class="w"></span>
+<span class="cm">/* per-instance private data */</span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">my_data</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">ktime_t</span><span class="w"> </span><span class="n">entry_stamp</span><span class="p">;</span>
+<span class="p">};</span>
 
-<span class="cm">/* Here we use the entry_hanlder to timestamp function entry */</span><span class="w"></span>
-<span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="nf">entry_handler</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kretprobe_instance</span><span class="w"> </span><span class="o">*</span><span class="n">ri</span><span class="p">,</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">pt_regs</span><span class="w"> </span><span class="o">*</span><span class="n">regs</span><span class="p">)</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="k">struct</span><span class="w"> </span><span class="nc">my_data</span><span class="w"> </span><span class="o">*</span><span class="n">data</span><span class="p">;</span><span class="w"></span>
+<span class="cm">/* Here we use the entry_hanlder to timestamp function entry */</span>
+<span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="nf">entry_handler</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kretprobe_instance</span><span class="w"> </span><span class="o">*</span><span class="n">ri</span><span class="p">,</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">pt_regs</span><span class="w"> </span><span class="o">*</span><span class="n">regs</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">        </span><span class="k">struct</span><span class="w"> </span><span class="nc">my_data</span><span class="w"> </span><span class="o">*</span><span class="n">data</span><span class="p">;</span>
 
-<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">current</span><span class="o">-&gt;</span><span class="n">mm</span><span class="p">)</span><span class="w"></span>
-<span class="w">                </span><span class="k">return</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w">       </span><span class="cm">/* Skip kernel threads */</span><span class="w"></span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">current</span><span class="o">-&gt;</span><span class="n">mm</span><span class="p">)</span>
+<span class="w">                </span><span class="k">return</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w">       </span><span class="cm">/* Skip kernel threads */</span>
 
-<span class="w">        </span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">my_data</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="n">ri</span><span class="o">-&gt;</span><span class="n">data</span><span class="p">;</span><span class="w"></span>
-<span class="w">        </span><span class="n">data</span><span class="o">-&gt;</span><span class="n">entry_stamp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ktime_get</span><span class="p">();</span><span class="w"></span>
-<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">my_data</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="n">ri</span><span class="o">-&gt;</span><span class="n">data</span><span class="p">;</span>
+<span class="w">        </span><span class="n">data</span><span class="o">-&gt;</span><span class="n">entry_stamp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ktime_get</span><span class="p">();</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
 
 <span class="cm">/*</span>
 <span class="cm"> * Return-probe handler: Log the return value and duration. Duration may turn</span>
 <span class="cm"> * out to be zero consistently, depending upon the granularity of time</span>
 <span class="cm"> * accounting on the platform.</span>
-<span class="cm"> */</span><span class="w"></span>
-<span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="nf">ret_handler</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kretprobe_instance</span><span class="w"> </span><span class="o">*</span><span class="n">ri</span><span class="p">,</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">pt_regs</span><span class="w"> </span><span class="o">*</span><span class="n">regs</span><span class="p">)</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="kt">int</span><span class="w"> </span><span class="n">retval</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">regs_return_value</span><span class="p">(</span><span class="n">regs</span><span class="p">);</span><span class="w"></span>
-<span class="w">        </span><span class="k">struct</span><span class="w"> </span><span class="nc">my_data</span><span class="w"> </span><span class="o">*</span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">my_data</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="n">ri</span><span class="o">-&gt;</span><span class="n">data</span><span class="p">;</span><span class="w"></span>
-<span class="w">        </span><span class="n">s64</span><span class="w"> </span><span class="n">delta</span><span class="p">;</span><span class="w"></span>
-<span class="w">        </span><span class="n">ktime_t</span><span class="w"> </span><span class="n">now</span><span class="p">;</span><span class="w"></span>
+<span class="cm"> */</span>
+<span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="nf">ret_handler</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kretprobe_instance</span><span class="w"> </span><span class="o">*</span><span class="n">ri</span><span class="p">,</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">pt_regs</span><span class="w"> </span><span class="o">*</span><span class="n">regs</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">        </span><span class="kt">int</span><span class="w"> </span><span class="n">retval</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">regs_return_value</span><span class="p">(</span><span class="n">regs</span><span class="p">);</span>
+<span class="w">        </span><span class="k">struct</span><span class="w"> </span><span class="nc">my_data</span><span class="w"> </span><span class="o">*</span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">my_data</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="n">ri</span><span class="o">-&gt;</span><span class="n">data</span><span class="p">;</span>
+<span class="w">        </span><span class="n">s64</span><span class="w"> </span><span class="n">delta</span><span class="p">;</span>
+<span class="w">        </span><span class="n">ktime_t</span><span class="w"> </span><span class="n">now</span><span class="p">;</span>
 
-<span class="w">        </span><span class="n">now</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ktime_get</span><span class="p">();</span><span class="w"></span>
-<span class="w">        </span><span class="n">delta</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ktime_to_ns</span><span class="p">(</span><span class="n">ktime_sub</span><span class="p">(</span><span class="n">now</span><span class="p">,</span><span class="w"> </span><span class="n">data</span><span class="o">-&gt;</span><span class="n">entry_stamp</span><span class="p">));</span><span class="w"></span>
+<span class="w">        </span><span class="n">now</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ktime_get</span><span class="p">();</span>
+<span class="w">        </span><span class="n">delta</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ktime_to_ns</span><span class="p">(</span><span class="n">ktime_sub</span><span class="p">(</span><span class="n">now</span><span class="p">,</span><span class="w"> </span><span class="n">data</span><span class="o">-&gt;</span><span class="n">entry_stamp</span><span class="p">));</span>
 
-<span class="w">        </span><span class="n">printk</span><span class="p">(</span><span class="n">KERN_INFO</span><span class="w"> </span><span class="s">&quot;%s returned %d and took %lld ns to execute</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"></span>
-<span class="w">                        </span><span class="n">func_name</span><span class="p">,</span><span class="w"> </span><span class="n">retval</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="p">)</span><span class="n">delta</span><span class="p">);</span><span class="w"></span>
-<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="n">printk</span><span class="p">(</span><span class="n">KERN_INFO</span><span class="w"> </span><span class="s">&quot;%s returned %d and took %lld ns to execute</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span>
+<span class="w">                        </span><span class="n">func_name</span><span class="p">,</span><span class="w"> </span><span class="n">retval</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="p">)</span><span class="n">delta</span><span class="p">);</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
 
-<span class="k">static</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">kretprobe</span><span class="w"> </span><span class="n">my_kretprobe</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="p">.</span><span class="n">handler</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="n">ret_handler</span><span class="p">,</span><span class="w"></span>
-<span class="w">        </span><span class="p">.</span><span class="n">entry_handler</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="n">entry_handler</span><span class="p">,</span><span class="w"></span>
-<span class="w">        </span><span class="p">.</span><span class="n">data_size</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">my_data</span><span class="p">),</span><span class="w"></span>
-<span class="w">        </span><span class="cm">/* Probe up to 20 instances concurrently. */</span><span class="w"></span>
-<span class="w">        </span><span class="p">.</span><span class="n">maxactive</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="mi">20</span><span class="p">,</span><span class="w"></span>
-<span class="p">};</span><span class="w"></span>
+<span class="k">static</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">kretprobe</span><span class="w"> </span><span class="n">my_kretprobe</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="p">.</span><span class="n">handler</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="n">ret_handler</span><span class="p">,</span>
+<span class="w">        </span><span class="p">.</span><span class="n">entry_handler</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="n">entry_handler</span><span class="p">,</span>
+<span class="w">        </span><span class="p">.</span><span class="n">data_size</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">my_data</span><span class="p">),</span>
+<span class="w">        </span><span class="cm">/* Probe up to 20 instances concurrently. */</span>
+<span class="w">        </span><span class="p">.</span><span class="n">maxactive</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="mi">20</span><span class="p">,</span>
+<span class="p">};</span>
 
-<span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">__init</span><span class="w"> </span><span class="nf">kretprobe_init</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="kt">int</span><span class="w"> </span><span class="n">ret</span><span class="p">;</span><span class="w"></span>
+<span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">__init</span><span class="w"> </span><span class="nf">kretprobe_init</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">        </span><span class="kt">int</span><span class="w"> </span><span class="n">ret</span><span class="p">;</span>
 
-<span class="w">        </span><span class="n">my_kretprobe</span><span class="p">.</span><span class="n">kp</span><span class="p">.</span><span class="n">symbol_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">func_name</span><span class="p">;</span><span class="w"></span>
-<span class="w">        </span><span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">register_kretprobe</span><span class="p">(</span><span class="o">&amp;</span><span class="n">my_kretprobe</span><span class="p">);</span><span class="w"></span>
-<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">ret</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">                </span><span class="n">printk</span><span class="p">(</span><span class="n">KERN_INFO</span><span class="w"> </span><span class="s">&quot;register_kretprobe failed, returned %d</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"></span>
-<span class="w">                                </span><span class="n">ret</span><span class="p">);</span><span class="w"></span>
-<span class="w">                </span><span class="k">return</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span><span class="w"></span>
-<span class="w">        </span><span class="p">}</span><span class="w"></span>
-<span class="w">        </span><span class="n">printk</span><span class="p">(</span><span class="n">KERN_INFO</span><span class="w"> </span><span class="s">&quot;Planted return probe at %s: %p</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"></span>
-<span class="w">                        </span><span class="n">my_kretprobe</span><span class="p">.</span><span class="n">kp</span><span class="p">.</span><span class="n">symbol_name</span><span class="p">,</span><span class="w"> </span><span class="n">my_kretprobe</span><span class="p">.</span><span class="n">kp</span><span class="p">.</span><span class="n">addr</span><span class="p">);</span><span class="w"></span>
-<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="n">my_kretprobe</span><span class="p">.</span><span class="n">kp</span><span class="p">.</span><span class="n">symbol_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">func_name</span><span class="p">;</span>
+<span class="w">        </span><span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">register_kretprobe</span><span class="p">(</span><span class="o">&amp;</span><span class="n">my_kretprobe</span><span class="p">);</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">ret</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="n">printk</span><span class="p">(</span><span class="n">KERN_INFO</span><span class="w"> </span><span class="s">&quot;register_kretprobe failed, returned %d</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span>
+<span class="w">                                </span><span class="n">ret</span><span class="p">);</span>
+<span class="w">                </span><span class="k">return</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">        </span><span class="n">printk</span><span class="p">(</span><span class="n">KERN_INFO</span><span class="w"> </span><span class="s">&quot;Planted return probe at %s: %p</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span>
+<span class="w">                        </span><span class="n">my_kretprobe</span><span class="p">.</span><span class="n">kp</span><span class="p">.</span><span class="n">symbol_name</span><span class="p">,</span><span class="w"> </span><span class="n">my_kretprobe</span><span class="p">.</span><span class="n">kp</span><span class="p">.</span><span class="n">addr</span><span class="p">);</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
 
-<span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="n">__exit</span><span class="w"> </span><span class="nf">kretprobe_exit</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="n">unregister_kretprobe</span><span class="p">(</span><span class="o">&amp;</span><span class="n">my_kretprobe</span><span class="p">);</span><span class="w"></span>
-<span class="w">        </span><span class="n">printk</span><span class="p">(</span><span class="n">KERN_INFO</span><span class="w"> </span><span class="s">&quot;kretprobe at %p unregistered</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"></span>
-<span class="w">                        </span><span class="n">my_kretprobe</span><span class="p">.</span><span class="n">kp</span><span class="p">.</span><span class="n">addr</span><span class="p">);</span><span class="w"></span>
+<span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="n">__exit</span><span class="w"> </span><span class="nf">kretprobe_exit</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">        </span><span class="n">unregister_kretprobe</span><span class="p">(</span><span class="o">&amp;</span><span class="n">my_kretprobe</span><span class="p">);</span>
+<span class="w">        </span><span class="n">printk</span><span class="p">(</span><span class="n">KERN_INFO</span><span class="w"> </span><span class="s">&quot;kretprobe at %p unregistered</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span>
+<span class="w">                        </span><span class="n">my_kretprobe</span><span class="p">.</span><span class="n">kp</span><span class="p">.</span><span class="n">addr</span><span class="p">);</span>
 
-<span class="w">        </span><span class="cm">/* nmissed &gt; 0 suggests that maxactive was set too low. */</span><span class="w"></span>
-<span class="w">        </span><span class="n">printk</span><span class="p">(</span><span class="n">KERN_INFO</span><span class="w"> </span><span class="s">&quot;Missed probing %d instances of %s</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"></span>
-<span class="w">                </span><span class="n">my_kretprobe</span><span class="p">.</span><span class="n">nmissed</span><span class="p">,</span><span class="w"> </span><span class="n">my_kretprobe</span><span class="p">.</span><span class="n">kp</span><span class="p">.</span><span class="n">symbol_name</span><span class="p">);</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="cm">/* nmissed &gt; 0 suggests that maxactive was set too low. */</span>
+<span class="w">        </span><span class="n">printk</span><span class="p">(</span><span class="n">KERN_INFO</span><span class="w"> </span><span class="s">&quot;Missed probing %d instances of %s</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span>
+<span class="w">                </span><span class="n">my_kretprobe</span><span class="p">.</span><span class="n">nmissed</span><span class="p">,</span><span class="w"> </span><span class="n">my_kretprobe</span><span class="p">.</span><span class="n">kp</span><span class="p">.</span><span class="n">symbol_name</span><span class="p">);</span>
+<span class="p">}</span>
 
-<span class="n">module_init</span><span class="p">(</span><span class="n">kretprobe_init</span><span class="p">)</span><span class="w"></span>
-<span class="n">module_exit</span><span class="p">(</span><span class="n">kretprobe_exit</span><span class="p">)</span><span class="w"></span>
-<span class="n">MODULE_LICENSE</span><span class="p">(</span><span class="s">&quot;GPL&quot;</span><span class="p">);</span><span class="w"></span>
+<span class="n">module_init</span><span class="p">(</span><span class="n">kretprobe_init</span><span class="p">)</span>
+<span class="n">module_exit</span><span class="p">(</span><span class="n">kretprobe_exit</span><span class="p">)</span>
+<span class="n">MODULE_LICENSE</span><span class="p">(</span><span class="s">&quot;GPL&quot;</span><span class="p">);</span>
 </code></pre></div>
 
 <p>探测的结果输出如下：</p>
-<div class="highlight"><pre><span></span><code><span class="o">[</span><span class="m">60362</span>.085372<span class="o">]</span> inet_release returned <span class="m">0</span> and took <span class="m">16360</span> ns to execute
-<span class="o">[</span><span class="m">60362</span>.091124<span class="o">]</span> inet_release returned <span class="m">0</span> and took <span class="m">8880</span> ns to execute
-<span class="o">[</span><span class="m">60362</span>.091147<span class="o">]</span> inet_release returned <span class="m">0</span> and took <span class="m">7640</span> ns to execute
-<span class="o">[</span><span class="m">60362</span>.091173<span class="o">]</span> inet_release returned <span class="m">0</span> and took <span class="m">7900</span> ns to execute
-<span class="o">[</span><span class="m">60362</span>.941665<span class="o">]</span> inet_release returned <span class="m">0</span> and took <span class="m">9100</span> ns to execute
-<span class="o">[</span><span class="m">60363</span>.099577<span class="o">]</span> inet_release returned <span class="m">0</span> and took <span class="m">9240</span> ns to execute
-<span class="o">[</span><span class="m">60363</span>.126682<span class="o">]</span> inet_release returned <span class="m">0</span> and took <span class="m">6000</span> ns to execute
-<span class="o">[</span><span class="m">60363</span>.153610<span class="o">]</span> inet_release returned <span class="m">0</span> and took <span class="m">9060</span> ns to execute
-<span class="o">[</span><span class="m">60363</span>.153820<span class="o">]</span> inet_release returned <span class="m">0</span> and took <span class="m">3220</span> ns to execute
-<span class="o">[</span><span class="m">60363</span>.154699<span class="o">]</span> inet_release returned <span class="m">0</span> and took <span class="m">3260</span> ns to execute
-<span class="o">[</span><span class="m">60363</span>.159178<span class="o">]</span> inet_release returned <span class="m">0</span> and took <span class="m">3200</span> ns to execute
-<span class="o">[</span><span class="m">60363</span>.180098<span class="o">]</span> inet_release returned <span class="m">0</span> and took <span class="m">3080</span> ns to execute
+<div class="highlight"><pre><span></span><code><span class="o">[</span><span class="m">60362</span>.085372<span class="o">]</span><span class="w"> </span>inet_release<span class="w"> </span>returned<span class="w"> </span><span class="m">0</span><span class="w"> </span>and<span class="w"> </span>took<span class="w"> </span><span class="m">16360</span><span class="w"> </span>ns<span class="w"> </span>to<span class="w"> </span>execute
+<span class="o">[</span><span class="m">60362</span>.091124<span class="o">]</span><span class="w"> </span>inet_release<span class="w"> </span>returned<span class="w"> </span><span class="m">0</span><span class="w"> </span>and<span class="w"> </span>took<span class="w"> </span><span class="m">8880</span><span class="w"> </span>ns<span class="w"> </span>to<span class="w"> </span>execute
+<span class="o">[</span><span class="m">60362</span>.091147<span class="o">]</span><span class="w"> </span>inet_release<span class="w"> </span>returned<span class="w"> </span><span class="m">0</span><span class="w"> </span>and<span class="w"> </span>took<span class="w"> </span><span class="m">7640</span><span class="w"> </span>ns<span class="w"> </span>to<span class="w"> </span>execute
+<span class="o">[</span><span class="m">60362</span>.091173<span class="o">]</span><span class="w"> </span>inet_release<span class="w"> </span>returned<span class="w"> </span><span class="m">0</span><span class="w"> </span>and<span class="w"> </span>took<span class="w"> </span><span class="m">7900</span><span class="w"> </span>ns<span class="w"> </span>to<span class="w"> </span>execute
+<span class="o">[</span><span class="m">60362</span>.941665<span class="o">]</span><span class="w"> </span>inet_release<span class="w"> </span>returned<span class="w"> </span><span class="m">0</span><span class="w"> </span>and<span class="w"> </span>took<span class="w"> </span><span class="m">9100</span><span class="w"> </span>ns<span class="w"> </span>to<span class="w"> </span>execute
+<span class="o">[</span><span class="m">60363</span>.099577<span class="o">]</span><span class="w"> </span>inet_release<span class="w"> </span>returned<span class="w"> </span><span class="m">0</span><span class="w"> </span>and<span class="w"> </span>took<span class="w"> </span><span class="m">9240</span><span class="w"> </span>ns<span class="w"> </span>to<span class="w"> </span>execute
+<span class="o">[</span><span class="m">60363</span>.126682<span class="o">]</span><span class="w"> </span>inet_release<span class="w"> </span>returned<span class="w"> </span><span class="m">0</span><span class="w"> </span>and<span class="w"> </span>took<span class="w"> </span><span class="m">6000</span><span class="w"> </span>ns<span class="w"> </span>to<span class="w"> </span>execute
+<span class="o">[</span><span class="m">60363</span>.153610<span class="o">]</span><span class="w"> </span>inet_release<span class="w"> </span>returned<span class="w"> </span><span class="m">0</span><span class="w"> </span>and<span class="w"> </span>took<span class="w"> </span><span class="m">9060</span><span class="w"> </span>ns<span class="w"> </span>to<span class="w"> </span>execute
+<span class="o">[</span><span class="m">60363</span>.153820<span class="o">]</span><span class="w"> </span>inet_release<span class="w"> </span>returned<span class="w"> </span><span class="m">0</span><span class="w"> </span>and<span class="w"> </span>took<span class="w"> </span><span class="m">3220</span><span class="w"> </span>ns<span class="w"> </span>to<span class="w"> </span>execute
+<span class="o">[</span><span class="m">60363</span>.154699<span class="o">]</span><span class="w"> </span>inet_release<span class="w"> </span>returned<span class="w"> </span><span class="m">0</span><span class="w"> </span>and<span class="w"> </span>took<span class="w"> </span><span class="m">3260</span><span class="w"> </span>ns<span class="w"> </span>to<span class="w"> </span>execute
+<span class="o">[</span><span class="m">60363</span>.159178<span class="o">]</span><span class="w"> </span>inet_release<span class="w"> </span>returned<span class="w"> </span><span class="m">0</span><span class="w"> </span>and<span class="w"> </span>took<span class="w"> </span><span class="m">3200</span><span class="w"> </span>ns<span class="w"> </span>to<span class="w"> </span>execute
+<span class="o">[</span><span class="m">60363</span>.180098<span class="o">]</span><span class="w"> </span>inet_release<span class="w"> </span>returned<span class="w"> </span><span class="m">0</span><span class="w"> </span>and<span class="w"> </span>took<span class="w"> </span><span class="m">3080</span><span class="w"> </span>ns<span class="w"> </span>to<span class="w"> </span>execute
 </code></pre></div>
 
 

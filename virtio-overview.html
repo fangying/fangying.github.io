@@ -129,9 +129,9 @@ bit24-bit37预给队列和feature协商机制，bit38以上保留给未来其他
  每个部分都是前端驱动或者后端单向可写的（不能两端同时写）。
  每个virtqueue都有一个16bit的queue size参数，表示队列的总长度。
  每个virtqueue由3个部分组成：</p>
-<div class="highlight"><pre><span></span><code><span class="c">    </span><span class="nb">+-------------------+--------------------------------+-----------------------+</span><span class="c"></span>
+<div class="highlight"><pre><span></span><code><span class="c">    </span><span class="nb">+-------------------+--------------------------------+-----------------------+</span>
 <span class="c">    | Descriptor Table  |   Available Ring  (padding)    |       Used Ring       |</span>
-<span class="c">    </span><span class="nb">+-------------------+--------------------------------+-----------------------+</span><span class="c"></span>
+<span class="c">    </span><span class="nb">+-------------------+--------------------------------+-----------------------+</span>
 </code></pre></div>
 
 <ul>
@@ -164,30 +164,30 @@ virtio legacy（virtio 0.95）协议规定，对应的配置数据结构（virti
 <div class="highlight"><pre><span></span><code><span class="c">                       virtio legacy ==</span><span class="nv">&gt;</span><span class="c"> Mapped into PCI BAR0 </span>
 <span class="c">    </span><span class="nb">+------------------------------------------------------------------+</span><span class="c"> </span>
 <span class="c">    |                    Host Feature Bits</span><span class="k">[</span><span class="c">0:31</span><span class="k">]</span><span class="c">                       | </span>
-<span class="c">    </span><span class="nb">+------------------------------------------------------------------+</span><span class="c"></span>
+<span class="c">    </span><span class="nb">+------------------------------------------------------------------+</span>
 <span class="c">    |                    Guest Feature Bits</span><span class="k">[</span><span class="c">0:31</span><span class="k">]</span><span class="c">                      |</span>
-<span class="c">    </span><span class="nb">+------------------------------------------------------------------+</span><span class="c"></span>
+<span class="c">    </span><span class="nb">+------------------------------------------------------------------+</span>
 <span class="c">    |                    Virtqueue Address PFN                         |</span>
-<span class="c">    </span><span class="nb">+---------------------------------+--------------------------------+</span><span class="c"></span>
+<span class="c">    </span><span class="nb">+---------------------------------+--------------------------------+</span>
 <span class="c">    |           Queue Select          |           Queue Size           |</span>
-<span class="c">    </span><span class="nb">+----------------+----------------+--------------------------------+</span><span class="c"></span>
+<span class="c">    </span><span class="nb">+----------------+----------------+--------------------------------+</span>
 <span class="c">    |   ISR Status   | Device Stat    |           Queue Notify         |</span>
-<span class="c">    </span><span class="nb">+----------------+----------------+--------------------------------+</span><span class="c"></span>
+<span class="c">    </span><span class="nb">+----------------+----------------+--------------------------------+</span>
 <span class="c">    |       MSI Config Vector         |         MSI Queue Vector       |</span>
-<span class="c">    </span><span class="nb">+---------------------------------+--------------------------------+</span><span class="c"></span>
+<span class="c">    </span><span class="nb">+---------------------------------+--------------------------------+</span>
 </code></pre></div>
 
 <p>对于新的<code>virtio modern</code>，协议将配置结构划分为5种类型：</p>
-<div class="highlight"><pre><span></span><code><span class="cm">/* Common configuration */</span><span class="w"> </span>
-<span class="err">#</span>define<span class="w"> </span>VIRTIO_PCI_CAP_COMMON_CFG<span class="w">        </span><span class="m">1</span><span class="w"> </span>
-<span class="cm">/* Notifications */</span><span class="w"> </span>
-<span class="err">#</span>define<span class="w"> </span>VIRTIO_PCI_CAP_NOTIFY_CFG<span class="w">        </span><span class="m">2</span><span class="w"></span>
-<span class="cm">/* ISR Status */</span><span class="w"> </span>
-<span class="err">#</span>define<span class="w"> </span>VIRTIO_PCI_CAP_ISR_CFG<span class="w">           </span><span class="m">3</span><span class="w"> </span>
-<span class="cm">/* Device specific configuration */</span><span class="w"> </span>
-<span class="err">#</span>define<span class="w"> </span>VIRTIO_PCI_CAP_DEVICE_CFG<span class="w">        </span><span class="m">4</span><span class="w"> </span>
-<span class="cm">/* PCI configuration access */</span><span class="w"> </span>
-<span class="err">#</span>define<span class="w"> </span>VIRTIO_PCI_CAP_PCI_CFG<span class="w">           </span><span class="m">5</span><span class="w"> </span>
+<div class="highlight"><pre><span></span><code><span class="o">/*</span><span class="w"> </span><span class="n">Common</span><span class="w"> </span><span class="n">configuration</span><span class="w"> </span><span class="o">*/</span><span class="w"> </span>
+#<span class="n">define</span><span class="w"> </span><span class="n">VIRTIO_PCI_CAP_COMMON_CFG</span><span class="w">        </span><span class="mi">1</span><span class="w"> </span>
+<span class="o">/*</span><span class="w"> </span><span class="n">Notifications</span><span class="w"> </span><span class="o">*/</span><span class="w"> </span>
+#<span class="n">define</span><span class="w"> </span><span class="n">VIRTIO_PCI_CAP_NOTIFY_CFG</span><span class="w">        </span><span class="mi">2</span>
+<span class="o">/*</span><span class="w"> </span><span class="n">ISR</span><span class="w"> </span><span class="n">Status</span><span class="w"> </span><span class="o">*/</span><span class="w"> </span>
+#<span class="n">define</span><span class="w"> </span><span class="n">VIRTIO_PCI_CAP_ISR_CFG</span><span class="w">           </span><span class="mi">3</span><span class="w"> </span>
+<span class="o">/*</span><span class="w"> </span><span class="n">Device</span><span class="w"> </span><span class="n">specific</span><span class="w"> </span><span class="n">configuration</span><span class="w"> </span><span class="o">*/</span><span class="w"> </span>
+#<span class="n">define</span><span class="w"> </span><span class="n">VIRTIO_PCI_CAP_DEVICE_CFG</span><span class="w">        </span><span class="mi">4</span><span class="w"> </span>
+<span class="o">/*</span><span class="w"> </span><span class="n">PCI</span><span class="w"> </span><span class="n">configuration</span><span class="w"> </span><span class="n">access</span><span class="w"> </span><span class="o">*/</span><span class="w"> </span>
+#<span class="n">define</span><span class="w"> </span><span class="n">VIRTIO_PCI_CAP_PCI_CFG</span><span class="w">           </span><span class="mi">5</span><span class="w"> </span>
 </code></pre></div>
 
 <p>以上的每种配置结构是直接映射到virtio设备的BAR空间内，那么如何指定每种配置结构的位置呢？
@@ -201,7 +201,7 @@ virtio legacy（virtio 0.95）协议规定，对应的配置数据结构（virti
 <span class="w">        </span><span class="err">u8</span><span class="w"> </span><span class="err">padding</span><span class="cp">[</span><span class="mi">3</span><span class="cp">]</span><span class="p">;</span><span class="w">  </span><span class="c">/* Pad to full dword. */</span><span class="w"> </span>
 <span class="w">        </span><span class="err">le32</span><span class="w"> </span><span class="err">offset</span><span class="p">;</span><span class="w">    </span><span class="c">/* Offset within bar. */</span><span class="w"> </span>
 <span class="w">        </span><span class="err">le32</span><span class="w"> </span><span class="err">length</span><span class="p">;</span><span class="w">    </span><span class="c">/* Length of the structure, in bytes. */</span><span class="w"> </span>
-<span class="p">}</span><span class="o">;</span><span class="w"></span>
+<span class="p">}</span><span class="o">;</span>
 </code></pre></div>
 
 <p>只是略微不同的是，virtio-pci的Capability有一个统一的结构，
@@ -209,30 +209,30 @@ virtio legacy（virtio 0.95）协议规定，对应的配置数据结构（virti
 这样每个配置结构都可以通过BAR空间直接访问，或者通过PCI配置空间的<code>VIRTIO_PCI_CAP_PCI_CFG</code>域进行访问。
 每个Cap的具体结构定义可以参考virtio spec 4.1.4.3小节。
 为了方便理解这里以一张virtio-net网卡为例：</p>
-<div class="highlight"><pre><span></span><code><span class="o">[</span><span class="n">root@localhost ~</span><span class="o">]</span><span class="err">#</span><span class="w"> </span><span class="n">lspci</span><span class="w"> </span><span class="o">-</span><span class="n">vvvs</span><span class="w"> </span><span class="mi">04</span><span class="err">:</span><span class="mf">00.0</span><span class="w"></span>
-<span class="mi">04</span><span class="err">:</span><span class="mf">00.0</span><span class="w"> </span><span class="n">Ethernet</span><span class="w"> </span><span class="nl">controller</span><span class="p">:</span><span class="w"> </span><span class="n">Red</span><span class="w"> </span><span class="n">Hat</span><span class="p">,</span><span class="w"> </span><span class="n">Inc</span><span class="p">.</span><span class="w"> </span><span class="n">Virtio</span><span class="w"> </span><span class="n">network</span><span class="w"> </span><span class="n">device</span><span class="w"> </span><span class="p">(</span><span class="n">rev</span><span class="w"> </span><span class="mi">01</span><span class="p">)</span><span class="w"></span>
-<span class="w">    </span><span class="nl">Subsystem</span><span class="p">:</span><span class="w"> </span><span class="n">Red</span><span class="w"> </span><span class="n">Hat</span><span class="p">,</span><span class="w"> </span><span class="n">Inc</span><span class="p">.</span><span class="w"> </span><span class="n">Device</span><span class="w"> </span><span class="mi">1100</span><span class="w"></span>
-<span class="w">    </span><span class="n">Physical</span><span class="w"> </span><span class="nl">Slot</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="o">-</span><span class="mi">1</span><span class="w"></span>
-<span class="w">    </span><span class="nl">Control</span><span class="p">:</span><span class="w"> </span><span class="n">I</span><span class="o">/</span><span class="n">O</span><span class="o">+</span><span class="w"> </span><span class="n">Mem</span><span class="o">+</span><span class="w"> </span><span class="n">BusMaster</span><span class="o">+</span><span class="w"> </span><span class="n">SpecCycle</span><span class="o">-</span><span class="w"> </span><span class="n">MemWINV</span><span class="o">-</span><span class="w"> </span><span class="n">VGASnoop</span><span class="o">-</span><span class="w"> </span><span class="n">ParErr</span><span class="o">-</span><span class="w"> </span><span class="n">Stepping</span><span class="o">-</span><span class="w"> </span><span class="n">SERR</span><span class="o">+</span><span class="w"> </span><span class="n">FastB2B</span><span class="o">-</span><span class="w"> </span><span class="n">DisINTx</span><span class="o">+</span><span class="w"></span>
-<span class="w">    </span><span class="nl">Status</span><span class="p">:</span><span class="w"> </span><span class="n">Cap</span><span class="o">+</span><span class="w"> </span><span class="mi">66</span><span class="n">MHz</span><span class="o">-</span><span class="w"> </span><span class="n">UDF</span><span class="o">-</span><span class="w"> </span><span class="n">FastB2B</span><span class="o">-</span><span class="w"> </span><span class="n">ParErr</span><span class="o">-</span><span class="w"> </span><span class="n">DEVSEL</span><span class="o">=</span><span class="n">fast</span><span class="w"> </span><span class="o">&gt;</span><span class="n">TAbort</span><span class="o">-</span><span class="w"> </span><span class="o">&lt;</span><span class="n">TAbort</span><span class="o">-</span><span class="w"> </span><span class="o">&lt;</span><span class="n">MAbort</span><span class="o">-</span><span class="w"> </span><span class="o">&gt;</span><span class="n">SERR</span><span class="o">-</span><span class="w"> </span><span class="o">&lt;</span><span class="n">PERR</span><span class="o">-</span><span class="w"> </span><span class="n">INTx</span><span class="o">-</span><span class="w"></span>
-<span class="w">    </span><span class="nl">Latency</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="w"></span>
-<span class="w">    </span><span class="nl">Interrupt</span><span class="p">:</span><span class="w"> </span><span class="n">pin</span><span class="w"> </span><span class="n">A</span><span class="w"> </span><span class="n">routed</span><span class="w"> </span><span class="k">to</span><span class="w"> </span><span class="n">IRQ</span><span class="w"> </span><span class="mi">21</span><span class="w"></span>
-<span class="w">    </span><span class="n">Region</span><span class="w"> </span><span class="mi">1</span><span class="err">:</span><span class="w"> </span><span class="n">Memory</span><span class="w"> </span><span class="k">at</span><span class="w"> </span><span class="n">fe840000</span><span class="w"> </span><span class="p">(</span><span class="mi">32</span><span class="o">-</span><span class="nc">bit</span><span class="p">,</span><span class="w"> </span><span class="n">non</span><span class="o">-</span><span class="n">prefetchable</span><span class="p">)</span><span class="w"> </span><span class="o">[</span><span class="n">size=4K</span><span class="o">]</span><span class="w"></span>
-<span class="w">    </span><span class="n">Region</span><span class="w"> </span><span class="mi">4</span><span class="err">:</span><span class="w"> </span><span class="n">Memory</span><span class="w"> </span><span class="k">at</span><span class="w"> </span><span class="n">fa600000</span><span class="w"> </span><span class="p">(</span><span class="mi">64</span><span class="o">-</span><span class="nc">bit</span><span class="p">,</span><span class="w"> </span><span class="n">prefetchable</span><span class="p">)</span><span class="w"> </span><span class="o">[</span><span class="n">size=16K</span><span class="o">]</span><span class="w"></span>
-<span class="w">    </span><span class="n">Expansion</span><span class="w"> </span><span class="n">ROM</span><span class="w"> </span><span class="k">at</span><span class="w"> </span><span class="n">fe800000</span><span class="w"> </span><span class="o">[</span><span class="n">disabled</span><span class="o">]</span><span class="w"> </span><span class="o">[</span><span class="n">size=256K</span><span class="o">]</span><span class="w"></span>
-<span class="w">    </span><span class="nl">Capabilities</span><span class="p">:</span><span class="w"> </span><span class="o">[</span><span class="n">dc</span><span class="o">]</span><span class="w"> </span><span class="n">MSI</span><span class="o">-</span><span class="nl">X</span><span class="p">:</span><span class="w"> </span><span class="n">Enable</span><span class="o">+</span><span class="w"> </span><span class="nf">Count</span><span class="o">=</span><span class="mi">10</span><span class="w"> </span><span class="n">Masked</span><span class="o">-</span><span class="w"></span>
-<span class="w">        </span><span class="n">Vector</span><span class="w"> </span><span class="nc">table</span><span class="err">:</span><span class="w"> </span><span class="n">BAR</span><span class="o">=</span><span class="mi">1</span><span class="w"> </span><span class="n">offset</span><span class="o">=</span><span class="mi">00000000</span><span class="w"></span>
-<span class="w">        </span><span class="nl">PBA</span><span class="p">:</span><span class="w"> </span><span class="n">BAR</span><span class="o">=</span><span class="mi">1</span><span class="w"> </span><span class="n">offset</span><span class="o">=</span><span class="mi">00000800</span><span class="w"></span>
-<span class="w">    </span><span class="nl">Capabilities</span><span class="p">:</span><span class="w"> </span><span class="o">[</span><span class="n">c8</span><span class="o">]</span><span class="w"> </span><span class="n">Vendor</span><span class="w"> </span><span class="k">Specific</span><span class="w"> </span><span class="nl">Information</span><span class="p">:</span><span class="w"> </span><span class="nl">VirtIO</span><span class="p">:</span><span class="w"> </span><span class="o">&lt;</span><span class="k">unknown</span><span class="o">&gt;</span><span class="w"></span>
-<span class="w">        </span><span class="n">BAR</span><span class="o">=</span><span class="mi">0</span><span class="w"> </span><span class="n">offset</span><span class="o">=</span><span class="mi">00000000</span><span class="w"> </span><span class="k">size</span><span class="o">=</span><span class="mi">00000000</span><span class="w"></span>
-<span class="w">    </span><span class="nl">Capabilities</span><span class="p">:</span><span class="w"> </span><span class="o">[</span><span class="n">b4</span><span class="o">]</span><span class="w"> </span><span class="n">Vendor</span><span class="w"> </span><span class="k">Specific</span><span class="w"> </span><span class="nl">Information</span><span class="p">:</span><span class="w"> </span><span class="nl">VirtIO</span><span class="p">:</span><span class="w"> </span><span class="n">Notify</span><span class="w"></span>
-<span class="w">        </span><span class="n">BAR</span><span class="o">=</span><span class="mi">4</span><span class="w"> </span><span class="n">offset</span><span class="o">=</span><span class="mi">00003000</span><span class="w"> </span><span class="k">size</span><span class="o">=</span><span class="mi">00001000</span><span class="w"> </span><span class="n">multiplier</span><span class="o">=</span><span class="mi">00000004</span><span class="w"></span>
-<span class="w">    </span><span class="nl">Capabilities</span><span class="p">:</span><span class="w"> </span><span class="o">[</span><span class="n">a4</span><span class="o">]</span><span class="w"> </span><span class="n">Vendor</span><span class="w"> </span><span class="k">Specific</span><span class="w"> </span><span class="nl">Information</span><span class="p">:</span><span class="w"> </span><span class="nl">VirtIO</span><span class="p">:</span><span class="w"> </span><span class="n">DeviceCfg</span><span class="w"></span>
-<span class="w">        </span><span class="n">BAR</span><span class="o">=</span><span class="mi">4</span><span class="w"> </span><span class="n">offset</span><span class="o">=</span><span class="mi">00002000</span><span class="w"> </span><span class="k">size</span><span class="o">=</span><span class="mi">00001000</span><span class="w"></span>
-<span class="w">    </span><span class="nl">Capabilities</span><span class="p">:</span><span class="w"> </span><span class="o">[</span><span class="n">94</span><span class="o">]</span><span class="w"> </span><span class="n">Vendor</span><span class="w"> </span><span class="k">Specific</span><span class="w"> </span><span class="nl">Information</span><span class="p">:</span><span class="w"> </span><span class="nl">VirtIO</span><span class="p">:</span><span class="w"> </span><span class="n">ISR</span><span class="w"></span>
-<span class="w">        </span><span class="n">BAR</span><span class="o">=</span><span class="mi">4</span><span class="w"> </span><span class="n">offset</span><span class="o">=</span><span class="mi">00001000</span><span class="w"> </span><span class="k">size</span><span class="o">=</span><span class="mi">00001000</span><span class="w"></span>
-<span class="w">    </span><span class="nl">Capabilities</span><span class="p">:</span><span class="w"> </span><span class="o">[</span><span class="n">84</span><span class="o">]</span><span class="w"> </span><span class="n">Vendor</span><span class="w"> </span><span class="k">Specific</span><span class="w"> </span><span class="nl">Information</span><span class="p">:</span><span class="w"> </span><span class="nl">VirtIO</span><span class="p">:</span><span class="w"> </span><span class="n">CommonCfg</span><span class="w"></span>
-<span class="w">        </span><span class="n">BAR</span><span class="o">=</span><span class="mi">4</span><span class="w"> </span><span class="n">offset</span><span class="o">=</span><span class="mi">00000000</span><span class="w"> </span><span class="k">size</span><span class="o">=</span><span class="mi">00001000</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="o">[</span><span class="n">root@localhost ~</span><span class="o">]</span><span class="err">#</span><span class="w"> </span><span class="n">lspci</span><span class="w"> </span><span class="o">-</span><span class="n">vvvs</span><span class="w"> </span><span class="mi">04</span><span class="err">:</span><span class="mf">00.0</span>
+<span class="mi">04</span><span class="err">:</span><span class="mf">00.0</span><span class="w"> </span><span class="n">Ethernet</span><span class="w"> </span><span class="nl">controller</span><span class="p">:</span><span class="w"> </span><span class="n">Red</span><span class="w"> </span><span class="n">Hat</span><span class="p">,</span><span class="w"> </span><span class="n">Inc</span><span class="p">.</span><span class="w"> </span><span class="n">Virtio</span><span class="w"> </span><span class="n">network</span><span class="w"> </span><span class="n">device</span><span class="w"> </span><span class="p">(</span><span class="n">rev</span><span class="w"> </span><span class="mi">01</span><span class="p">)</span>
+<span class="w">    </span><span class="nl">Subsystem</span><span class="p">:</span><span class="w"> </span><span class="n">Red</span><span class="w"> </span><span class="n">Hat</span><span class="p">,</span><span class="w"> </span><span class="n">Inc</span><span class="p">.</span><span class="w"> </span><span class="n">Device</span><span class="w"> </span><span class="mi">1100</span>
+<span class="w">    </span><span class="n">Physical</span><span class="w"> </span><span class="nl">Slot</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="o">-</span><span class="mi">1</span>
+<span class="w">    </span><span class="nl">Control</span><span class="p">:</span><span class="w"> </span><span class="n">I</span><span class="o">/</span><span class="n">O</span><span class="o">+</span><span class="w"> </span><span class="n">Mem</span><span class="o">+</span><span class="w"> </span><span class="n">BusMaster</span><span class="o">+</span><span class="w"> </span><span class="n">SpecCycle</span><span class="o">-</span><span class="w"> </span><span class="n">MemWINV</span><span class="o">-</span><span class="w"> </span><span class="n">VGASnoop</span><span class="o">-</span><span class="w"> </span><span class="n">ParErr</span><span class="o">-</span><span class="w"> </span><span class="n">Stepping</span><span class="o">-</span><span class="w"> </span><span class="n">SERR</span><span class="o">+</span><span class="w"> </span><span class="n">FastB2B</span><span class="o">-</span><span class="w"> </span><span class="n">DisINTx</span><span class="o">+</span>
+<span class="w">    </span><span class="nl">Status</span><span class="p">:</span><span class="w"> </span><span class="n">Cap</span><span class="o">+</span><span class="w"> </span><span class="mi">66</span><span class="n">MHz</span><span class="o">-</span><span class="w"> </span><span class="n">UDF</span><span class="o">-</span><span class="w"> </span><span class="n">FastB2B</span><span class="o">-</span><span class="w"> </span><span class="n">ParErr</span><span class="o">-</span><span class="w"> </span><span class="n">DEVSEL</span><span class="o">=</span><span class="n">fast</span><span class="w"> </span><span class="o">&gt;</span><span class="n">TAbort</span><span class="o">-</span><span class="w"> </span><span class="o">&lt;</span><span class="n">TAbort</span><span class="o">-</span><span class="w"> </span><span class="o">&lt;</span><span class="n">MAbort</span><span class="o">-</span><span class="w"> </span><span class="o">&gt;</span><span class="n">SERR</span><span class="o">-</span><span class="w"> </span><span class="o">&lt;</span><span class="n">PERR</span><span class="o">-</span><span class="w"> </span><span class="n">INTx</span><span class="o">-</span>
+<span class="w">    </span><span class="nl">Latency</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span>
+<span class="w">    </span><span class="nl">Interrupt</span><span class="p">:</span><span class="w"> </span><span class="n">pin</span><span class="w"> </span><span class="n">A</span><span class="w"> </span><span class="n">routed</span><span class="w"> </span><span class="k">to</span><span class="w"> </span><span class="n">IRQ</span><span class="w"> </span><span class="mi">21</span>
+<span class="w">    </span><span class="n">Region</span><span class="w"> </span><span class="mi">1</span><span class="err">:</span><span class="w"> </span><span class="n">Memory</span><span class="w"> </span><span class="k">at</span><span class="w"> </span><span class="n">fe840000</span><span class="w"> </span><span class="p">(</span><span class="mi">32</span><span class="o">-</span><span class="nc">bit</span><span class="p">,</span><span class="w"> </span><span class="n">non</span><span class="o">-</span><span class="n">prefetchable</span><span class="p">)</span><span class="w"> </span><span class="o">[</span><span class="n">size=4K</span><span class="o">]</span>
+<span class="w">    </span><span class="n">Region</span><span class="w"> </span><span class="mi">4</span><span class="err">:</span><span class="w"> </span><span class="n">Memory</span><span class="w"> </span><span class="k">at</span><span class="w"> </span><span class="n">fa600000</span><span class="w"> </span><span class="p">(</span><span class="mi">64</span><span class="o">-</span><span class="nc">bit</span><span class="p">,</span><span class="w"> </span><span class="n">prefetchable</span><span class="p">)</span><span class="w"> </span><span class="o">[</span><span class="n">size=16K</span><span class="o">]</span>
+<span class="w">    </span><span class="n">Expansion</span><span class="w"> </span><span class="n">ROM</span><span class="w"> </span><span class="k">at</span><span class="w"> </span><span class="n">fe800000</span><span class="w"> </span><span class="o">[</span><span class="n">disabled</span><span class="o">]</span><span class="w"> </span><span class="o">[</span><span class="n">size=256K</span><span class="o">]</span>
+<span class="w">    </span><span class="nl">Capabilities</span><span class="p">:</span><span class="w"> </span><span class="o">[</span><span class="n">dc</span><span class="o">]</span><span class="w"> </span><span class="n">MSI</span><span class="o">-</span><span class="nl">X</span><span class="p">:</span><span class="w"> </span><span class="n">Enable</span><span class="o">+</span><span class="w"> </span><span class="nf">Count</span><span class="o">=</span><span class="mi">10</span><span class="w"> </span><span class="n">Masked</span><span class="o">-</span>
+<span class="w">        </span><span class="n">Vector</span><span class="w"> </span><span class="nc">table</span><span class="err">:</span><span class="w"> </span><span class="n">BAR</span><span class="o">=</span><span class="mi">1</span><span class="w"> </span><span class="n">offset</span><span class="o">=</span><span class="mi">00000000</span>
+<span class="w">        </span><span class="nl">PBA</span><span class="p">:</span><span class="w"> </span><span class="n">BAR</span><span class="o">=</span><span class="mi">1</span><span class="w"> </span><span class="n">offset</span><span class="o">=</span><span class="mi">00000800</span>
+<span class="w">    </span><span class="nl">Capabilities</span><span class="p">:</span><span class="w"> </span><span class="o">[</span><span class="n">c8</span><span class="o">]</span><span class="w"> </span><span class="n">Vendor</span><span class="w"> </span><span class="k">Specific</span><span class="w"> </span><span class="nl">Information</span><span class="p">:</span><span class="w"> </span><span class="nl">VirtIO</span><span class="p">:</span><span class="w"> </span><span class="o">&lt;</span><span class="k">unknown</span><span class="o">&gt;</span>
+<span class="w">        </span><span class="n">BAR</span><span class="o">=</span><span class="mi">0</span><span class="w"> </span><span class="n">offset</span><span class="o">=</span><span class="mi">00000000</span><span class="w"> </span><span class="k">size</span><span class="o">=</span><span class="mi">00000000</span>
+<span class="w">    </span><span class="nl">Capabilities</span><span class="p">:</span><span class="w"> </span><span class="o">[</span><span class="n">b4</span><span class="o">]</span><span class="w"> </span><span class="n">Vendor</span><span class="w"> </span><span class="k">Specific</span><span class="w"> </span><span class="nl">Information</span><span class="p">:</span><span class="w"> </span><span class="nl">VirtIO</span><span class="p">:</span><span class="w"> </span><span class="n">Notify</span>
+<span class="w">        </span><span class="n">BAR</span><span class="o">=</span><span class="mi">4</span><span class="w"> </span><span class="n">offset</span><span class="o">=</span><span class="mi">00003000</span><span class="w"> </span><span class="k">size</span><span class="o">=</span><span class="mi">00001000</span><span class="w"> </span><span class="n">multiplier</span><span class="o">=</span><span class="mi">00000004</span>
+<span class="w">    </span><span class="nl">Capabilities</span><span class="p">:</span><span class="w"> </span><span class="o">[</span><span class="n">a4</span><span class="o">]</span><span class="w"> </span><span class="n">Vendor</span><span class="w"> </span><span class="k">Specific</span><span class="w"> </span><span class="nl">Information</span><span class="p">:</span><span class="w"> </span><span class="nl">VirtIO</span><span class="p">:</span><span class="w"> </span><span class="n">DeviceCfg</span>
+<span class="w">        </span><span class="n">BAR</span><span class="o">=</span><span class="mi">4</span><span class="w"> </span><span class="n">offset</span><span class="o">=</span><span class="mi">00002000</span><span class="w"> </span><span class="k">size</span><span class="o">=</span><span class="mi">00001000</span>
+<span class="w">    </span><span class="nl">Capabilities</span><span class="p">:</span><span class="w"> </span><span class="o">[</span><span class="n">94</span><span class="o">]</span><span class="w"> </span><span class="n">Vendor</span><span class="w"> </span><span class="k">Specific</span><span class="w"> </span><span class="nl">Information</span><span class="p">:</span><span class="w"> </span><span class="nl">VirtIO</span><span class="p">:</span><span class="w"> </span><span class="n">ISR</span>
+<span class="w">        </span><span class="n">BAR</span><span class="o">=</span><span class="mi">4</span><span class="w"> </span><span class="n">offset</span><span class="o">=</span><span class="mi">00001000</span><span class="w"> </span><span class="k">size</span><span class="o">=</span><span class="mi">00001000</span>
+<span class="w">    </span><span class="nl">Capabilities</span><span class="p">:</span><span class="w"> </span><span class="o">[</span><span class="n">84</span><span class="o">]</span><span class="w"> </span><span class="n">Vendor</span><span class="w"> </span><span class="k">Specific</span><span class="w"> </span><span class="nl">Information</span><span class="p">:</span><span class="w"> </span><span class="nl">VirtIO</span><span class="p">:</span><span class="w"> </span><span class="n">CommonCfg</span>
+<span class="w">        </span><span class="n">BAR</span><span class="o">=</span><span class="mi">4</span><span class="w"> </span><span class="n">offset</span><span class="o">=</span><span class="mi">00000000</span><span class="w"> </span><span class="k">size</span><span class="o">=</span><span class="mi">00001000</span>
 </code></pre></div>
 
 <p>MSI-X的vector table和PBA放到了BAR1里面，
@@ -276,11 +276,11 @@ virtio为了提升设备的IO性能，采用了共享内存机制，
 </code></pre></div>
 
 <p><code>Desriptor Table</code>中存放的是一个一个的<code>virtq_desc</code>元素，每个<code>virq_desc</code>元素占用16个字节。</p>
-<div class="highlight"><pre><span></span><code><span class="nb">+-----------------------------------------------------------+</span><span class="c"></span>
+<div class="highlight"><pre><span></span><code><span class="nb">+-----------------------------------------------------------+</span>
 <span class="c">|                        addr/gpa </span><span class="k">[</span><span class="c">0:63</span><span class="k">]</span><span class="c">                    |</span>
-<span class="nb">+-------------------------+-----------------+---------------+</span><span class="c"></span>
+<span class="nb">+-------------------------+-----------------+---------------+</span>
 <span class="c">|         len </span><span class="k">[</span><span class="c">0:31</span><span class="k">]</span><span class="c">      |  flags </span><span class="k">[</span><span class="c">0:15</span><span class="k">]</span><span class="c">   |  next </span><span class="k">[</span><span class="c">0:15</span><span class="k">]</span><span class="c">  |</span>
-<span class="nb">+-------------------------+-----------------+---------------+</span><span class="c"></span>
+<span class="nb">+-------------------------+-----------------+---------------+</span>
 </code></pre></div>
 
 <p>其中，addr占用64bit存放了单个IO请求的GPA地址信息，例如addr可能表示某个DMA buffer的起始地址。
@@ -293,9 +293,9 @@ next是指向下一个<code>virtq_desc</code>的索引号（前提是<code>VIRTQ
 其中，flags取值为<code>VIRTQ_AVAIL_F_NO_INTERRUPT</code>时表示前端驱动告诉后端：
 “当你消耗完一个IO buffer的时候，不要立刻给我发中断”（防止中断过多影响效率）。
 idx表示下次前端驱动要放置<code>Descriptor Entry</code>的地方。</p>
-<div class="highlight"><pre><span></span><code><span class="nb">+--------------+-------------+--------------+---------------------+</span><span class="c"></span>
+<div class="highlight"><pre><span></span><code><span class="nb">+--------------+-------------+--------------+---------------------+</span>
 <span class="c">| flags </span><span class="k">[</span><span class="c">0:15</span><span class="k">]</span><span class="c"> |  idx </span><span class="k">[</span><span class="c">0:15</span><span class="k">]</span><span class="c"> |  ring</span><span class="k">[</span><span class="c">0:15</span><span class="k">]</span><span class="c">  |  used_event </span><span class="k">[</span><span class="c">0:15</span><span class="k">]</span><span class="c">  |</span>
-<span class="nb">+--------------+-------------+--------------+---------------------+</span><span class="c"></span>
+<span class="nb">+--------------+-------------+--------------+---------------------+</span>
 </code></pre></div>
 
 <p>Used Ring结构稍微不一样，flags的值如果为<code>VIRTIO_F_EVENT_IDX</code>并且前后端协商<code>VIRTIO_F_EVENT_IDX</code> feature成功,
@@ -305,9 +305,9 @@ idx表示下次前端驱动要放置<code>Descriptor Entry</code>的地方。</p
 “Hi 老兄，记得把这个idx的请求kick给我哈”。
 <code>VIRTIO_F_EVENT_IDX</code>对virtio通知/中断有一定的优化，在某些场景下能够提升IO性能。</p>
 <div class="highlight"><pre><span></span><code><span class="cm">/* The Guest publishes the used index for which it expects an interrupt</span>
-<span class="cm"> * at the end of the avail ring. Host should ignore the avail-&gt;flags field. */</span><span class="w"></span>
+<span class="cm"> * at the end of the avail ring. Host should ignore the avail-&gt;flags field. */</span>
 <span class="cm">/* The Host publishes the avail index for which it expects a kick</span>
-<span class="cm"> * at the end of the used ring. Guest should ignore the used-&gt;flags field. */</span><span class="w"></span>
+<span class="cm"> * at the end of the used ring. Guest should ignore the used-&gt;flags field. */</span>
 
 <span class="k">struct</span><span class="w"> </span><span class="nc">virtq_used</span><span class="w"> </span><span class="p">{</span><span class="w"> </span>
 <span class="cp">#define VIRTQ_USED_F_NO_NOTIFY  1 </span>
@@ -323,7 +323,7 @@ idx表示下次前端驱动要放置<code>Descriptor Entry</code>的地方。</p
 <span class="w">        </span><span class="n">le32</span><span class="w"> </span><span class="n">id</span><span class="p">;</span><span class="w"> </span>
 <span class="w">        </span><span class="cm">/* Total length of the descriptor chain which was used (written to) */</span><span class="w"> </span>
 <span class="w">        </span><span class="n">le32</span><span class="w"> </span><span class="n">len</span><span class="p">;</span><span class="w"> </span>
-<span class="p">};</span><span class="w"></span>
+<span class="p">};</span>
 </code></pre></div>
 
 <p>原理就到这里，后面会以virtio网卡为例进行详细流程说明。</p>
@@ -357,21 +357,21 @@ Virtio前后端通信概括起来只有两个方向，即GuestOS通知QEMU和QEM
 <p>前端驱动通知后端比较简单，QEMU设置一段特定的MMIO地址空间，前端驱动访问这段MMIO触发VMExit，
 退出到KVM后利用<code>ioeventfd</code>机制通知到用户态的QEMU，QEMU主循环（main_loop poll）
 检测到ioeventfd事件后调用callback进行处理。</p>
-<div class="highlight"><pre><span></span><code><span class="n">前端驱动通知后端</span><span class="err">：</span><span class="w"></span>
-<span class="n">内核流程mark一下</span><span class="err">，</span><span class="n">PCI设备驱动流程这个后面可以学习一下</span><span class="err">，</span><span class="n">先扫描PCI</span><span class="w"> </span><span class="n">bus发现是virtio设备再扫描virtio</span><span class="o">-</span><span class="n">bus</span><span class="err">。</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="n">前端驱动通知后端</span><span class="err">：</span>
+<span class="n">内核流程mark一下</span><span class="err">，</span><span class="n">PCI设备驱动流程这个后面可以学习一下</span><span class="err">，</span><span class="n">先扫描PCI</span><span class="w"> </span><span class="n">bus发现是virtio设备再扫描virtio</span><span class="o">-</span><span class="n">bus</span><span class="err">。</span>
 <span class="n">worker_thread</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">process_one_work</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">pciehp_power_thread</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">pciehp_enable_slot</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span>
 <span class="n">pciehp_configure_device</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">pci_bus_add_devices</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">pci_bus_add_device</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">device_attach</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span>
 <span class="n">__device_attach</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">bus_for_each_drv</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">__device_attach_driver</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">driver_probe_device</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span>
 <span class="n">pci_device_probe</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">local_pci_probe</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">virtio_pci_probe</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">register_virtio_device</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span>
 <span class="n">device_register</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">device_add</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">bus_probe_device</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">device_initial_probe</span><span class="w"> </span>
-<span class="o">--&gt;</span><span class="w"> </span><span class="n">__device_attach</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">bus_for_each_drv</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">__device_attach_driver</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"></span>
-<span class="n">driver_probe_device</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">virtio_dev_probe</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">virtnet_probe</span><span class="w"> </span><span class="p">(</span><span class="n">网卡设备驱动加载的入口</span><span class="p">)</span><span class="w"></span>
+<span class="o">--&gt;</span><span class="w"> </span><span class="n">__device_attach</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">bus_for_each_drv</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">__device_attach_driver</span><span class="w"> </span><span class="o">--&gt;</span>
+<span class="n">driver_probe_device</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">virtio_dev_probe</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">virtnet_probe</span><span class="w"> </span><span class="p">(</span><span class="n">网卡设备驱动加载的入口</span><span class="p">)</span>
 
 <span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">virtnet_probe</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">virtio_device</span><span class="w"> </span><span class="o">*</span><span class="n">vdev</span><span class="p">)</span><span class="w"> </span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="p">......</span><span class="w"></span>
-<span class="w">    </span><span class="n">virtio_device_ready</span><span class="p">(</span><span class="n">vdev</span><span class="p">);</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="p">{</span>
+<span class="w">    </span><span class="p">......</span>
+<span class="w">    </span><span class="n">virtio_device_ready</span><span class="p">(</span><span class="n">vdev</span><span class="p">);</span>
+<span class="p">}</span>
 
 <span class="cm">/**</span>
 <span class="cm"> * virtio_device_ready - enable vq use in probe function</span>
@@ -380,29 +380,29 @@ Virtio前后端通信概括起来只有两个方向，即GuestOS通知QEMU和QEM
 <span class="cm"> * Driver must call this to use vqs in the probe function.</span>
 <span class="cm"> *</span>
 <span class="cm"> * Note: vqs are enabled automatically after probe returns.</span>
-<span class="cm"> */</span><span class="w"></span>
-<span class="k">static</span><span class="w"> </span><span class="kr">inline</span><span class="w"></span>
-<span class="kt">void</span><span class="w"> </span><span class="n">virtio_device_ready</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">virtio_device</span><span class="w"> </span><span class="o">*</span><span class="n">dev</span><span class="p">)</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="n">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">dev</span><span class="o">-&gt;</span><span class="n">config</span><span class="o">-&gt;</span><span class="n">get_status</span><span class="p">(</span><span class="n">dev</span><span class="p">);</span><span class="w"></span>
+<span class="cm"> */</span>
+<span class="k">static</span><span class="w"> </span><span class="kr">inline</span>
+<span class="kt">void</span><span class="w"> </span><span class="n">virtio_device_ready</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">virtio_device</span><span class="w"> </span><span class="o">*</span><span class="n">dev</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="n">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">dev</span><span class="o">-&gt;</span><span class="n">config</span><span class="o">-&gt;</span><span class="n">get_status</span><span class="p">(</span><span class="n">dev</span><span class="p">);</span>
 
-<span class="w">        </span><span class="n">BUG_ON</span><span class="p">(</span><span class="n">status</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">VIRTIO_CONFIG_S_DRIVER_OK</span><span class="p">);</span><span class="w"></span>
-<span class="w">        </span><span class="n">dev</span><span class="o">-&gt;</span><span class="n">config</span><span class="o">-&gt;</span><span class="n">set_status</span><span class="p">(</span><span class="n">dev</span><span class="p">,</span><span class="w"> </span><span class="n">status</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">VIRTIO_CONFIG_S_DRIVER_OK</span><span class="p">);</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="n">BUG_ON</span><span class="p">(</span><span class="n">status</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">VIRTIO_CONFIG_S_DRIVER_OK</span><span class="p">);</span>
+<span class="w">        </span><span class="n">dev</span><span class="o">-&gt;</span><span class="n">config</span><span class="o">-&gt;</span><span class="n">set_status</span><span class="p">(</span><span class="n">dev</span><span class="p">,</span><span class="w"> </span><span class="n">status</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">VIRTIO_CONFIG_S_DRIVER_OK</span><span class="p">);</span>
+<span class="p">}</span>
 
 <span class="cp"># QEMU/KVM后端的处理流程如下：</span>
 <span class="cp"># 前端驱动写Status位，val &amp; VIRTIO_CONFIG_S_DRIVER_OK，这时候前端驱动已经ready</span>
-<span class="n">virtio_pci_config_write</span><span class="w">  </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">virtio_ioport_write</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">virtio_pci_start_ioeventfd</span><span class="w"></span>
-<span class="o">--&gt;</span><span class="w"> </span><span class="n">virtio_bus_set_host_notifier</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">virtio_bus_start_ioeventfd</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">virtio_device_start_ioeventfd_impl</span><span class="w"></span>
-<span class="o">--&gt;</span><span class="w"> </span><span class="n">virtio_bus_set_host_notifier</span><span class="w"></span>
-<span class="w">    </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">virtio_pci_ioeventfd_assign</span><span class="w"></span>
-<span class="w">        </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">memory_region_add_eventfd</span><span class="w"></span>
-<span class="w">            </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">memory_region_transaction_commit</span><span class="w"></span>
-<span class="w">              </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">address_space_update_ioeventfds</span><span class="w"></span>
-<span class="w">                </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">address_space_add_del_ioeventfds</span><span class="w"></span>
-<span class="w">                  </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">kvm_io_ioeventfd_add</span><span class="o">/</span><span class="n">vhost_eventfd_add</span><span class="w"></span>
-<span class="w">                    </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">kvm_set_ioeventfd_pio</span><span class="w"></span>
-<span class="w">                      </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">kvm_vm_ioctl</span><span class="p">(</span><span class="n">kvm_state</span><span class="p">,</span><span class="w"> </span><span class="n">KVM_IOEVENTFD</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">kick</span><span class="p">)</span><span class="w"></span>
+<span class="n">virtio_pci_config_write</span><span class="w">  </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">virtio_ioport_write</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">virtio_pci_start_ioeventfd</span>
+<span class="o">--&gt;</span><span class="w"> </span><span class="n">virtio_bus_set_host_notifier</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">virtio_bus_start_ioeventfd</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">virtio_device_start_ioeventfd_impl</span>
+<span class="o">--&gt;</span><span class="w"> </span><span class="n">virtio_bus_set_host_notifier</span>
+<span class="w">    </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">virtio_pci_ioeventfd_assign</span>
+<span class="w">        </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">memory_region_add_eventfd</span>
+<span class="w">            </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">memory_region_transaction_commit</span>
+<span class="w">              </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">address_space_update_ioeventfds</span>
+<span class="w">                </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">address_space_add_del_ioeventfds</span>
+<span class="w">                  </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">kvm_io_ioeventfd_add</span><span class="o">/</span><span class="n">vhost_eventfd_add</span>
+<span class="w">                    </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">kvm_set_ioeventfd_pio</span>
+<span class="w">                      </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">kvm_vm_ioctl</span><span class="p">(</span><span class="n">kvm_state</span><span class="p">,</span><span class="w"> </span><span class="n">KVM_IOEVENTFD</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">kick</span><span class="p">)</span>
 </code></pre></div>
 
 <p>其实，这就是QEMU的<code>Fast MMIO</code>实现机制。
@@ -412,25 +412,25 @@ Virtio前后端通信概括起来只有两个方向，即GuestOS通知QEMU和QEM
 如果是的话就直接写eventfd告知QEMU，QEMU就会从coalesced mmio ring page中取MMIO请求
 （注：pio page和 mmio page是QEMU和KVM内核之间的共享内存页，已经提前mmap好了）。</p>
 <div class="highlight"><pre><span></span><code><span class="cp">#kvm内核代码virt/kvm/eventfd.c中</span>
-<span class="n">kvm_vm_ioctl</span><span class="p">(</span><span class="n">KVM_IOEVENTFD</span><span class="p">)</span><span class="w"></span>
-<span class="w">  </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">kvm_ioeventfd</span><span class="w"></span>
-<span class="w">    </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">kvm_assign_ioeventfd</span><span class="w"></span>
-<span class="w">      </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">kvm_assign_ioeventfd_idx</span><span class="w"></span>
+<span class="n">kvm_vm_ioctl</span><span class="p">(</span><span class="n">KVM_IOEVENTFD</span><span class="p">)</span>
+<span class="w">  </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">kvm_ioeventfd</span>
+<span class="w">    </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">kvm_assign_ioeventfd</span>
+<span class="w">      </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">kvm_assign_ioeventfd_idx</span>
 
 <span class="cp"># MMIO处理流程中（handle_ept_misconfig）最后会调用到ioeventfd_write通知QEMU。</span>
-<span class="cm">/* MMIO/PIO writes trigger an event if the addr/val match */</span><span class="w"></span>
-<span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"></span>
-<span class="n">ioeventfd_write</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="p">,</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_io_device</span><span class="w"> </span><span class="o">*</span><span class="n">this</span><span class="p">,</span><span class="w"> </span><span class="n">gpa_t</span><span class="w"> </span><span class="n">addr</span><span class="p">,</span><span class="w"></span>
-<span class="w">                </span><span class="kt">int</span><span class="w"> </span><span class="n">len</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">val</span><span class="p">)</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="k">struct</span><span class="w"> </span><span class="nc">_ioeventfd</span><span class="w"> </span><span class="o">*</span><span class="n">p</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">to_ioeventfd</span><span class="p">(</span><span class="n">this</span><span class="p">);</span><span class="w"></span>
+<span class="cm">/* MMIO/PIO writes trigger an event if the addr/val match */</span>
+<span class="k">static</span><span class="w"> </span><span class="kt">int</span>
+<span class="n">ioeventfd_write</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="p">,</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_io_device</span><span class="w"> </span><span class="o">*</span><span class="n">this</span><span class="p">,</span><span class="w"> </span><span class="n">gpa_t</span><span class="w"> </span><span class="n">addr</span><span class="p">,</span>
+<span class="w">                </span><span class="kt">int</span><span class="w"> </span><span class="n">len</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">val</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">        </span><span class="k">struct</span><span class="w"> </span><span class="nc">_ioeventfd</span><span class="w"> </span><span class="o">*</span><span class="n">p</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">to_ioeventfd</span><span class="p">(</span><span class="n">this</span><span class="p">);</span>
 
-<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">ioeventfd_in_range</span><span class="p">(</span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="n">addr</span><span class="p">,</span><span class="w"> </span><span class="n">len</span><span class="p">,</span><span class="w"> </span><span class="n">val</span><span class="p">))</span><span class="w"></span>
-<span class="w">                </span><span class="k">return</span><span class="w"> </span><span class="o">-</span><span class="n">EOPNOTSUPP</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">ioeventfd_in_range</span><span class="p">(</span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="n">addr</span><span class="p">,</span><span class="w"> </span><span class="n">len</span><span class="p">,</span><span class="w"> </span><span class="n">val</span><span class="p">))</span>
+<span class="w">                </span><span class="k">return</span><span class="w"> </span><span class="o">-</span><span class="n">EOPNOTSUPP</span><span class="p">;</span>
 
-<span class="w">        </span><span class="n">eventfd_signal</span><span class="p">(</span><span class="n">p</span><span class="o">-&gt;</span><span class="n">eventfd</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span><span class="w"></span>
-<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="n">eventfd_signal</span><span class="p">(</span><span class="n">p</span><span class="o">-&gt;</span><span class="n">eventfd</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
 </code></pre></div>
 
 <p>不了解<code>MMIO</code>是如何模拟的童鞋，可以结合本站的文章<a href="https://kernelgo.org/mmio.html"><code>MMIO</code>模拟实现分析</a>去了解一下，
@@ -441,11 +441,11 @@ Virtio前后端通信概括起来只有两个方向，即GuestOS通知QEMU和QEM
 对于virtio-pci设备，可以通过Cap呈现MSIx给虚拟机，这样在前端驱动加载的时候就会尝试去使能MSIx中断，
 后端在这个时候建立起MSIx通道。</p>
 <p>前端驱动加载(probe)的过程中，会去初始化<code>virtqueue</code>，这个时候会去申请MSIx中断并注册中断处理函数：</p>
-<div class="highlight"><pre><span></span><code><span class="n">virtnet_probe</span><span class="w"></span>
-<span class="w">  </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">init_vqs</span><span class="w"></span>
-<span class="w">    </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">virtnet_find_vqs</span><span class="w"></span>
-<span class="w">      </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">vdev</span><span class="o">-&gt;</span><span class="n">config</span><span class="o">-&gt;</span><span class="n">find_vqs</span><span class="w"> </span><span class="p">[</span><span class="n">vp_modern_find_vqs</span><span class="p">]</span><span class="w"></span>
-<span class="w">        </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">vp_find_vqs</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="n">virtnet_probe</span>
+<span class="w">  </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">init_vqs</span>
+<span class="w">    </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">virtnet_find_vqs</span>
+<span class="w">      </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">vdev</span><span class="o">-&gt;</span><span class="n">config</span><span class="o">-&gt;</span><span class="n">find_vqs</span><span class="w"> </span><span class="p">[</span><span class="n">vp_modern_find_vqs</span><span class="p">]</span>
+<span class="w">        </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">vp_find_vqs</span>
 <span class="w">          </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">vp_find_vqs_msix</span><span class="w"> </span><span class="c1">// 为每virtqueue申请一个MSIx中断，通常收发各一个队列</span>
 <span class="w">            </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">vp_request_msix_vectors</span><span class="w"> </span><span class="c1">// 主要的MSIx中断申请逻辑都在这个函数里面</span>
 <span class="w">              </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">pci_alloc_irq_vectors_affinity</span><span class="w"> </span><span class="c1">// 申请MSIx中断描述符(__pci_enable_msix_range)</span>
@@ -457,43 +457,43 @@ Virtio前后端通信概括起来只有两个方向，即GuestOS通知QEMU和QEM
 </code></pre></div>
 
 <p>在QEMU/KVM这一侧，开始模拟MSIx中断，具体流程大致如下：</p>
-<div class="highlight"><pre><span></span><code><span class="n">virtio_pci_config_write</span><span class="w"></span>
-<span class="w">  </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">virtio_ioport_write</span><span class="w"></span>
-<span class="w">    </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">virtio_set_status</span><span class="w"></span>
-<span class="w">      </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">virtio_net_vhost_status</span><span class="w"></span>
-<span class="w">        </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">vhost_net_start</span><span class="w"></span>
-<span class="w">          </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">virtio_pci_set_guest_notifiers</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="n">virtio_pci_config_write</span>
+<span class="w">  </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">virtio_ioport_write</span>
+<span class="w">    </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">virtio_set_status</span>
+<span class="w">      </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">virtio_net_vhost_status</span>
+<span class="w">        </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">vhost_net_start</span>
+<span class="w">          </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">virtio_pci_set_guest_notifiers</span>
 <span class="w">            </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">kvm_virtio_pci_vector_use</span><span class="w"> </span>
 <span class="w">              </span><span class="o">|--&gt;</span><span class="w"> </span><span class="n">kvm_irqchip_add_msi_route</span><span class="w"> </span><span class="c1">//更新中断路由表</span>
 <span class="w">              </span><span class="o">|--&gt;</span><span class="w"> </span><span class="n">kvm_virtio_pci_irqfd_use</span><span class="w">  </span><span class="c1">//使能MSI中断</span>
-<span class="w">                 </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">kvm_irqchip_add_irqfd_notifier_gsi</span><span class="w"></span>
-<span class="w">                   </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">kvm_irqchip_assign_irqfd</span><span class="w"></span>
+<span class="w">                 </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">kvm_irqchip_add_irqfd_notifier_gsi</span>
+<span class="w">                   </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">kvm_irqchip_assign_irqfd</span>
 
 <span class="cp"># 申请MSIx中断的时候，会为MSIx分配一个gsi，并为这个gsi绑定一个irqfd，然后调用ioctl KVM_IRQFD注册到内核中。               </span>
-<span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">kvm_irqchip_assign_irqfd</span><span class="p">(</span><span class="n">KVMState</span><span class="w"> </span><span class="o">*</span><span class="n">s</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">fd</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">rfd</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">virq</span><span class="p">,</span><span class="w"></span>
-<span class="w">                                    </span><span class="kt">bool</span><span class="w"> </span><span class="n">assign</span><span class="p">)</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_irqfd</span><span class="w"> </span><span class="n">irqfd</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="p">.</span><span class="n">fd</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">fd</span><span class="p">,</span><span class="w"></span>
-<span class="w">        </span><span class="p">.</span><span class="n">gsi</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">virq</span><span class="p">,</span><span class="w"></span>
-<span class="w">        </span><span class="p">.</span><span class="n">flags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">assign</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">KVM_IRQFD_FLAG_DEASSIGN</span><span class="p">,</span><span class="w"></span>
-<span class="w">    </span><span class="p">};</span><span class="w"></span>
+<span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">kvm_irqchip_assign_irqfd</span><span class="p">(</span><span class="n">KVMState</span><span class="w"> </span><span class="o">*</span><span class="n">s</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">fd</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">rfd</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">virq</span><span class="p">,</span>
+<span class="w">                                    </span><span class="kt">bool</span><span class="w"> </span><span class="n">assign</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_irqfd</span><span class="w"> </span><span class="n">irqfd</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="p">.</span><span class="n">fd</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">fd</span><span class="p">,</span>
+<span class="w">        </span><span class="p">.</span><span class="n">gsi</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">virq</span><span class="p">,</span>
+<span class="w">        </span><span class="p">.</span><span class="n">flags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">assign</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">KVM_IRQFD_FLAG_DEASSIGN</span><span class="p">,</span>
+<span class="w">    </span><span class="p">};</span>
 
-<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">rfd</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="mi">-1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="n">irqfd</span><span class="p">.</span><span class="n">flags</span><span class="w"> </span><span class="o">|=</span><span class="w"> </span><span class="n">KVM_IRQFD_FLAG_RESAMPLE</span><span class="p">;</span><span class="w"></span>
-<span class="w">        </span><span class="n">irqfd</span><span class="p">.</span><span class="n">resamplefd</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rfd</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">rfd</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="mi">-1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">irqfd</span><span class="p">.</span><span class="n">flags</span><span class="w"> </span><span class="o">|=</span><span class="w"> </span><span class="n">KVM_IRQFD_FLAG_RESAMPLE</span><span class="p">;</span>
+<span class="w">        </span><span class="n">irqfd</span><span class="p">.</span><span class="n">resamplefd</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rfd</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
 
-<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">kvm_irqfds_enabled</span><span class="p">())</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="o">-</span><span class="n">ENOSYS</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">kvm_irqfds_enabled</span><span class="p">())</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="o">-</span><span class="n">ENOSYS</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
 
-<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">kvm_vm_ioctl</span><span class="p">(</span><span class="n">s</span><span class="p">,</span><span class="w"> </span><span class="n">KVM_IRQFD</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">irqfd</span><span class="p">);</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">kvm_vm_ioctl</span><span class="p">(</span><span class="n">s</span><span class="p">,</span><span class="w"> </span><span class="n">KVM_IRQFD</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">irqfd</span><span class="p">);</span>
+<span class="p">}</span>
 
 <span class="cp"># KVM内核代码virt/kvm/eventfd.c</span>
-<span class="n">kvm_vm_ioctl</span><span class="p">(</span><span class="n">s</span><span class="p">,</span><span class="w"> </span><span class="n">KVM_IRQFD</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">irqfd</span><span class="p">)</span><span class="w"></span>
-<span class="w">  </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">kvm_irqfd_assign</span><span class="w"></span>
+<span class="n">kvm_vm_ioctl</span><span class="p">(</span><span class="n">s</span><span class="p">,</span><span class="w"> </span><span class="n">KVM_IRQFD</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">irqfd</span><span class="p">)</span>
+<span class="w">  </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">kvm_irqfd_assign</span>
 <span class="w">    </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">vfs_poll</span><span class="p">(</span><span class="n">f</span><span class="p">.</span><span class="n">file</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">irqfd</span><span class="o">-&gt;</span><span class="n">pt</span><span class="p">)</span><span class="w"> </span><span class="c1">// 在内核中poll这个irqfd</span>
 </code></pre></div>
 
@@ -520,9 +520,9 @@ Virtio前后端通信概括起来只有两个方向，即GuestOS通知QEMU和QEM
 </code></pre></div>
 
 <p>在<code>virtio_notify_irqfd</code>函数中，会去写<code>irqfd</code>，给内核发送一个信号。</p>
-<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">virtio_notify_irqfd</span><span class="p">(</span><span class="n">VirtIODevice</span><span class="w"> </span><span class="o">*</span><span class="n">vdev</span><span class="p">,</span><span class="w"> </span><span class="n">VirtQueue</span><span class="w"> </span><span class="o">*</span><span class="n">vq</span><span class="p">)</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="p">...</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">virtio_notify_irqfd</span><span class="p">(</span><span class="n">VirtIODevice</span><span class="w"> </span><span class="o">*</span><span class="n">vdev</span><span class="p">,</span><span class="w"> </span><span class="n">VirtQueue</span><span class="w"> </span><span class="o">*</span><span class="n">vq</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="p">...</span>
 <span class="w">     </span><span class="cm">/*</span>
 <span class="cm">     * virtio spec 1.0 says ISR bit 0 should be ignored with MSI, but</span>
 <span class="cm">     * windows drivers included in virtio-win 1.8.0 (circa 2015) are</span>
@@ -537,30 +537,30 @@ Virtio前后端通信概括起来只有两个方向，即GuestOS通知QEMU和QEM
 <span class="cm">     *</span>
 <span class="cm">     * Note: it&#39;s safe to update ISR from any thread as it was switched</span>
 <span class="cm">     * to an atomic operation.</span>
-<span class="cm">     */</span><span class="w"></span>
-<span class="w">    </span><span class="n">virtio_set_isr</span><span class="p">(</span><span class="n">vq</span><span class="o">-&gt;</span><span class="n">vdev</span><span class="p">,</span><span class="w"> </span><span class="mh">0x1</span><span class="p">);</span><span class="w"></span>
+<span class="cm">     */</span>
+<span class="w">    </span><span class="n">virtio_set_isr</span><span class="p">(</span><span class="n">vq</span><span class="o">-&gt;</span><span class="n">vdev</span><span class="p">,</span><span class="w"> </span><span class="mh">0x1</span><span class="p">);</span>
 <span class="w">    </span><span class="n">event_notifier_set</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vq</span><span class="o">-&gt;</span><span class="n">guest_notifier</span><span class="p">);</span><span class="w">   </span><span class="c1">//写vq-&gt;guest_notifier，即irqfd</span>
-<span class="p">}</span><span class="w"></span>
+<span class="p">}</span>
 </code></pre></div>
 
 <p>QEMU写了这个<code>irqfd</code>后，KVM内核模块中的irqfd poll就收到一个<code>POLL_IN</code>事件，然后将MSIx中断自动投递给对应的LAPIC。
 大致流程是：<code>POLL_IN</code> -&gt; <code>kvm_arch_set_irq_inatomic</code> -&gt; <code>kvm_set_msi_irq</code>, <code>kvm_irq_delivery_to_apic_fast</code></p>
-<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"></span>
-<span class="nf">irqfd_wakeup</span><span class="p">(</span><span class="n">wait_queue_entry_t</span><span class="w"> </span><span class="o">*</span><span class="n">wait</span><span class="p">,</span><span class="w"> </span><span class="kt">unsigned</span><span class="w"> </span><span class="n">mode</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">sync</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">key</span><span class="p">)</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">flags</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">EPOLLIN</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">                </span><span class="n">idx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">srcu_read_lock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">kvm</span><span class="o">-&gt;</span><span class="n">irq_srcu</span><span class="p">);</span><span class="w"></span>
-<span class="w">                </span><span class="k">do</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">                        </span><span class="n">seq</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">read_seqcount_begin</span><span class="p">(</span><span class="o">&amp;</span><span class="n">irqfd</span><span class="o">-&gt;</span><span class="n">irq_entry_sc</span><span class="p">);</span><span class="w"></span>
-<span class="w">                        </span><span class="n">irq</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">irqfd</span><span class="o">-&gt;</span><span class="n">irq_entry</span><span class="p">;</span><span class="w"></span>
-<span class="w">                </span><span class="p">}</span><span class="w"> </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">read_seqcount_retry</span><span class="p">(</span><span class="o">&amp;</span><span class="n">irqfd</span><span class="o">-&gt;</span><span class="n">irq_entry_sc</span><span class="p">,</span><span class="w"> </span><span class="n">seq</span><span class="p">));</span><span class="w"></span>
-<span class="w">                </span><span class="cm">/* An event has been signaled, inject an interrupt */</span><span class="w"></span>
-<span class="w">                </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_arch_set_irq_inatomic</span><span class="p">(</span><span class="o">&amp;</span><span class="n">irq</span><span class="p">,</span><span class="w"> </span><span class="n">kvm</span><span class="p">,</span><span class="w"></span>
-<span class="w">                                             </span><span class="n">KVM_USERSPACE_IRQ_SOURCE_ID</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"></span>
-<span class="w">                                             </span><span class="nb">false</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="o">-</span><span class="n">EWOULDBLOCK</span><span class="p">)</span><span class="w"></span>
-<span class="w">                        </span><span class="n">schedule_work</span><span class="p">(</span><span class="o">&amp;</span><span class="n">irqfd</span><span class="o">-&gt;</span><span class="n">inject</span><span class="p">);</span><span class="w"></span>
-<span class="w">                </span><span class="n">srcu_read_unlock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">kvm</span><span class="o">-&gt;</span><span class="n">irq_srcu</span><span class="p">,</span><span class="w"> </span><span class="n">idx</span><span class="p">);</span><span class="w"></span>
-<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">int</span>
+<span class="nf">irqfd_wakeup</span><span class="p">(</span><span class="n">wait_queue_entry_t</span><span class="w"> </span><span class="o">*</span><span class="n">wait</span><span class="p">,</span><span class="w"> </span><span class="kt">unsigned</span><span class="w"> </span><span class="n">mode</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">sync</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">key</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">flags</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">EPOLLIN</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="n">idx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">srcu_read_lock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">kvm</span><span class="o">-&gt;</span><span class="n">irq_srcu</span><span class="p">);</span>
+<span class="w">                </span><span class="k">do</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                        </span><span class="n">seq</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">read_seqcount_begin</span><span class="p">(</span><span class="o">&amp;</span><span class="n">irqfd</span><span class="o">-&gt;</span><span class="n">irq_entry_sc</span><span class="p">);</span>
+<span class="w">                        </span><span class="n">irq</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">irqfd</span><span class="o">-&gt;</span><span class="n">irq_entry</span><span class="p">;</span>
+<span class="w">                </span><span class="p">}</span><span class="w"> </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">read_seqcount_retry</span><span class="p">(</span><span class="o">&amp;</span><span class="n">irqfd</span><span class="o">-&gt;</span><span class="n">irq_entry_sc</span><span class="p">,</span><span class="w"> </span><span class="n">seq</span><span class="p">));</span>
+<span class="w">                </span><span class="cm">/* An event has been signaled, inject an interrupt */</span>
+<span class="w">                </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_arch_set_irq_inatomic</span><span class="p">(</span><span class="o">&amp;</span><span class="n">irq</span><span class="p">,</span><span class="w"> </span><span class="n">kvm</span><span class="p">,</span>
+<span class="w">                                             </span><span class="n">KVM_USERSPACE_IRQ_SOURCE_ID</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">                                             </span><span class="nb">false</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="o">-</span><span class="n">EWOULDBLOCK</span><span class="p">)</span>
+<span class="w">                        </span><span class="n">schedule_work</span><span class="p">(</span><span class="o">&amp;</span><span class="n">irqfd</span><span class="o">-&gt;</span><span class="n">inject</span><span class="p">);</span>
+<span class="w">                </span><span class="n">srcu_read_unlock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">kvm</span><span class="o">-&gt;</span><span class="n">irq_srcu</span><span class="p">,</span><span class="w"> </span><span class="n">idx</span><span class="p">);</span>
+<span class="w">        </span><span class="p">}</span>
 </code></pre></div>
 
 <p>这里还有一点没有想明白，结合代码和调试来看，virtio-blk/virtio-scsi的msi中断走irqfd机制，
@@ -568,11 +568,11 @@ Virtio前后端通信概括起来只有两个方向，即GuestOS通知QEMU和QEM
 最后通过KVM的ioctl投递中断？
 从代码路径上来看，后者明显路径更长，谁知道原因告诉我一下!!!。
 https://patchwork.kernel.org/patch/9531577/</p>
-<div class="highlight"><pre><span></span><code><span class="nv">Once</span> <span class="nv">in</span> <span class="nv">virtio_notify_irqfd</span>, <span class="nv">once</span> <span class="nv">in</span> <span class="nv">virtio_queue_guest_notifier_read</span>.
+<div class="highlight"><pre><span></span><code><span class="nv">Once</span><span class="w"> </span><span class="nv">in</span><span class="w"> </span><span class="nv">virtio_notify_irqfd</span>,<span class="w"> </span><span class="nv">once</span><span class="w"> </span><span class="nv">in</span><span class="w"> </span><span class="nv">virtio_queue_guest_notifier_read</span>.
 
-<span class="nv">Unfortunately</span>, <span class="k">for</span> <span class="nv">virtio</span><span class="o">-</span><span class="nv">blk</span> <span class="o">+</span> <span class="nv">MSI</span> <span class="o">+</span> <span class="nv">KVM</span> <span class="o">+</span> <span class="nv">old</span> <span class="nv">Windows</span> <span class="nv">drivers</span> <span class="nv">we</span> <span class="nv">need</span> <span class="nv">the</span> <span class="nv">one</span> <span class="nv">in</span> <span class="nv">virtio_notify_irqfd</span>.
-<span class="k">For</span> <span class="nv">virtio</span><span class="o">-</span><span class="nv">net</span> <span class="o">+</span> <span class="nv">vhost</span> <span class="o">+</span> <span class="nv">INTx</span> <span class="nv">we</span> <span class="nv">need</span> <span class="nv">the</span> <span class="nv">one</span> <span class="nv">in</span> <span class="nv">virtio_queue_guest_notifier_read</span>. 
-这显然路径更长啊。 
+<span class="nv">Unfortunately</span>,<span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="nv">virtio</span><span class="o">-</span><span class="nv">blk</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="nv">MSI</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="nv">KVM</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="nv">old</span><span class="w"> </span><span class="nv">Windows</span><span class="w"> </span><span class="nv">drivers</span><span class="w"> </span><span class="nv">we</span><span class="w"> </span><span class="nv">need</span><span class="w"> </span><span class="nv">the</span><span class="w"> </span><span class="nv">one</span><span class="w"> </span><span class="nv">in</span><span class="w"> </span><span class="nv">virtio_notify_irqfd</span>.
+<span class="k">For</span><span class="w"> </span><span class="nv">virtio</span><span class="o">-</span><span class="nv">net</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="nv">vhost</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="nv">INTx</span><span class="w"> </span><span class="nv">we</span><span class="w"> </span><span class="nv">need</span><span class="w"> </span><span class="nv">the</span><span class="w"> </span><span class="nv">one</span><span class="w"> </span><span class="nv">in</span><span class="w"> </span><span class="nv">virtio_queue_guest_notifier_read</span>.<span class="w"> </span>
+这显然路径更长啊。<span class="w"> </span>
 </code></pre></div>
 
 <p>Ok，到这里virtio前后端通信机制已经明了，最后一个小节我们以virtio-net为例，梳理一下virtio中的部分核心代码流程。</p>
@@ -586,60 +586,60 @@ https://patchwork.kernel.org/patch/9531577/</p>
 <span class="n">pci_device_probe</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">local_pci_probe</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">virtio_pci_probe</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">register_virtio_device</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span>
 <span class="n">device_register</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">device_add</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">bus_probe_device</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">device_initial_probe</span><span class="w"> </span>
 <span class="o">--&gt;</span><span class="w"> </span><span class="n">__device_attach</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">bus_for_each_drv</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">__device_attach_driver</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">driver_probe_device</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span>
-<span class="n">virtio_dev_probe</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">virtnet_probe</span><span class="w"></span>
+<span class="n">virtio_dev_probe</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">virtnet_probe</span>
 
 <span class="cp"># 在virtio_pci_probe里先尝试以virtio modern方式读取设备配置数据结构，如果失败则尝试virio legacy方式。</span>
 <span class="cp"># 对于virtio legacy，我们前面提到了virtio legacy协议规定设备的配置数据结构放在PCI BAR0里面。</span>
-<span class="cm">/* the PCI probing function */</span><span class="w"></span>
-<span class="kt">int</span><span class="w"> </span><span class="n">virtio_pci_legacy_probe</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">virtio_pci_device</span><span class="w"> </span><span class="o">*</span><span class="n">vp_dev</span><span class="p">)</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
+<span class="cm">/* the PCI probing function */</span>
+<span class="kt">int</span><span class="w"> </span><span class="n">virtio_pci_legacy_probe</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">virtio_pci_device</span><span class="w"> </span><span class="o">*</span><span class="n">vp_dev</span><span class="p">)</span>
+<span class="p">{</span>
 <span class="w">        </span><span class="n">rc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pci_request_region</span><span class="p">(</span><span class="n">pci_dev</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;virtio-pci-legacy&quot;</span><span class="p">);</span><span class="w">  </span><span class="c1">//将设备的BAR0映射到物理地址空间</span>
 <span class="w">        </span><span class="n">vp_dev</span><span class="o">-&gt;</span><span class="n">ioaddr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pci_iomap</span><span class="p">(</span><span class="n">pci_dev</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span><span class="w">   </span><span class="c1">//获得BAR0的内核地址</span>
-<span class="p">}</span><span class="w"></span>
+<span class="p">}</span>
 
 <span class="cp">#对于virtio modern，通过capability方式报告配置数据结构的位置，配置数据结构有5种类型。</span>
-<span class="kt">int</span><span class="w"> </span><span class="n">virtio_pci_modern_probe</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">virtio_pci_device</span><span class="w"> </span><span class="o">*</span><span class="n">vp_dev</span><span class="p">)</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="cm">/* check for a common config: if not, use legacy mode (bar 0). */</span><span class="w"></span>
-<span class="w">        </span><span class="n">common</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">virtio_pci_find_capability</span><span class="p">(</span><span class="n">pci_dev</span><span class="p">,</span><span class="w"> </span><span class="n">VIRTIO_PCI_CAP_COMMON_CFG</span><span class="p">,</span><span class="w"></span>
-<span class="w">                                            </span><span class="n">IORESOURCE_IO</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">IORESOURCE_MEM</span><span class="p">,</span><span class="w"></span>
-<span class="w">                                            </span><span class="o">&amp;</span><span class="n">vp_dev</span><span class="o">-&gt;</span><span class="n">modern_bars</span><span class="p">);</span><span class="w"></span>
+<span class="kt">int</span><span class="w"> </span><span class="n">virtio_pci_modern_probe</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">virtio_pci_device</span><span class="w"> </span><span class="o">*</span><span class="n">vp_dev</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">        </span><span class="cm">/* check for a common config: if not, use legacy mode (bar 0). */</span>
+<span class="w">        </span><span class="n">common</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">virtio_pci_find_capability</span><span class="p">(</span><span class="n">pci_dev</span><span class="p">,</span><span class="w"> </span><span class="n">VIRTIO_PCI_CAP_COMMON_CFG</span><span class="p">,</span>
+<span class="w">                                            </span><span class="n">IORESOURCE_IO</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">IORESOURCE_MEM</span><span class="p">,</span>
+<span class="w">                                            </span><span class="o">&amp;</span><span class="n">vp_dev</span><span class="o">-&gt;</span><span class="n">modern_bars</span><span class="p">);</span>
 
-<span class="w">        </span><span class="cm">/* If common is there, these should be too... */</span><span class="w"></span>
-<span class="w">        </span><span class="n">isr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">virtio_pci_find_capability</span><span class="p">(</span><span class="n">pci_dev</span><span class="p">,</span><span class="w"> </span><span class="n">VIRTIO_PCI_CAP_ISR_CFG</span><span class="p">,</span><span class="w"></span>
-<span class="w">                                         </span><span class="n">IORESOURCE_IO</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">IORESOURCE_MEM</span><span class="p">,</span><span class="w"></span>
-<span class="w">                                         </span><span class="o">&amp;</span><span class="n">vp_dev</span><span class="o">-&gt;</span><span class="n">modern_bars</span><span class="p">);</span><span class="w"></span>
-<span class="w">        </span><span class="n">notify</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">virtio_pci_find_capability</span><span class="p">(</span><span class="n">pci_dev</span><span class="p">,</span><span class="w"> </span><span class="n">VIRTIO_PCI_CAP_NOTIFY_CFG</span><span class="p">,</span><span class="w"></span>
-<span class="w">                                            </span><span class="n">IORESOURCE_IO</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">IORESOURCE_MEM</span><span class="p">,</span><span class="w"></span>
-<span class="w">                                            </span><span class="o">&amp;</span><span class="n">vp_dev</span><span class="o">-&gt;</span><span class="n">modern_bars</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="cm">/* If common is there, these should be too... */</span>
+<span class="w">        </span><span class="n">isr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">virtio_pci_find_capability</span><span class="p">(</span><span class="n">pci_dev</span><span class="p">,</span><span class="w"> </span><span class="n">VIRTIO_PCI_CAP_ISR_CFG</span><span class="p">,</span>
+<span class="w">                                         </span><span class="n">IORESOURCE_IO</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">IORESOURCE_MEM</span><span class="p">,</span>
+<span class="w">                                         </span><span class="o">&amp;</span><span class="n">vp_dev</span><span class="o">-&gt;</span><span class="n">modern_bars</span><span class="p">);</span>
+<span class="w">        </span><span class="n">notify</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">virtio_pci_find_capability</span><span class="p">(</span><span class="n">pci_dev</span><span class="p">,</span><span class="w"> </span><span class="n">VIRTIO_PCI_CAP_NOTIFY_CFG</span><span class="p">,</span>
+<span class="w">                                            </span><span class="n">IORESOURCE_IO</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">IORESOURCE_MEM</span><span class="p">,</span>
+<span class="w">                                            </span><span class="o">&amp;</span><span class="n">vp_dev</span><span class="o">-&gt;</span><span class="n">modern_bars</span><span class="p">);</span>
 
 <span class="w">        </span><span class="cm">/* Device capability is only mandatory for devices that have</span>
 <span class="cm">        * device-specific configuration.</span>
-<span class="cm">        */</span><span class="w"></span>
-<span class="w">        </span><span class="n">device</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">virtio_pci_find_capability</span><span class="p">(</span><span class="n">pci_dev</span><span class="p">,</span><span class="w"> </span><span class="n">VIRTIO_PCI_CAP_DEVICE_CFG</span><span class="p">,</span><span class="w"></span>
-<span class="w">                                            </span><span class="n">IORESOURCE_IO</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">IORESOURCE_MEM</span><span class="p">,</span><span class="w"></span>
-<span class="w">                                            </span><span class="o">&amp;</span><span class="n">vp_dev</span><span class="o">-&gt;</span><span class="n">modern_bars</span><span class="p">);</span><span class="w"></span>
+<span class="cm">        */</span>
+<span class="w">        </span><span class="n">device</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">virtio_pci_find_capability</span><span class="p">(</span><span class="n">pci_dev</span><span class="p">,</span><span class="w"> </span><span class="n">VIRTIO_PCI_CAP_DEVICE_CFG</span><span class="p">,</span>
+<span class="w">                                            </span><span class="n">IORESOURCE_IO</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">IORESOURCE_MEM</span><span class="p">,</span>
+<span class="w">                                            </span><span class="o">&amp;</span><span class="n">vp_dev</span><span class="o">-&gt;</span><span class="n">modern_bars</span><span class="p">);</span>
 
-<span class="w">        </span><span class="n">err</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pci_request_selected_regions</span><span class="p">(</span><span class="n">pci_dev</span><span class="p">,</span><span class="w"> </span><span class="n">vp_dev</span><span class="o">-&gt;</span><span class="n">modern_bars</span><span class="p">,</span><span class="w"></span>
-<span class="w">                                            </span><span class="s">&quot;virtio-pci-modern&quot;</span><span class="p">);</span><span class="w"></span>
-<span class="w">                                        </span><span class="k">sizeof</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">virtio_pci_common_cfg</span><span class="p">),</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span><span class="w"></span>
-<span class="w">                                        </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">virtio_pci_common_cfg</span><span class="p">),</span><span class="w"></span>
-<span class="w">                                        </span><span class="nb">NULL</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="n">err</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pci_request_selected_regions</span><span class="p">(</span><span class="n">pci_dev</span><span class="p">,</span><span class="w"> </span><span class="n">vp_dev</span><span class="o">-&gt;</span><span class="n">modern_bars</span><span class="p">,</span>
+<span class="w">                                            </span><span class="s">&quot;virtio-pci-modern&quot;</span><span class="p">);</span>
+<span class="w">                                        </span><span class="k">sizeof</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">virtio_pci_common_cfg</span><span class="p">),</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span>
+<span class="w">                                        </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">virtio_pci_common_cfg</span><span class="p">),</span>
+<span class="w">                                        </span><span class="nb">NULL</span><span class="p">);</span>
 <span class="w">        </span><span class="c1">// 将配virtio置结构所在的BAR空间MAP到内核地址空间里                                </span>
-<span class="w">        </span><span class="n">vp_dev</span><span class="o">-&gt;</span><span class="n">common</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">map_capability</span><span class="p">(</span><span class="n">pci_dev</span><span class="p">,</span><span class="w"> </span><span class="n">common</span><span class="p">,</span><span class="w"></span>
-<span class="w">                                        </span><span class="k">sizeof</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">virtio_pci_common_cfg</span><span class="p">),</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span><span class="w"></span>
-<span class="w">                                        </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">virtio_pci_common_cfg</span><span class="p">),</span><span class="w"></span>
-<span class="w">                                        </span><span class="nb">NULL</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="n">vp_dev</span><span class="o">-&gt;</span><span class="n">common</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">map_capability</span><span class="p">(</span><span class="n">pci_dev</span><span class="p">,</span><span class="w"> </span><span class="n">common</span><span class="p">,</span>
+<span class="w">                                        </span><span class="k">sizeof</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">virtio_pci_common_cfg</span><span class="p">),</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span>
+<span class="w">                                        </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">virtio_pci_common_cfg</span><span class="p">),</span>
+<span class="w">                                        </span><span class="nb">NULL</span><span class="p">);</span>
 <span class="w">        </span><span class="p">......</span><span class="w">                              </span>
-<span class="p">}</span><span class="w"></span>
+<span class="p">}</span>
 
 <span class="cp"># 接着来到virtio_dev_probe里面看下：</span>
-<span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">virtio_dev_probe</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">device</span><span class="w"> </span><span class="o">*</span><span class="n">_d</span><span class="p">)</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="cm">/* We have a driver! */</span><span class="w"></span>
+<span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">virtio_dev_probe</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">device</span><span class="w"> </span><span class="o">*</span><span class="n">_d</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">        </span><span class="cm">/* We have a driver! */</span>
 <span class="w">        </span><span class="n">virtio_add_status</span><span class="p">(</span><span class="n">dev</span><span class="p">,</span><span class="w"> </span><span class="n">VIRTIO_CONFIG_S_DRIVER</span><span class="p">);</span><span class="w">     </span><span class="c1">// 更新status bit，这里要写配置数据结构</span>
 
-<span class="w">        </span><span class="cm">/* Figure out what features the device supports. */</span><span class="w"></span>
+<span class="w">        </span><span class="cm">/* Figure out what features the device supports. */</span>
 <span class="w">        </span><span class="n">device_features</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">dev</span><span class="o">-&gt;</span><span class="n">config</span><span class="o">-&gt;</span><span class="n">get_features</span><span class="p">(</span><span class="n">dev</span><span class="p">);</span><span class="w">   </span><span class="c1">// 查询后端支持哪些feature bits</span>
 
 <span class="w">        </span><span class="c1">// feature set协商，取交集</span>
@@ -647,123 +647,123 @@ https://patchwork.kernel.org/patch/9531577/</p>
 
 <span class="w">        </span><span class="c1">// 调用特定virtio设备的驱动程序probe，例如: virtnet_probe, virtblk_probe</span>
 <span class="w">        </span><span class="n">err</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">drv</span><span class="o">-&gt;</span><span class="n">probe</span><span class="p">(</span><span class="n">dev</span><span class="p">);</span><span class="w"> </span>
-<span class="p">}</span><span class="w"></span>
+<span class="p">}</span>
 </code></pre></div>
 
 <p>再看下<code>virtnet_probe</code>里面的一些关键的流程，这里包含了virtio-net网卡前端初始化的主要逻辑。</p>
-<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="nf">virtnet_probe</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">virtio_device</span><span class="w"> </span><span class="o">*</span><span class="n">vdev</span><span class="p">)</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="nf">virtnet_probe</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">virtio_device</span><span class="w"> </span><span class="o">*</span><span class="n">vdev</span><span class="p">)</span>
+<span class="p">{</span>
 <span class="w">       </span><span class="c1">// check后端是否支持多队列，并按情况创建队列</span>
-<span class="w">       </span><span class="cm">/* Allocate ourselves a network device with room for our info */</span><span class="w"></span>
-<span class="w">        </span><span class="n">dev</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">alloc_etherdev_mq</span><span class="p">(</span><span class="k">sizeof</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">virtnet_info</span><span class="p">),</span><span class="w"> </span><span class="n">max_queue_pairs</span><span class="p">);</span><span class="w"></span>
+<span class="w">       </span><span class="cm">/* Allocate ourselves a network device with room for our info */</span>
+<span class="w">        </span><span class="n">dev</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">alloc_etherdev_mq</span><span class="p">(</span><span class="k">sizeof</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">virtnet_info</span><span class="p">),</span><span class="w"> </span><span class="n">max_queue_pairs</span><span class="p">);</span>
 
 <span class="w">        </span><span class="c1">// 定义一个网络设备并配置一些属性，例如MAC地址</span>
-<span class="w">        </span><span class="n">dev</span><span class="o">-&gt;</span><span class="n">ethtool_ops</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&amp;</span><span class="n">virtnet_ethtool_ops</span><span class="p">;</span><span class="w"></span>
-<span class="w">           </span><span class="n">SET_NETDEV_DEV</span><span class="p">(</span><span class="n">dev</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">vdev</span><span class="o">-&gt;</span><span class="n">dev</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="n">dev</span><span class="o">-&gt;</span><span class="n">ethtool_ops</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&amp;</span><span class="n">virtnet_ethtool_ops</span><span class="p">;</span>
+<span class="w">           </span><span class="n">SET_NETDEV_DEV</span><span class="p">(</span><span class="n">dev</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">vdev</span><span class="o">-&gt;</span><span class="n">dev</span><span class="p">);</span>
 
 <span class="w">        </span><span class="c1">// 初始化virtqueue</span>
-<span class="w">        </span><span class="n">err</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">init_vqs</span><span class="p">(</span><span class="n">vi</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="n">err</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">init_vqs</span><span class="p">(</span><span class="n">vi</span><span class="p">);</span>
 
 <span class="w">        </span><span class="c1">// 注册一个网络设备</span>
-<span class="w">        </span><span class="n">err</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">register_netdev</span><span class="p">(</span><span class="n">dev</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="n">err</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">register_netdev</span><span class="p">(</span><span class="n">dev</span><span class="p">);</span>
 
 <span class="w">        </span><span class="c1">// 写状态位DRIVER_OK，告诉后端，前端已经ready</span>
-<span class="w">        </span><span class="n">virtio_device_ready</span><span class="p">(</span><span class="n">vdev</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="n">virtio_device_ready</span><span class="p">(</span><span class="n">vdev</span><span class="p">);</span>
 
 <span class="w">        </span><span class="c1">// 将网卡up起来</span>
-<span class="w">        </span><span class="n">netif_carrier_on</span><span class="p">(</span><span class="n">dev</span><span class="p">);</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="n">netif_carrier_on</span><span class="p">(</span><span class="n">dev</span><span class="p">);</span>
+<span class="p">}</span>
 </code></pre></div>
 
 <p>其中关键的流程是<code>init_vqs</code>，在<code>vp_find_vqs_msix</code>流程中会尝试去申请MSIx中断，这里前面已经有分析过了。
 其中，"configuration changed" 中断服务程序<code>vp_config_changed</code>， 
 virtqueue队列的中断服务程序是 <code>vp_vring_interrupt</code>。</p>
-<div class="highlight"><pre><span></span><code><span class="n">init_vqs</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">virtnet_find_vqs</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">vdev</span><span class="o">-&gt;</span><span class="n">config</span><span class="o">-&gt;</span><span class="n">find_vqs</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">vp_modern_find_vqs</span><span class="w"></span>
-<span class="o">--&gt;</span><span class="w"> </span><span class="n">vp_find_vqs</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">vp_find_vqs_msix</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="n">init_vqs</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">virtnet_find_vqs</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">vdev</span><span class="o">-&gt;</span><span class="n">config</span><span class="o">-&gt;</span><span class="n">find_vqs</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">vp_modern_find_vqs</span>
+<span class="o">--&gt;</span><span class="w"> </span><span class="n">vp_find_vqs</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">vp_find_vqs_msix</span>
 
-<span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">vp_find_vqs_msix</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">virtio_device</span><span class="w"> </span><span class="o">*</span><span class="n">vdev</span><span class="p">,</span><span class="w"> </span><span class="kt">unsigned</span><span class="w"> </span><span class="n">nvqs</span><span class="p">,</span><span class="w"></span>
-<span class="w">        </span><span class="k">struct</span><span class="w"> </span><span class="nc">virtqueue</span><span class="w"> </span><span class="o">*</span><span class="n">vqs</span><span class="p">[],</span><span class="w"> </span><span class="n">vq_callback_t</span><span class="w"> </span><span class="o">*</span><span class="n">callbacks</span><span class="p">[],</span><span class="w"></span>
-<span class="w">        </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">names</span><span class="p">[],</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">per_vq_vectors</span><span class="p">,</span><span class="w"></span>
-<span class="w">        </span><span class="k">const</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="o">*</span><span class="n">ctx</span><span class="p">,</span><span class="w"></span>
-<span class="w">        </span><span class="k">struct</span><span class="w"> </span><span class="nc">irq_affinity</span><span class="w"> </span><span class="o">*</span><span class="n">desc</span><span class="p">)</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="cm">/* 为configuration change申请MSIx中断 */</span><span class="w"></span>
-<span class="w">    </span><span class="n">err</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vp_request_msix_vectors</span><span class="p">(</span><span class="n">vdev</span><span class="p">,</span><span class="w"> </span><span class="n">nvectors</span><span class="p">,</span><span class="w"> </span><span class="n">per_vq_vectors</span><span class="p">,</span><span class="w"></span>
-<span class="w">                  </span><span class="n">per_vq_vectors</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">desc</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="nb">NULL</span><span class="p">);</span><span class="w"></span>
-<span class="w">        </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">nvqs</span><span class="p">;</span><span class="w"> </span><span class="o">++</span><span class="n">i</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">vp_find_vqs_msix</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">virtio_device</span><span class="w"> </span><span class="o">*</span><span class="n">vdev</span><span class="p">,</span><span class="w"> </span><span class="kt">unsigned</span><span class="w"> </span><span class="n">nvqs</span><span class="p">,</span>
+<span class="w">        </span><span class="k">struct</span><span class="w"> </span><span class="nc">virtqueue</span><span class="w"> </span><span class="o">*</span><span class="n">vqs</span><span class="p">[],</span><span class="w"> </span><span class="n">vq_callback_t</span><span class="w"> </span><span class="o">*</span><span class="n">callbacks</span><span class="p">[],</span>
+<span class="w">        </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">names</span><span class="p">[],</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">per_vq_vectors</span><span class="p">,</span>
+<span class="w">        </span><span class="k">const</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="o">*</span><span class="n">ctx</span><span class="p">,</span>
+<span class="w">        </span><span class="k">struct</span><span class="w"> </span><span class="nc">irq_affinity</span><span class="w"> </span><span class="o">*</span><span class="n">desc</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">        </span><span class="cm">/* 为configuration change申请MSIx中断 */</span>
+<span class="w">    </span><span class="n">err</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vp_request_msix_vectors</span><span class="p">(</span><span class="n">vdev</span><span class="p">,</span><span class="w"> </span><span class="n">nvectors</span><span class="p">,</span><span class="w"> </span><span class="n">per_vq_vectors</span><span class="p">,</span>
+<span class="w">                  </span><span class="n">per_vq_vectors</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">desc</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="nb">NULL</span><span class="p">);</span>
+<span class="w">        </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">nvqs</span><span class="p">;</span><span class="w"> </span><span class="o">++</span><span class="n">i</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
 <span class="w">         </span><span class="c1">// 创建队列 --&gt; vring_create_virtqueue --&gt; vring_create_virtqueue_split --&gt; vring_alloc_queue</span>
-<span class="w">             </span><span class="n">vqs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vp_setup_vq</span><span class="p">(</span><span class="n">vdev</span><span class="p">,</span><span class="w"> </span><span class="n">queue_idx</span><span class="o">++</span><span class="p">,</span><span class="w"> </span><span class="n">callbacks</span><span class="p">[</span><span class="n">i</span><span class="p">],</span><span class="w"> </span><span class="n">names</span><span class="p">[</span><span class="n">i</span><span class="p">],</span><span class="w"></span>
-<span class="w">                                </span><span class="n">ctx</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">ctx</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="nb">false</span><span class="p">,</span><span class="w"></span>
-<span class="w">                                </span><span class="n">msix_vec</span><span class="p">);</span><span class="w"></span>
+<span class="w">             </span><span class="n">vqs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vp_setup_vq</span><span class="p">(</span><span class="n">vdev</span><span class="p">,</span><span class="w"> </span><span class="n">queue_idx</span><span class="o">++</span><span class="p">,</span><span class="w"> </span><span class="n">callbacks</span><span class="p">[</span><span class="n">i</span><span class="p">],</span><span class="w"> </span><span class="n">names</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
+<span class="w">                                </span><span class="n">ctx</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">ctx</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="nb">false</span><span class="p">,</span>
+<span class="w">                                </span><span class="n">msix_vec</span><span class="p">);</span>
 <span class="w">        </span><span class="c1">// 每个队列申请一个MSIx中断</span>
-<span class="w">                </span><span class="n">err</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">request_irq</span><span class="p">(</span><span class="n">pci_irq_vector</span><span class="p">(</span><span class="n">vp_dev</span><span class="o">-&gt;</span><span class="n">pci_dev</span><span class="p">,</span><span class="w"> </span><span class="n">msix_vec</span><span class="p">),</span><span class="w"></span>
-<span class="w">                                  </span><span class="n">vring_interrupt</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"></span>
-<span class="w">                                  </span><span class="n">vp_dev</span><span class="o">-&gt;</span><span class="n">msix_names</span><span class="p">[</span><span class="n">msix_vec</span><span class="p">],</span><span class="w"></span>
-<span class="w">                                  </span><span class="n">vqs</span><span class="p">[</span><span class="n">i</span><span class="p">]);</span><span class="w"></span>
-<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">                </span><span class="n">err</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">request_irq</span><span class="p">(</span><span class="n">pci_irq_vector</span><span class="p">(</span><span class="n">vp_dev</span><span class="o">-&gt;</span><span class="n">pci_dev</span><span class="p">,</span><span class="w"> </span><span class="n">msix_vec</span><span class="p">),</span>
+<span class="w">                                  </span><span class="n">vring_interrupt</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">                                  </span><span class="n">vp_dev</span><span class="o">-&gt;</span><span class="n">msix_names</span><span class="p">[</span><span class="n">msix_vec</span><span class="p">],</span>
+<span class="w">                                  </span><span class="n">vqs</span><span class="p">[</span><span class="n">i</span><span class="p">]);</span>
+<span class="w">    </span><span class="p">}</span>
 </code></pre></div>
 
 <p><code>vp_setup_vq</code>流程再往下走就开始分配共享内存页，至此建立起共享内存通信通道。
 值得注意的是一路传下来的callbacks参数其实传入了发送队列和接收队列的回调处理函数，
 好家伙，从<code>virtnet_find_vqs</code>一路传递到了<code>__vring_new_virtqueue</code>中最终赋值给了<code>vq-&gt;vq.callback</code>。</p>
-<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="n">struct</span><span class="w"> </span><span class="n">virtqueue</span><span class="w"> </span><span class="o">*</span><span class="n">vring_create_virtqueue_split</span><span class="p">(</span><span class="w"></span>
-<span class="w">        </span><span class="n">unsigned</span><span class="w"> </span><span class="nb nb-Type">int</span><span class="w"> </span><span class="n">index</span><span class="p">,</span><span class="w"></span>
-<span class="w">        </span><span class="n">unsigned</span><span class="w"> </span><span class="nb nb-Type">int</span><span class="w"> </span><span class="n">num</span><span class="p">,</span><span class="w"></span>
-<span class="w">        </span><span class="n">unsigned</span><span class="w"> </span><span class="nb nb-Type">int</span><span class="w"> </span><span class="n">vring_align</span><span class="p">,</span><span class="w"></span>
-<span class="w">        </span><span class="n">struct</span><span class="w"> </span><span class="n">virtio_device</span><span class="w"> </span><span class="o">*</span><span class="n">vdev</span><span class="p">,</span><span class="w"></span>
-<span class="w">        </span><span class="nb nb-Type">bool</span><span class="w"> </span><span class="n">weak_barriers</span><span class="p">,</span><span class="w"></span>
-<span class="w">        </span><span class="nb nb-Type">bool</span><span class="w"> </span><span class="n">may_reduce_num</span><span class="p">,</span><span class="w"></span>
-<span class="w">        </span><span class="nb nb-Type">bool</span><span class="w"> </span><span class="n">context</span><span class="p">,</span><span class="w"></span>
-<span class="w">        </span><span class="nb nb-Type">bool</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">notify</span><span class="p">)(</span><span class="n">struct</span><span class="w"> </span><span class="n">virtqueue</span><span class="w"> </span><span class="o">*</span><span class="p">),</span><span class="w"></span>
-<span class="w">        </span><span class="nb nb-Type">void</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">callback</span><span class="p">)(</span><span class="n">struct</span><span class="w"> </span><span class="n">virtqueue</span><span class="w"> </span><span class="o">*</span><span class="p">),</span><span class="w"></span>
-<span class="w">        </span><span class="k">const</span><span class="w"> </span><span class="nb">char</span><span class="w"> </span><span class="o">*</span><span class="n">name</span><span class="p">)</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">       </span><span class="o">/*</span><span class="w"> </span><span class="n">TODO</span><span class="p">:</span><span class="w"> </span><span class="n">allocate</span><span class="w"> </span><span class="n">each</span><span class="w"> </span><span class="n">queue</span><span class="w"> </span><span class="n">chunk</span><span class="w"> </span><span class="n">individually</span><span class="w"> </span><span class="o">*/</span><span class="w"></span>
-<span class="w">        </span><span class="k">for</span><span class="w"> </span><span class="p">(;</span><span class="w"> </span><span class="n">num</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">vring_size</span><span class="p">(</span><span class="n">num</span><span class="p">,</span><span class="w"> </span><span class="n">vring_align</span><span class="p">)</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">PAGE_SIZE</span><span class="p">;</span><span class="w"> </span><span class="n">num</span><span class="w"> </span><span class="o">/=</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="o">//</span><span class="w"> </span><span class="err">申请物理页，地址赋值给</span><span class="n">queue</span><span class="w"></span>
-<span class="w">                </span><span class="n">queue</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vring_alloc_queue</span><span class="p">(</span><span class="n">vdev</span><span class="p">,</span><span class="w"> </span><span class="n">vring_size</span><span class="p">(</span><span class="n">num</span><span class="p">,</span><span class="w"> </span><span class="n">vring_align</span><span class="p">),</span><span class="w"></span>
-<span class="w">                                          </span><span class="o">&amp;</span><span class="n">dma_addr</span><span class="p">,</span><span class="w"></span>
-<span class="w">                                          </span><span class="n">GFP_KERNEL</span><span class="o">|</span><span class="n">__GFP_NOWARN</span><span class="o">|</span><span class="n">__GFP_ZERO</span><span class="p">);</span><span class="w"></span>
-<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="n">struct</span><span class="w"> </span><span class="n">virtqueue</span><span class="w"> </span><span class="o">*</span><span class="n">vring_create_virtqueue_split</span><span class="p">(</span>
+<span class="w">        </span><span class="n">unsigned</span><span class="w"> </span><span class="nb nb-Type">int</span><span class="w"> </span><span class="n">index</span><span class="p">,</span>
+<span class="w">        </span><span class="n">unsigned</span><span class="w"> </span><span class="nb nb-Type">int</span><span class="w"> </span><span class="n">num</span><span class="p">,</span>
+<span class="w">        </span><span class="n">unsigned</span><span class="w"> </span><span class="nb nb-Type">int</span><span class="w"> </span><span class="n">vring_align</span><span class="p">,</span>
+<span class="w">        </span><span class="n">struct</span><span class="w"> </span><span class="n">virtio_device</span><span class="w"> </span><span class="o">*</span><span class="n">vdev</span><span class="p">,</span>
+<span class="w">        </span><span class="nb nb-Type">bool</span><span class="w"> </span><span class="n">weak_barriers</span><span class="p">,</span>
+<span class="w">        </span><span class="nb nb-Type">bool</span><span class="w"> </span><span class="n">may_reduce_num</span><span class="p">,</span>
+<span class="w">        </span><span class="nb nb-Type">bool</span><span class="w"> </span><span class="n">context</span><span class="p">,</span>
+<span class="w">        </span><span class="nb nb-Type">bool</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">notify</span><span class="p">)(</span><span class="n">struct</span><span class="w"> </span><span class="n">virtqueue</span><span class="w"> </span><span class="o">*</span><span class="p">),</span>
+<span class="w">        </span><span class="nb nb-Type">void</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">callback</span><span class="p">)(</span><span class="n">struct</span><span class="w"> </span><span class="n">virtqueue</span><span class="w"> </span><span class="o">*</span><span class="p">),</span>
+<span class="w">        </span><span class="k">const</span><span class="w"> </span><span class="nb">char</span><span class="w"> </span><span class="o">*</span><span class="n">name</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">       </span><span class="o">/*</span><span class="w"> </span><span class="n">TODO</span><span class="p">:</span><span class="w"> </span><span class="n">allocate</span><span class="w"> </span><span class="n">each</span><span class="w"> </span><span class="n">queue</span><span class="w"> </span><span class="n">chunk</span><span class="w"> </span><span class="n">individually</span><span class="w"> </span><span class="o">*/</span>
+<span class="w">        </span><span class="k">for</span><span class="w"> </span><span class="p">(;</span><span class="w"> </span><span class="n">num</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">vring_size</span><span class="p">(</span><span class="n">num</span><span class="p">,</span><span class="w"> </span><span class="n">vring_align</span><span class="p">)</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">PAGE_SIZE</span><span class="p">;</span><span class="w"> </span><span class="n">num</span><span class="w"> </span><span class="o">/=</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="o">//</span><span class="w"> </span><span class="err">申请物理页，地址赋值给</span><span class="n">queue</span>
+<span class="w">                </span><span class="n">queue</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vring_alloc_queue</span><span class="p">(</span><span class="n">vdev</span><span class="p">,</span><span class="w"> </span><span class="n">vring_size</span><span class="p">(</span><span class="n">num</span><span class="p">,</span><span class="w"> </span><span class="n">vring_align</span><span class="p">),</span>
+<span class="w">                                          </span><span class="o">&amp;</span><span class="n">dma_addr</span><span class="p">,</span>
+<span class="w">                                          </span><span class="n">GFP_KERNEL</span><span class="o">|</span><span class="n">__GFP_NOWARN</span><span class="o">|</span><span class="n">__GFP_ZERO</span><span class="p">);</span>
+<span class="w">        </span><span class="p">}</span>
 
 
-<span class="w">        </span><span class="n">queue_size_in_bytes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vring_size</span><span class="p">(</span><span class="n">num</span><span class="p">,</span><span class="w"> </span><span class="n">vring_align</span><span class="p">);</span><span class="w"></span>
-<span class="w">        </span><span class="n">vring_init</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vring</span><span class="p">,</span><span class="w"> </span><span class="n">num</span><span class="p">,</span><span class="w"> </span><span class="n">queue</span><span class="p">,</span><span class="w"> </span><span class="n">vring_align</span><span class="p">);</span><span class="w"> </span><span class="o">//</span><span class="w"> </span><span class="err">确定</span><span class="w"> </span><span class="n">descriptor</span><span class="w"> </span><span class="n">table</span><span class="p">,</span><span class="w"> </span><span class="n">available</span><span class="w"> </span><span class="n">ring</span><span class="p">,</span><span class="w"> </span><span class="n">used</span><span class="w"> </span><span class="n">ring的位置</span><span class="err">。</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="n">queue_size_in_bytes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vring_size</span><span class="p">(</span><span class="n">num</span><span class="p">,</span><span class="w"> </span><span class="n">vring_align</span><span class="p">);</span>
+<span class="w">        </span><span class="n">vring_init</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vring</span><span class="p">,</span><span class="w"> </span><span class="n">num</span><span class="p">,</span><span class="w"> </span><span class="n">queue</span><span class="p">,</span><span class="w"> </span><span class="n">vring_align</span><span class="p">);</span><span class="w"> </span><span class="o">//</span><span class="w"> </span><span class="err">确定</span><span class="w"> </span><span class="n">descriptor</span><span class="w"> </span><span class="n">table</span><span class="p">,</span><span class="w"> </span><span class="n">available</span><span class="w"> </span><span class="n">ring</span><span class="p">,</span><span class="w"> </span><span class="n">used</span><span class="w"> </span><span class="n">ring的位置</span><span class="err">。</span>
+<span class="p">}</span>
 </code></pre></div>
 
 <p>我们看下如果<code>virtqueue</code>队列如果收到MSIx中断消息后，会调用哪个<code>hook</code>来处理？</p>
-<div class="highlight"><pre><span></span><code><span class="n">irqreturn_t</span><span class="w"> </span><span class="nf">vring_interrupt</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">irq</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">_vq</span><span class="p">)</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="k">struct</span><span class="w"> </span><span class="nc">vring_virtqueue</span><span class="w"> </span><span class="o">*</span><span class="n">vq</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">to_vvq</span><span class="p">(</span><span class="n">_vq</span><span class="p">);</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="n">irqreturn_t</span><span class="w"> </span><span class="nf">vring_interrupt</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">irq</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">_vq</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">        </span><span class="k">struct</span><span class="w"> </span><span class="nc">vring_virtqueue</span><span class="w"> </span><span class="o">*</span><span class="n">vq</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">to_vvq</span><span class="p">(</span><span class="n">_vq</span><span class="p">);</span>
 
-<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">more_used</span><span class="p">(</span><span class="n">vq</span><span class="p">))</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">                </span><span class="n">pr_debug</span><span class="p">(</span><span class="s">&quot;virtqueue interrupt with no work for %p</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">vq</span><span class="p">);</span><span class="w"></span>
-<span class="w">                </span><span class="k">return</span><span class="w"> </span><span class="n">IRQ_NONE</span><span class="p">;</span><span class="w"></span>
-<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">more_used</span><span class="p">(</span><span class="n">vq</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="n">pr_debug</span><span class="p">(</span><span class="s">&quot;virtqueue interrupt with no work for %p</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">vq</span><span class="p">);</span>
+<span class="w">                </span><span class="k">return</span><span class="w"> </span><span class="n">IRQ_NONE</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
 
-<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">unlikely</span><span class="p">(</span><span class="n">vq</span><span class="o">-&gt;</span><span class="n">broken</span><span class="p">))</span><span class="w"></span>
-<span class="w">                </span><span class="k">return</span><span class="w"> </span><span class="n">IRQ_HANDLED</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">unlikely</span><span class="p">(</span><span class="n">vq</span><span class="o">-&gt;</span><span class="n">broken</span><span class="p">))</span>
+<span class="w">                </span><span class="k">return</span><span class="w"> </span><span class="n">IRQ_HANDLED</span><span class="p">;</span>
 
-<span class="w">        </span><span class="n">pr_debug</span><span class="p">(</span><span class="s">&quot;virtqueue callback for %p (%p)</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">vq</span><span class="p">,</span><span class="w"> </span><span class="n">vq</span><span class="o">-&gt;</span><span class="n">vq</span><span class="p">.</span><span class="n">callback</span><span class="p">);</span><span class="w"></span>
-<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">vq</span><span class="o">-&gt;</span><span class="n">vq</span><span class="p">.</span><span class="n">callback</span><span class="p">)</span><span class="w"></span>
-<span class="w">                </span><span class="n">vq</span><span class="o">-&gt;</span><span class="n">vq</span><span class="p">.</span><span class="n">callback</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vq</span><span class="o">-&gt;</span><span class="n">vq</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="n">pr_debug</span><span class="p">(</span><span class="s">&quot;virtqueue callback for %p (%p)</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">vq</span><span class="p">,</span><span class="w"> </span><span class="n">vq</span><span class="o">-&gt;</span><span class="n">vq</span><span class="p">.</span><span class="n">callback</span><span class="p">);</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">vq</span><span class="o">-&gt;</span><span class="n">vq</span><span class="p">.</span><span class="n">callback</span><span class="p">)</span>
+<span class="w">                </span><span class="n">vq</span><span class="o">-&gt;</span><span class="n">vq</span><span class="p">.</span><span class="n">callback</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vq</span><span class="o">-&gt;</span><span class="n">vq</span><span class="p">);</span>
 
-<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">IRQ_HANDLED</span><span class="p">;</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
-<span class="n">EXPORT_SYMBOL_GPL</span><span class="p">(</span><span class="n">vring_interrupt</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">IRQ_HANDLED</span><span class="p">;</span>
+<span class="p">}</span>
+<span class="n">EXPORT_SYMBOL_GPL</span><span class="p">(</span><span class="n">vring_interrupt</span><span class="p">);</span>
 </code></pre></div>
 
 <p>不难想到中断服务程序里面会调用队列上的callback。
 我们再回过头来看下<code>virtnet_find_vqs</code>，原来接受队列的回调函数是<code>skb_recv_done</code>，发送队列的回调函数是<code>skb_xmit_done</code>。</p>
-<div class="highlight"><pre><span></span><code><span class="n">static</span><span class="w"> </span><span class="n">int</span><span class="w"> </span><span class="n">virtnet_find_vqs</span><span class="p">(</span><span class="n">struct</span><span class="w"> </span><span class="n">virtnet_info</span><span class="w"> </span><span class="o">*</span><span class="n">vi</span><span class="p">)</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">       </span><span class="cm">/* Allocate/initialize parameters for send/receive virtqueues */</span><span class="w"></span>
-<span class="w">        </span><span class="n">for</span><span class="w"> </span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">max_queue_pairs</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="n">callbacks</span><span class="p">[</span><span class="n">rxq2vq</span><span class="p">(</span><span class="n">i</span><span class="p">)]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">skb_recv_done</span><span class="p">;</span><span class="w"></span>
-<span class="w">        </span><span class="n">callbacks</span><span class="p">[</span><span class="n">txq2vq</span><span class="p">(</span><span class="n">i</span><span class="p">)]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">skb_xmit_done</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="p">}</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="n">static</span><span class="w"> </span><span class="n">int</span><span class="w"> </span><span class="n">virtnet_find_vqs</span><span class="p">(</span><span class="n">struct</span><span class="w"> </span><span class="n">virtnet_info</span><span class="w"> </span><span class="o">*</span><span class="n">vi</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">       </span><span class="cm">/* Allocate/initialize parameters for send/receive virtqueues */</span>
+<span class="w">        </span><span class="n">for</span><span class="w"> </span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">max_queue_pairs</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">callbacks</span><span class="p">[</span><span class="n">rxq2vq</span><span class="p">(</span><span class="n">i</span><span class="p">)]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">skb_recv_done</span><span class="p">;</span>
+<span class="w">        </span><span class="n">callbacks</span><span class="p">[</span><span class="n">txq2vq</span><span class="p">(</span><span class="n">i</span><span class="p">)]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">skb_xmit_done</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
 </code></pre></div>
 
 <p>OK，这个小节就到这里。Are you clear ?</p>
@@ -778,45 +778,45 @@ virtio-net模式下网卡收发包的流程为： </p>
 <p>前面我们看到virtio-net设备初始化的时候会创建一个<code>net_device</code>设备：
 <code>virtnet_probe</code> -&gt; <code>alloc_etherdev_mq</code>注册了<code>netdev_ops</code> = <code>&amp;virtnet_netdev</code>，
 这里<code>virtnet_netdev</code>是网卡驱动的回调函数集合（收发包和参数设置）。</p>
-<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">net_device_ops</span><span class="w"> </span><span class="n">netdev_ops</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="p">.</span><span class="n">ndo_open</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="n">rio_open</span><span class="p">,</span><span class="w"></span>
-<span class="w">        </span><span class="p">.</span><span class="n">ndo_start_xmit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">start_xmit</span><span class="p">,</span><span class="w"></span>
-<span class="w">        </span><span class="p">.</span><span class="n">ndo_stop</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="n">rio_close</span><span class="p">,</span><span class="w"></span>
-<span class="w">        </span><span class="p">.</span><span class="n">ndo_get_stats</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="n">get_stats</span><span class="p">,</span><span class="w"></span>
-<span class="w">        </span><span class="p">.</span><span class="n">ndo_validate_addr</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="n">eth_validate_addr</span><span class="p">,</span><span class="w"></span>
-<span class="w">        </span><span class="p">.</span><span class="n">ndo_set_mac_address</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="n">eth_mac_addr</span><span class="p">,</span><span class="w"></span>
-<span class="w">        </span><span class="p">.</span><span class="n">ndo_set_rx_mode</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="n">set_multicast</span><span class="p">,</span><span class="w"></span>
-<span class="w">        </span><span class="p">.</span><span class="n">ndo_do_ioctl</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="n">rio_ioctl</span><span class="p">,</span><span class="w"></span>
-<span class="w">        </span><span class="p">.</span><span class="n">ndo_tx_timeout</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="n">rio_tx_timeout</span><span class="p">,</span><span class="w"></span>
-<span class="p">};</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">net_device_ops</span><span class="w"> </span><span class="n">netdev_ops</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="p">.</span><span class="n">ndo_open</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="n">rio_open</span><span class="p">,</span>
+<span class="w">        </span><span class="p">.</span><span class="n">ndo_start_xmit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">start_xmit</span><span class="p">,</span>
+<span class="w">        </span><span class="p">.</span><span class="n">ndo_stop</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="n">rio_close</span><span class="p">,</span>
+<span class="w">        </span><span class="p">.</span><span class="n">ndo_get_stats</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="n">get_stats</span><span class="p">,</span>
+<span class="w">        </span><span class="p">.</span><span class="n">ndo_validate_addr</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="n">eth_validate_addr</span><span class="p">,</span>
+<span class="w">        </span><span class="p">.</span><span class="n">ndo_set_mac_address</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="n">eth_mac_addr</span><span class="p">,</span>
+<span class="w">        </span><span class="p">.</span><span class="n">ndo_set_rx_mode</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="n">set_multicast</span><span class="p">,</span>
+<span class="w">        </span><span class="p">.</span><span class="n">ndo_do_ioctl</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="n">rio_ioctl</span><span class="p">,</span>
+<span class="w">        </span><span class="p">.</span><span class="n">ndo_tx_timeout</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="n">rio_tx_timeout</span><span class="p">,</span>
+<span class="p">};</span>
 </code></pre></div>
 
 <p>网卡发包的时候调用<code>ndo_start_xmit</code>，将TCP/IP上层协议栈扔下来的数据发送出去。
 对应到virtio网卡的回调函数就是<code>start_xmit</code>，从代码看就是将skb发送到virtqueue中，
 然后调用virtqueue_kick通知qemu后端将数据包发送出去。</p>
 <p>Guest内核里面的virtio-net驱动发包：</p>
-<div class="highlight"><pre><span></span><code><span class="n">内核驱动</span><span class="w"> </span><span class="n">virtio_net</span><span class="p">.</span><span class="n">c</span><span class="w"></span>
-<span class="n">start_xmit</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="n">内核驱动</span><span class="w"> </span><span class="n">virtio_net</span><span class="p">.</span><span class="n">c</span>
+<span class="n">start_xmit</span>
 <span class="w">    </span><span class="c1">// 将skb放到virtqueue队列中</span>
-<span class="w">    </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">xmit_skb</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">sg_init_table</span><span class="p">,</span><span class="n">virtqueue_add_outbuf</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">virtqueue_add</span><span class="w"></span>
+<span class="w">    </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">xmit_skb</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">sg_init_table</span><span class="p">,</span><span class="n">virtqueue_add_outbuf</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">virtqueue_add</span>
 <span class="w">    </span><span class="c1">// kick通知qemu后端去取</span>
 <span class="w">    </span><span class="n">virtqueue_kick_prepare</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">virtqueue_notify</span><span class="w"> </span>
 <span class="w">    </span><span class="c1">// kick次数加1</span>
-<span class="w">    </span><span class="n">sq</span><span class="o">-&gt;</span><span class="n">stats</span><span class="p">.</span><span class="n">kicks</span><span class="o">++</span><span class="w"></span>
+<span class="w">    </span><span class="n">sq</span><span class="o">-&gt;</span><span class="n">stats</span><span class="p">.</span><span class="n">kicks</span><span class="o">++</span>
 </code></pre></div>
 
 <p>Guest Kick后端从KVM中VMExit出来退出到Qemu用户态（走的是ioeventfd）由Qemu去将数据发送出去。
 大致调用的流程是：
 <code>virtio_queue_host_notifier_read</code> -&gt; <code>virtio_net_handle_tx_bh</code> -&gt; <code>virtio_net_flush_tx</code>
 -&gt; <code>virtqueue_pop</code>拿到发包(skb) -&gt; <code>qemu_sendv_packet_async</code></p>
-<div class="highlight"><pre><span></span><code><span class="n">Qemu代码virtio</span><span class="o">-</span><span class="n">net相关代码</span><span class="o">:</span><span class="w"></span>
-<span class="n">virtio_queue_host_notifier_read</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">virtio_queue_notify_vq</span><span class="w"></span>
-<span class="w">    </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">vq</span><span class="o">-&gt;</span><span class="n">handle_output</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">virtio_net_handle_tx_bh</span><span class="w"> </span><span class="n">队列注册的时候</span><span class="err">，</span><span class="n">回注册回调函数</span><span class="w"></span>
-<span class="w">        </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">qemu_bh_schedule</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">virtio_net_tx_bh</span><span class="w"></span>
-<span class="w">            </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">virtio_net_flush_tx</span><span class="w"></span>
-<span class="w">            </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">virtqueue_pop</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="n">Qemu代码virtio</span><span class="o">-</span><span class="n">net相关代码</span><span class="o">:</span>
+<span class="n">virtio_queue_host_notifier_read</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">virtio_queue_notify_vq</span>
+<span class="w">    </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">vq</span><span class="o">-&gt;</span><span class="n">handle_output</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">virtio_net_handle_tx_bh</span><span class="w"> </span><span class="n">队列注册的时候</span><span class="err">，</span><span class="n">回注册回调函数</span>
+<span class="w">        </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">qemu_bh_schedule</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">virtio_net_tx_bh</span>
+<span class="w">            </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">virtio_net_flush_tx</span>
+<span class="w">            </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">virtqueue_pop</span>
 <span class="w">        </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">qemu_sendv_packet_async</span><span class="w"> </span><span class="c1">// 报文放到发送队列上，写tap设备的fd去发包</span>
-<span class="w">            </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">tap_receive_iov</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">tap_write_packet</span><span class="w"></span>
+<span class="w">            </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">tap_receive_iov</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">tap_write_packet</span>
 
 <span class="c1">// 最后调用 tap_write_packet 把数据包发给tap设备投递出去</span>
 </code></pre></div>
@@ -824,13 +824,13 @@ virtio-net模式下网卡收发包的流程为： </p>
 <h4>3.2.2 virtio-net网卡收包</h4>
 <p>网卡收包的时候，tap设备先收到报文，对应的virtio-net网卡tap设备fd变为可读，
 Qemu主循环收到POLL_IN事件调用回调函数收包。</p>
-<div class="highlight"><pre><span></span><code><span class="n">tap_send</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">qemu_send_packet_async</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">qemu_send_packet_async_with_flags</span><span class="w"></span>
-<span class="w">    </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">qemu_net_queue_send</span><span class="w"></span>
-<span class="w">        </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">qemu_net_queue_deliver</span><span class="w"></span>
-<span class="w">        </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">qemu_deliver_packet_iov</span><span class="w"></span>
-<span class="w">            </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">nc_sendv_compat</span><span class="w"></span>
-<span class="w">            </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">virtio_net_receive</span><span class="w"></span>
-<span class="w">                </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">virtio_net_receive_rcu</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="n">tap_send</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">qemu_send_packet_async</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">qemu_send_packet_async_with_flags</span>
+<span class="w">    </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">qemu_net_queue_send</span>
+<span class="w">        </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">qemu_net_queue_deliver</span>
+<span class="w">        </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">qemu_deliver_packet_iov</span>
+<span class="w">            </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">nc_sendv_compat</span>
+<span class="w">            </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">virtio_net_receive</span>
+<span class="w">                </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">virtio_net_receive_rcu</span>
 </code></pre></div>
 
 <p>virtio-net网卡收报最终调用了<code>virtio_net_receive_rcu</code>，

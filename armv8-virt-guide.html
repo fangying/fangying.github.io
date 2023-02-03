@@ -131,12 +131,12 @@
 <li>使用虚拟内存管理机制，VA的最高有效位（MSB）为0时MMU使用TTBR0的转换表来翻译，VA的最高有效位为1时MMU使用TTBR1的转换表来翻译</li>
 <li>EL2和EL3有TTBR0，但是没有TTBR1，这意味着EL2和EL3下只能使用0x0~0x0000FFFF_FFFFFFFF范围的虚拟地址空间</li>
 </ul>
-<div class="highlight"><pre><span></span><code><span class="nb">-------------------------------------------------------------------------</span><span class="c"></span>
+<div class="highlight"><pre><span></span><code><span class="nb">-------------------------------------------------------------------------</span>
 <span class="c">AArch64 Linux memory layout with 4KB pages </span><span class="nb">+</span><span class="c"> 4 levels::</span>
 <span class="c">  Start         End         Size        Use</span>
 <span class="c">  0000000000000000  0000ffffffffffff     256TB      user</span>
 <span class="c">  ffff000000000000  ffffffffffffffff     256TB      kernel</span>
-<span class="nb">-------------------------------------------------------------------------</span><span class="c"></span>
+<span class="nb">-------------------------------------------------------------------------</span>
 </code></pre></div>
 
 <p><img alt="ARM Address Translation" src="../images/arm_address_translation.png"></p>
@@ -257,11 +257,11 @@ SVM使得虚拟机里面的每个进程都能够独立使用某个直通设备�
 然后QEMU再通过VFIO的IOCTL调用（VFIO_DEVICE_BIND_TASK）将表的信息传给SMMU，
 这样SMMU就获得了Guest内部进程的PASID Table的shadow信息，它就知道该如何建立Stage1地址翻译表了。</p>
 <p>所以，在两阶段地址翻译场景下，Guest内部DMA请求的处理步骤</p>
-<div class="highlight"><pre><span></span><code><span class="n">Step1</span><span class="o">:</span><span class="w">  </span><span class="n">Guest驱动发起DMA请求</span><span class="err">，这个</span><span class="n">DMA请求包含GVA</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">PASID</span><span class="w"> </span><span class="n">Prefix</span><span class="w"></span>
-<span class="n">Step2</span><span class="err">：</span><span class="w"> </span><span class="n">DMA请求到达SMMU</span><span class="err">，</span><span class="n">SMMU提取DMA请求中的RequestID就知道这个请求是哪个设备发来的</span><span class="err">，然后去</span><span class="n">StreamTable索引对应的STE</span><span class="w"></span>
-<span class="n">Step3</span><span class="o">:</span><span class="w">  </span><span class="err">从对应的</span><span class="n">STE表中查找到对应的CD</span><span class="err">，然后用</span><span class="n">PASID到CD中进行索引找到对应的S1</span><span class="w"> </span><span class="n">Page</span><span class="w"> </span><span class="n">Table</span><span class="w"></span>
-<span class="n">Step4</span><span class="err">：</span><span class="w"> </span><span class="n">IOMMU进行S1</span><span class="w"> </span><span class="n">Page</span><span class="w"> </span><span class="n">Table</span><span class="w"> </span><span class="n">Walk</span><span class="err">，将</span><span class="n">GVA翻译成GPA</span><span class="err">（</span><span class="n">IPA</span><span class="err">）并作为</span><span class="n">S2的输入</span><span class="w"></span>
-<span class="n">Step5</span><span class="err">：</span><span class="w"> </span><span class="n">IOMMU执行S2</span><span class="w"> </span><span class="n">Page</span><span class="w"> </span><span class="n">Table</span><span class="w"> </span><span class="n">Walk</span><span class="err">，将</span><span class="n">GPA翻译成HPA</span><span class="err">，</span><span class="n">done</span><span class="err">！</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="n">Step1</span><span class="o">:</span><span class="w">  </span><span class="n">Guest驱动发起DMA请求</span><span class="err">，这个</span><span class="n">DMA请求包含GVA</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">PASID</span><span class="w"> </span><span class="n">Prefix</span>
+<span class="n">Step2</span><span class="err">：</span><span class="w"> </span><span class="n">DMA请求到达SMMU</span><span class="err">，</span><span class="n">SMMU提取DMA请求中的RequestID就知道这个请求是哪个设备发来的</span><span class="err">，然后去</span><span class="n">StreamTable索引对应的STE</span>
+<span class="n">Step3</span><span class="o">:</span><span class="w">  </span><span class="err">从对应的</span><span class="n">STE表中查找到对应的CD</span><span class="err">，然后用</span><span class="n">PASID到CD中进行索引找到对应的S1</span><span class="w"> </span><span class="n">Page</span><span class="w"> </span><span class="n">Table</span>
+<span class="n">Step4</span><span class="err">：</span><span class="w"> </span><span class="n">IOMMU进行S1</span><span class="w"> </span><span class="n">Page</span><span class="w"> </span><span class="n">Table</span><span class="w"> </span><span class="n">Walk</span><span class="err">，将</span><span class="n">GVA翻译成GPA</span><span class="err">（</span><span class="n">IPA</span><span class="err">）并作为</span><span class="n">S2的输入</span>
+<span class="n">Step5</span><span class="err">：</span><span class="w"> </span><span class="n">IOMMU执行S2</span><span class="w"> </span><span class="n">Page</span><span class="w"> </span><span class="n">Table</span><span class="w"> </span><span class="n">Walk</span><span class="err">，将</span><span class="n">GPA翻译成HPA</span><span class="err">，</span><span class="n">done</span><span class="err">！</span>
 </code></pre></div>
 
 <p>纵观SMMUv3，从设计上来和Intel IOMMU的设计和功能基本类似，毕竟这里没有太多可以创新的地方。
@@ -337,8 +337,8 @@ ARM上的中断类型：</p>
 </code></pre></div>
 
 <p>例如，现在有个ARM Big.Little架构的移动处理器SOC，拥有2个Cluster，小核心拥有4个Cortex-A53大核心拥有2个A72，那么可以表示为：</p>
-<div class="highlight"><pre><span></span><code><span class="mf">0.0.0.</span><span class="err">[</span><span class="mf">0</span><span class="p">:</span><span class="mf">3</span><span class="err">]</span><span class="w"> </span><span class="n">Cores</span><span class="w"> </span><span class="mf">0</span><span class="w"> </span><span class="kr">to</span><span class="w"> </span><span class="mf">3</span><span class="w"> </span><span class="n">of</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="n">Cortex</span><span class="o">-</span><span class="n">A53</span><span class="w"> </span><span class="n">processor</span><span class="w"></span>
-<span class="mf">0.0.1.</span><span class="err">[</span><span class="mf">0</span><span class="p">:</span><span class="mf">1</span><span class="err">]</span><span class="w"> </span><span class="n">Cores</span><span class="w"> </span><span class="mf">0</span><span class="w"> </span><span class="kr">to</span><span class="w"> </span><span class="mf">1</span><span class="w"> </span><span class="n">of</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="n">Cortex</span><span class="o">-</span><span class="n">A72</span><span class="w"> </span><span class="n">processor</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="mf">0.0.0.</span><span class="err">[</span><span class="mf">0</span><span class="p">:</span><span class="mf">3</span><span class="err">]</span><span class="w"> </span><span class="n">Cores</span><span class="w"> </span><span class="mf">0</span><span class="w"> </span><span class="kr">to</span><span class="w"> </span><span class="mf">3</span><span class="w"> </span><span class="n">of</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="n">Cortex</span><span class="o">-</span><span class="n">A53</span><span class="w"> </span><span class="n">processor</span>
+<span class="mf">0.0.1.</span><span class="err">[</span><span class="mf">0</span><span class="p">:</span><span class="mf">1</span><span class="err">]</span><span class="w"> </span><span class="n">Cores</span><span class="w"> </span><span class="mf">0</span><span class="w"> </span><span class="kr">to</span><span class="w"> </span><span class="mf">1</span><span class="w"> </span><span class="n">of</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="n">Cortex</span><span class="o">-</span><span class="n">A72</span><span class="w"> </span><span class="n">processor</span>
 </code></pre></div>
 
 <p>GICv3的设计上和x86的IOAPIC/LAPIC架构差异甚远，GICv3的设计架构如下图所示：</p>

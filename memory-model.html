@@ -165,10 +165,10 @@ ARMv8，PowerPC和MIPS等体系结构都是弱内存模型。
 C/C++和Java等不同的编程语言都有定义内存模型相关规范。</p>
 <p>2011年发布的C11/C++11 ISO Standard为我们带来了memory order的支持，
 引用C++11里的一段描述：</p>
-<div class="highlight"><pre><span></span><code><span class="n">The</span><span class="w"> </span><span class="n">memory</span><span class="w"> </span><span class="n">model</span><span class="w"> </span><span class="n">means</span><span class="w"> </span><span class="n">that</span><span class="w"> </span><span class="n">C</span><span class="o">++</span><span class="w"> </span><span class="n">code</span><span class="w"> </span><span class="n">now</span><span class="w"> </span><span class="n">has</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="n">standardized</span><span class="w"></span>
-<span class="n">library</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="n">call</span><span class="w"> </span><span class="n">regardless</span><span class="w"> </span><span class="n">of</span><span class="w"> </span><span class="n">who</span><span class="w"> </span><span class="n">made</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">compiler</span><span class="w"> </span><span class="k">and</span><span class="w"> </span><span class="n">on</span><span class="w"></span>
-<span class="n">what</span><span class="w"> </span><span class="n">platform</span><span class="w"> </span><span class="n">it</span><span class="p">&#39;</span><span class="n">s</span><span class="w"> </span><span class="n">running</span><span class="p">.</span><span class="w"> </span><span class="n">There</span><span class="p">&#39;</span><span class="n">s</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="n">standard</span><span class="w"> </span><span class="n">way</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="n">control</span><span class="w"></span>
-<span class="n">how</span><span class="w"> </span><span class="n">different</span><span class="w"> </span><span class="n">threads</span><span class="w"> </span><span class="n">talk</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">processor</span><span class="p">&#39;</span><span class="n">s</span><span class="w"> </span><span class="n">memory</span><span class="p">.[</span><span class="mh">7</span><span class="p">]</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="n">The</span><span class="w"> </span><span class="n">memory</span><span class="w"> </span><span class="n">model</span><span class="w"> </span><span class="n">means</span><span class="w"> </span><span class="n">that</span><span class="w"> </span><span class="n">C</span><span class="o">++</span><span class="w"> </span><span class="n">code</span><span class="w"> </span><span class="n">now</span><span class="w"> </span><span class="n">has</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="n">standardized</span>
+<span class="n">library</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="n">call</span><span class="w"> </span><span class="n">regardless</span><span class="w"> </span><span class="n">of</span><span class="w"> </span><span class="n">who</span><span class="w"> </span><span class="n">made</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">compiler</span><span class="w"> </span><span class="k">and</span><span class="w"> </span><span class="n">on</span>
+<span class="n">what</span><span class="w"> </span><span class="n">platform</span><span class="w"> </span><span class="n">it</span><span class="p">&#39;</span><span class="n">s</span><span class="w"> </span><span class="n">running</span><span class="p">.</span><span class="w"> </span><span class="n">There</span><span class="p">&#39;</span><span class="n">s</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="n">standard</span><span class="w"> </span><span class="n">way</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="n">control</span>
+<span class="n">how</span><span class="w"> </span><span class="n">different</span><span class="w"> </span><span class="n">threads</span><span class="w"> </span><span class="n">talk</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">processor</span><span class="p">&#39;</span><span class="n">s</span><span class="w"> </span><span class="n">memory</span><span class="p">.[</span><span class="mh">7</span><span class="p">]</span>
 </code></pre></div>
 
 <p>memory order的问题就是因为指令重排引起的, 指令重排导致 原来的内存可见顺序发生了变化,
@@ -183,9 +183,9 @@ C/C++和Java等不同的编程语言都有定义内存模型相关规范。</p>
 而用来联系memory order的是atomic变量，
 atomic操作可以用load()和release()语义来描述。
 一个简单的atomic变量赋值可描述为：</p>
-<div class="highlight"><pre><span></span><code><span class="w"> </span><span class="n">atomic_var1</span><span class="o">.</span><span class="n">store</span><span class="w"> </span><span class="p">(</span><span class="n">atomic_var2</span><span class="o">.</span><span class="n">load</span><span class="p">());</span><span class="w"> </span><span class="o">//</span><span class="w"> </span><span class="n">atomic</span><span class="w"> </span><span class="n">variables</span><span class="w"></span>
-<span class="w">     </span><span class="n">vs</span><span class="w"></span>
-<span class="w"> </span><span class="n">var1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">var2</span><span class="p">;</span><span class="w">                            </span><span class="o">//</span><span class="w"> </span><span class="n">regular</span><span class="w"> </span><span class="n">variables</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="w"> </span><span class="n">atomic_var1</span><span class="o">.</span><span class="n">store</span><span class="w"> </span><span class="p">(</span><span class="n">atomic_var2</span><span class="o">.</span><span class="n">load</span><span class="p">());</span><span class="w"> </span><span class="o">//</span><span class="w"> </span><span class="n">atomic</span><span class="w"> </span><span class="n">variables</span>
+<span class="w">     </span><span class="n">vs</span>
+<span class="w"> </span><span class="n">var1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">var2</span><span class="p">;</span><span class="w">                            </span><span class="o">//</span><span class="w"> </span><span class="n">regular</span><span class="w"> </span><span class="n">variables</span>
 </code></pre></div>
 
 <p>为了更好地描述内存模型，有4种关系术语需要了解一下。</p>
@@ -195,7 +195,7 @@ atomic操作可以用load()和release()语义来描述。
 两个操作A和操作B，如果有A sequenced-before B，除了表示操作A的顺序在B之前，还表示了操作A的结果操作B可见。
 例如：语句A是sequenced-before语句B的。</p>
 <div class="highlight"><pre><span></span><code><span class="n">r2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">x</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">std</span><span class="p">::</span><span class="n">memory_order_relaxed</span><span class="p">);</span><span class="w"> </span><span class="o">//</span><span class="w"> </span><span class="n">A</span><span class="w"> </span>
-<span class="n">y</span><span class="o">.</span><span class="n">store</span><span class="p">(</span><span class="mi">42</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">memory_order_relaxed</span><span class="p">);</span><span class="w"> </span><span class="o">//</span><span class="w"> </span><span class="n">B</span><span class="w"></span>
+<span class="n">y</span><span class="o">.</span><span class="n">store</span><span class="p">(</span><span class="mi">42</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">memory_order_relaxed</span><span class="p">);</span><span class="w"> </span><span class="o">//</span><span class="w"> </span><span class="n">B</span>
 </code></pre></div>
 
 <h3>happens-before</h3>
@@ -211,9 +211,9 @@ happens before包含了inter-thread happens before和synchronizes-with两种关�
 <h3>Carries dependency</h3>
 <p>同一个线程内，表达式A sequenced-before 表达式B，并且表达式B的值是受表达式A的影响的一种关系，
 称之为"Carries dependency"。这个很好理解，例如：</p>
-<div class="highlight"><pre><span></span><code><span class="nb nb-Type">int</span><span class="w"> </span><span class="o">*</span><span class="n">a</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&amp;</span><span class="n">var1</span><span class="p">;</span><span class="w">     </span><span class="o">//</span><span class="w"> </span><span class="n">A</span><span class="w"></span>
-<span class="nb nb-Type">int</span><span class="w"> </span><span class="o">*</span><span class="n">b</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&amp;</span><span class="n">var2</span><span class="p">;</span><span class="w">     </span><span class="o">//</span><span class="w"> </span><span class="n">B</span><span class="w"></span>
-<span class="n">c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">*</span><span class="n">a</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="o">*</span><span class="n">b</span><span class="p">;</span><span class="w">        </span><span class="o">//</span><span class="w"> </span><span class="n">C</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="nb nb-Type">int</span><span class="w"> </span><span class="o">*</span><span class="n">a</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&amp;</span><span class="n">var1</span><span class="p">;</span><span class="w">     </span><span class="o">//</span><span class="w"> </span><span class="n">A</span>
+<span class="nb nb-Type">int</span><span class="w"> </span><span class="o">*</span><span class="n">b</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&amp;</span><span class="n">var2</span><span class="p">;</span><span class="w">     </span><span class="o">//</span><span class="w"> </span><span class="n">B</span>
+<span class="n">c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">*</span><span class="n">a</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="o">*</span><span class="n">b</span><span class="p">;</span><span class="w">        </span><span class="o">//</span><span class="w"> </span><span class="n">C</span>
 </code></pre></div>
 
 <p>执行语句A和B与语句C之间就存在"Carries dependency"关系，
@@ -221,14 +221,14 @@ happens before包含了inter-thread happens before和synchronizes-with两种关�
 <p>了解了上面一些基本概念，下面我们来一起学习一下内存模型吧。</p>
 <h2>2. C11/C++11内存模型</h2>
 <p>C/C++11标准中提供了6种memory order，来描述内存模型[6]:</p>
-<div class="highlight"><pre><span></span><code><span class="k">enum</span><span class="w"> </span><span class="nc">memory_order</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="n">memory_order_relaxed</span><span class="p">,</span><span class="w"></span>
-<span class="w">    </span><span class="n">memory_order_consume</span><span class="p">,</span><span class="w"></span>
-<span class="w">    </span><span class="n">memory_order_acquire</span><span class="p">,</span><span class="w"></span>
-<span class="w">    </span><span class="n">memory_order_release</span><span class="p">,</span><span class="w"></span>
-<span class="w">    </span><span class="n">memory_order_acq_rel</span><span class="p">,</span><span class="w"></span>
-<span class="w">    </span><span class="n">memory_order_seq_cst</span><span class="w"></span>
-<span class="p">};</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="k">enum</span><span class="w"> </span><span class="nc">memory_order</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">memory_order_relaxed</span><span class="p">,</span>
+<span class="w">    </span><span class="n">memory_order_consume</span><span class="p">,</span>
+<span class="w">    </span><span class="n">memory_order_acquire</span><span class="p">,</span>
+<span class="w">    </span><span class="n">memory_order_release</span><span class="p">,</span>
+<span class="w">    </span><span class="n">memory_order_acq_rel</span><span class="p">,</span>
+<span class="w">    </span><span class="n">memory_order_seq_cst</span>
+<span class="p">};</span>
 </code></pre></div>
 
 <p>每种memory order的规则可以简要描述为：</p>
@@ -275,12 +275,12 @@ happens before包含了inter-thread happens before和synchronizes-with两种关�
 <h3>2.1 memory order releaxed</h3>
 <p><code>relaxed</code>表示一种最为宽松的内存操作约定，Relaxed ordering 仅仅保证load()和store()是原子操作，
 除此之外，不提供任何跨线程的同步[5]。</p>
-<div class="highlight"><pre><span></span><code><span class="w">                   </span><span class="n">std</span><span class="p">::</span><span class="n">atomic</span><span class="o">&lt;</span><span class="nb nb-Type">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w">     </span><span class="o">//</span><span class="w"> </span><span class="n">global</span><span class="w"> </span><span class="n">variable</span><span class="w"></span>
-<span class="w">                   </span><span class="n">std</span><span class="p">::</span><span class="n">atomic</span><span class="o">&lt;</span><span class="nb nb-Type">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w">     </span><span class="o">//</span><span class="w"> </span><span class="n">global</span><span class="w"> </span><span class="n">variable</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="w">                   </span><span class="n">std</span><span class="p">::</span><span class="n">atomic</span><span class="o">&lt;</span><span class="nb nb-Type">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w">     </span><span class="o">//</span><span class="w"> </span><span class="n">global</span><span class="w"> </span><span class="n">variable</span>
+<span class="w">                   </span><span class="n">std</span><span class="p">::</span><span class="n">atomic</span><span class="o">&lt;</span><span class="nb nb-Type">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w">     </span><span class="o">//</span><span class="w"> </span><span class="n">global</span><span class="w"> </span><span class="n">variable</span>
 
-<span class="n">Thread</span><span class="o">-</span><span class="mi">1</span><span class="p">:</span><span class="w">                                  </span><span class="n">Thread</span><span class="o">-</span><span class="mi">2</span><span class="p">:</span><span class="w"></span>
-<span class="n">r1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">y</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">memory_order_relaxed</span><span class="p">);</span><span class="w"> </span><span class="o">//</span><span class="w"> </span><span class="n">A</span><span class="w">    </span><span class="n">r2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">x</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">memory_order_relaxed</span><span class="p">);</span><span class="w"> </span><span class="o">//</span><span class="w"> </span><span class="n">C</span><span class="w"></span>
-<span class="n">x</span><span class="o">.</span><span class="n">store</span><span class="p">(</span><span class="n">r1</span><span class="p">,</span><span class="w"> </span><span class="n">memory_order_relaxed</span><span class="p">);</span><span class="w"> </span><span class="o">//</span><span class="w"> </span><span class="n">B</span><span class="w">    </span><span class="n">y</span><span class="o">.</span><span class="n">store</span><span class="p">(</span><span class="mi">42</span><span class="p">,</span><span class="w"> </span><span class="n">memory_order_relaxed</span><span class="p">);</span><span class="w"> </span><span class="o">//</span><span class="w"> </span><span class="n">D</span><span class="w"></span>
+<span class="n">Thread</span><span class="o">-</span><span class="mi">1</span><span class="p">:</span><span class="w">                                  </span><span class="n">Thread</span><span class="o">-</span><span class="mi">2</span><span class="p">:</span>
+<span class="n">r1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">y</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">memory_order_relaxed</span><span class="p">);</span><span class="w"> </span><span class="o">//</span><span class="w"> </span><span class="n">A</span><span class="w">    </span><span class="n">r2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">x</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">memory_order_relaxed</span><span class="p">);</span><span class="w"> </span><span class="o">//</span><span class="w"> </span><span class="n">C</span>
+<span class="n">x</span><span class="o">.</span><span class="n">store</span><span class="p">(</span><span class="n">r1</span><span class="p">,</span><span class="w"> </span><span class="n">memory_order_relaxed</span><span class="p">);</span><span class="w"> </span><span class="o">//</span><span class="w"> </span><span class="n">B</span><span class="w">    </span><span class="n">y</span><span class="o">.</span><span class="n">store</span><span class="p">(</span><span class="mi">42</span><span class="p">,</span><span class="w"> </span><span class="n">memory_order_relaxed</span><span class="p">);</span><span class="w"> </span><span class="o">//</span><span class="w"> </span><span class="n">D</span>
 </code></pre></div>
 
 <p>上面的多线程模型执行的时候，可能出现r2 == r1 == 42。
@@ -288,31 +288,31 @@ happens before包含了inter-thread happens before和synchronizes-with两种关�
 如果程序的执行顺序是 D -&gt; A -&gt; B -&gt; C，那么就会出现r1 == r2 == 42。</p>
 <p>如果某个操作只要求是原子操作，除此之外，不需要其它同步的保障，那么就可以使用 relaxed ordering。
 程序计数器是一种典型的应用场景：</p>
-<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;cassert&gt;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;vector&gt;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;thread&gt;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;atomic&gt;</span><span class="cp"></span>
+<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;cassert&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;vector&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;thread&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;atomic&gt;</span>
 
-<span class="n">std</span><span class="o">::</span><span class="n">atomic</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">cnt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">0</span><span class="p">};</span><span class="w"></span>
-<span class="kt">void</span><span class="w"> </span><span class="nf">f</span><span class="p">()</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">1000</span><span class="p">;</span><span class="w"> </span><span class="o">++</span><span class="n">n</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="n">cnt</span><span class="p">.</span><span class="n">fetch_add</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">memory_order_relaxed</span><span class="p">);</span><span class="w"></span>
-<span class="w">    </span><span class="p">}</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
-<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="kr">thread</span><span class="o">&gt;</span><span class="w"> </span><span class="n">v</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">10</span><span class="p">;</span><span class="w"> </span><span class="o">++</span><span class="n">n</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="n">v</span><span class="p">.</span><span class="n">emplace_back</span><span class="p">(</span><span class="n">f</span><span class="p">);</span><span class="w"></span>
-<span class="w">    </span><span class="p">}</span><span class="w"></span>
-<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">v</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="n">t</span><span class="p">.</span><span class="n">join</span><span class="p">();</span><span class="w"></span>
-<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="n">std</span><span class="o">::</span><span class="n">atomic</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">cnt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">0</span><span class="p">};</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">f</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">1000</span><span class="p">;</span><span class="w"> </span><span class="o">++</span><span class="n">n</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">cnt</span><span class="p">.</span><span class="n">fetch_add</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">memory_order_relaxed</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="kr">thread</span><span class="o">&gt;</span><span class="w"> </span><span class="n">v</span><span class="p">;</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">10</span><span class="p">;</span><span class="w"> </span><span class="o">++</span><span class="n">n</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">v</span><span class="p">.</span><span class="n">emplace_back</span><span class="p">(</span><span class="n">f</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">v</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">t</span><span class="p">.</span><span class="n">join</span><span class="p">();</span>
+<span class="w">    </span><span class="p">}</span>
 <span class="w">    </span><span class="n">assert</span><span class="p">(</span><span class="n">cnt</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">10000</span><span class="p">);</span><span class="w">    </span><span class="c1">// never failed</span>
-<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
 </code></pre></div>
 
 <p><code>cnt</code>是共享的全局变量，多个线程并发地对<code>cnt</code>执行RMW（Read Modify Write）原子操作。
@@ -321,45 +321,45 @@ happens before包含了inter-thread happens before和synchronizes-with两种关�
 <p><code>consume</code>要搭配<code>release</code>一起使用。很多时候，<strong>线程间只想针对有依赖关系的操作进行同步</strong>，
 除此之外线程中其他操作顺序如何不关心，这时候就适合用<code>consume</code>来完成这个操作。
 例如：</p>
-<div class="highlight"><pre><span></span><code><span class="n">b</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">*</span><span class="n">a</span><span class="p">;</span><span class="w"></span>
-<span class="n">c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">*</span><span class="n">b</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="n">b</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">*</span><span class="n">a</span><span class="p">;</span>
+<span class="n">c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">*</span><span class="n">b</span>
 </code></pre></div>
 
 <p>第二行的变量c依赖于第一行的执行结果，因此这两行代码是"Carries dependency"关系。
 显然，由于<code>consume</code>是针对有明确依赖关系的语句来限定其执行顺序的一种内存顺序，
 而<code>releaxed</code>不提供任何顺序保证，
 所以consume order要比releaxed order要更加地Strong。</p>
-<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;thread&gt;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;atomic&gt;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;cassert&gt;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;string&gt;</span><span class="cp"></span>
+<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;thread&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;atomic&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;cassert&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;string&gt;</span>
 
-<span class="n">std</span><span class="o">::</span><span class="n">atomic</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">*&gt;</span><span class="w"> </span><span class="n">ptr</span><span class="p">;</span><span class="w"></span>
-<span class="kt">int</span><span class="w"> </span><span class="n">data</span><span class="p">;</span><span class="w"></span>
+<span class="n">std</span><span class="o">::</span><span class="n">atomic</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">*&gt;</span><span class="w"> </span><span class="n">ptr</span><span class="p">;</span>
+<span class="kt">int</span><span class="w"> </span><span class="n">data</span><span class="p">;</span>
 
-<span class="kt">void</span><span class="w"> </span><span class="nf">producer</span><span class="p">()</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">*</span><span class="w"> </span><span class="n">p</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="p">(</span><span class="s">&quot;Hello&quot;</span><span class="p">);</span><span class="w"></span>
-<span class="w">    </span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">42</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="n">ptr</span><span class="p">.</span><span class="n">store</span><span class="p">(</span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">memory_order_release</span><span class="p">);</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">producer</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">*</span><span class="w"> </span><span class="n">p</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="p">(</span><span class="s">&quot;Hello&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">42</span><span class="p">;</span>
+<span class="w">    </span><span class="n">ptr</span><span class="p">.</span><span class="n">store</span><span class="p">(</span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">memory_order_release</span><span class="p">);</span>
+<span class="p">}</span>
 
-<span class="kt">void</span><span class="w"> </span><span class="nf">consumer</span><span class="p">()</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">*</span><span class="w"> </span><span class="n">p2</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="p">(</span><span class="n">p2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ptr</span><span class="p">.</span><span class="n">load</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">memory_order_consume</span><span class="p">)))</span><span class="w"></span>
-<span class="w">        </span><span class="p">;</span><span class="w"></span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">consumer</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">*</span><span class="w"> </span><span class="n">p2</span><span class="p">;</span>
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="p">(</span><span class="n">p2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ptr</span><span class="p">.</span><span class="n">load</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">memory_order_consume</span><span class="p">)))</span>
+<span class="w">        </span><span class="p">;</span>
 <span class="w">    </span><span class="n">assert</span><span class="p">(</span><span class="o">*</span><span class="n">p2</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s">&quot;Hello&quot;</span><span class="p">);</span><span class="w">  </span><span class="c1">// never fires: *p2 carries dependency from ptr</span>
 <span class="w">    </span><span class="n">assert</span><span class="p">(</span><span class="n">data</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">42</span><span class="p">);</span><span class="w">      </span><span class="c1">// may or may not fire: data does not carry dependency from ptr</span>
-<span class="p">}</span><span class="w"></span>
+<span class="p">}</span>
 
-<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="kr">thread</span><span class="w"> </span><span class="n">t1</span><span class="p">(</span><span class="n">producer</span><span class="p">);</span><span class="w"></span>
-<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="kr">thread</span><span class="w"> </span><span class="n">t2</span><span class="p">(</span><span class="n">consumer</span><span class="p">);</span><span class="w"></span>
-<span class="w">    </span><span class="n">t1</span><span class="p">.</span><span class="n">join</span><span class="p">();</span><span class="w"></span>
-<span class="w">    </span><span class="n">t2</span><span class="p">.</span><span class="n">join</span><span class="p">();</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="kr">thread</span><span class="w"> </span><span class="n">t1</span><span class="p">(</span><span class="n">producer</span><span class="p">);</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="kr">thread</span><span class="w"> </span><span class="n">t2</span><span class="p">(</span><span class="n">consumer</span><span class="p">);</span>
+<span class="w">    </span><span class="n">t1</span><span class="p">.</span><span class="n">join</span><span class="p">();</span>
+<span class="w">    </span><span class="n">t2</span><span class="p">.</span><span class="n">join</span><span class="p">();</span>
+<span class="p">}</span>
 </code></pre></div>
 
 <p>assert(*p2 == "Hello")永远不会失败，但assert(data == 42)可能会。
@@ -373,37 +373,37 @@ happens before包含了inter-thread happens before和synchronizes-with两种关�
 <code>release</code>和<code>acquire</code>构成了synchronize-with关系，也就是同步关系。
 在这个关系下：<strong>线程A中所有发生在release x之前的值的写操作，
 对线程B的acquire x之后的任何操作都可见</strong>。</p>
-<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;thread&gt;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;atomic&gt;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;cassert&gt;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;string&gt;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span><span class="cp"></span>
+<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;thread&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;atomic&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;cassert&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;string&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span>
 
-<span class="n">std</span><span class="o">::</span><span class="n">atomic</span><span class="o">&lt;</span><span class="kt">bool</span><span class="o">&gt;</span><span class="w"> </span><span class="n">ready</span><span class="p">{</span><span class="w"> </span><span class="nb">false</span><span class="w"> </span><span class="p">};</span><span class="w"></span>
-<span class="kt">int</span><span class="w"> </span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
-<span class="n">std</span><span class="o">::</span><span class="n">atomic</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">var</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">0</span><span class="p">};</span><span class="w"></span>
+<span class="n">std</span><span class="o">::</span><span class="n">atomic</span><span class="o">&lt;</span><span class="kt">bool</span><span class="o">&gt;</span><span class="w"> </span><span class="n">ready</span><span class="p">{</span><span class="w"> </span><span class="nb">false</span><span class="w"> </span><span class="p">};</span>
+<span class="kt">int</span><span class="w"> </span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="n">std</span><span class="o">::</span><span class="n">atomic</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">var</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">0</span><span class="p">};</span>
 
-<span class="kt">void</span><span class="w"> </span><span class="nf">sender</span><span class="p">()</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">sender</span><span class="p">()</span>
+<span class="p">{</span>
 <span class="w">    </span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">42</span><span class="p">;</span><span class="w">                                              </span><span class="c1">// A</span>
 <span class="w">    </span><span class="n">var</span><span class="p">.</span><span class="n">store</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">memory_order_relaxed</span><span class="p">);</span><span class="w">              </span><span class="c1">// B</span>
 <span class="w">    </span><span class="n">ready</span><span class="p">.</span><span class="n">store</span><span class="p">(</span><span class="nb">true</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">memory_order_release</span><span class="p">);</span><span class="w">           </span><span class="c1">// C</span>
-<span class="p">}</span><span class="w"></span>
-<span class="kt">void</span><span class="w"> </span><span class="nf">receiver</span><span class="p">()</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
+<span class="p">}</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">receiver</span><span class="p">()</span>
+<span class="p">{</span>
 <span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">ready</span><span class="p">.</span><span class="n">load</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">memory_order_acquire</span><span class="p">))</span><span class="w">          </span><span class="c1">// D</span>
-<span class="w">        </span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="p">;</span>
 <span class="w">    </span><span class="n">assert</span><span class="p">(</span><span class="n">data</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">42</span><span class="p">);</span><span class="w">  </span><span class="c1">// never failed                    // E</span>
 <span class="w">    </span><span class="n">assert</span><span class="p">(</span><span class="n">var</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">100</span><span class="p">);</span><span class="w">  </span><span class="c1">// never failed                    // F</span>
-<span class="p">}</span><span class="w"></span>
+<span class="p">}</span>
 
-<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="kr">thread</span><span class="w"> </span><span class="n">t1</span><span class="p">(</span><span class="n">sender</span><span class="p">);</span><span class="w"></span>
-<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="kr">thread</span><span class="w"> </span><span class="n">t2</span><span class="p">(</span><span class="n">receiver</span><span class="p">);</span><span class="w"></span>
-<span class="w">    </span><span class="n">t1</span><span class="p">.</span><span class="n">join</span><span class="p">();</span><span class="w"></span>
-<span class="w">    </span><span class="n">t2</span><span class="p">.</span><span class="n">join</span><span class="p">();</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="kr">thread</span><span class="w"> </span><span class="n">t1</span><span class="p">(</span><span class="n">sender</span><span class="p">);</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="kr">thread</span><span class="w"> </span><span class="n">t2</span><span class="p">(</span><span class="n">receiver</span><span class="p">);</span>
+<span class="w">    </span><span class="n">t1</span><span class="p">.</span><span class="n">join</span><span class="p">();</span>
+<span class="w">    </span><span class="n">t2</span><span class="p">.</span><span class="n">join</span><span class="p">();</span>
+<span class="p">}</span>
 </code></pre></div>
 
 <p>上面的例子中：</p>
@@ -419,7 +419,7 @@ happens before包含了inter-thread happens before和synchronizes-with两种关�
 <p>这里就不用展开啰里啰嗦了。</p>
 <h3>2.5 memory order acq_rel</h3>
 <p><code>acq_rel</code>是acquire和release的叠加。中文不知道该咋描述好：</p>
-<div class="highlight"><pre><span></span><code><span class="n">A</span><span class="w"> </span><span class="n">read</span><span class="o">-</span><span class="n">modify</span><span class="o">-</span><span class="n">write</span><span class="w"> </span><span class="n">operation</span><span class="w"> </span><span class="n">with</span><span class="w"> </span><span class="n">this</span><span class="w"> </span><span class="n">memory</span><span class="w"> </span><span class="n">order</span><span class="w"> </span><span class="k">is</span><span class="w"> </span><span class="n">both</span><span class="w"> </span><span class="n">an</span><span class="w"> </span><span class="n">acquire</span><span class="w"> </span><span class="n">operation</span><span class="w"> </span><span class="ow">and</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="n">release</span><span class="w"> </span><span class="n">operation</span><span class="o">.</span><span class="w"> </span><span class="n">No</span><span class="w"> </span><span class="n">memory</span><span class="w"> </span><span class="n">reads</span><span class="w"> </span><span class="ow">or</span><span class="w"> </span><span class="n">writes</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">current</span><span class="w"> </span><span class="n">thread</span><span class="w"> </span><span class="n">can</span><span class="w"> </span><span class="n">be</span><span class="w"> </span><span class="n">reordered</span><span class="w"> </span><span class="n">before</span><span class="w"> </span><span class="ow">or</span><span class="w"> </span><span class="n">after</span><span class="w"> </span><span class="n">this</span><span class="w"> </span><span class="n">store</span><span class="o">.</span><span class="w"> </span><span class="n">All</span><span class="w"> </span><span class="n">writes</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="n">other</span><span class="w"> </span><span class="n">threads</span><span class="w"> </span><span class="n">that</span><span class="w"> </span><span class="n">release</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">same</span><span class="w"> </span><span class="n">atomic</span><span class="w"> </span><span class="n">variable</span><span class="w"> </span><span class="n">are</span><span class="w"> </span><span class="n">visible</span><span class="w"> </span><span class="n">before</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">modification</span><span class="w"> </span><span class="ow">and</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">modification</span><span class="w"> </span><span class="k">is</span><span class="w"> </span><span class="n">visible</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="n">other</span><span class="w"> </span><span class="n">threads</span><span class="w"> </span><span class="n">that</span><span class="w"> </span><span class="n">acquire</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">same</span><span class="w"> </span><span class="n">atomic</span><span class="w"> </span><span class="n">variable</span><span class="o">.</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="n">A</span><span class="w"> </span><span class="n">read</span><span class="o">-</span><span class="n">modify</span><span class="o">-</span><span class="n">write</span><span class="w"> </span><span class="n">operation</span><span class="w"> </span><span class="n">with</span><span class="w"> </span><span class="n">this</span><span class="w"> </span><span class="n">memory</span><span class="w"> </span><span class="n">order</span><span class="w"> </span><span class="k">is</span><span class="w"> </span><span class="n">both</span><span class="w"> </span><span class="n">an</span><span class="w"> </span><span class="n">acquire</span><span class="w"> </span><span class="n">operation</span><span class="w"> </span><span class="ow">and</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="n">release</span><span class="w"> </span><span class="n">operation</span><span class="o">.</span><span class="w"> </span><span class="n">No</span><span class="w"> </span><span class="n">memory</span><span class="w"> </span><span class="n">reads</span><span class="w"> </span><span class="ow">or</span><span class="w"> </span><span class="n">writes</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">current</span><span class="w"> </span><span class="n">thread</span><span class="w"> </span><span class="n">can</span><span class="w"> </span><span class="n">be</span><span class="w"> </span><span class="n">reordered</span><span class="w"> </span><span class="n">before</span><span class="w"> </span><span class="ow">or</span><span class="w"> </span><span class="n">after</span><span class="w"> </span><span class="n">this</span><span class="w"> </span><span class="n">store</span><span class="o">.</span><span class="w"> </span><span class="n">All</span><span class="w"> </span><span class="n">writes</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="n">other</span><span class="w"> </span><span class="n">threads</span><span class="w"> </span><span class="n">that</span><span class="w"> </span><span class="n">release</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">same</span><span class="w"> </span><span class="n">atomic</span><span class="w"> </span><span class="n">variable</span><span class="w"> </span><span class="n">are</span><span class="w"> </span><span class="n">visible</span><span class="w"> </span><span class="n">before</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">modification</span><span class="w"> </span><span class="ow">and</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">modification</span><span class="w"> </span><span class="k">is</span><span class="w"> </span><span class="n">visible</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="n">other</span><span class="w"> </span><span class="n">threads</span><span class="w"> </span><span class="n">that</span><span class="w"> </span><span class="n">acquire</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">same</span><span class="w"> </span><span class="n">atomic</span><span class="w"> </span><span class="n">variable</span><span class="o">.</span>
 </code></pre></div>
 
 <p>大致意思是：</p>
@@ -432,100 +432,100 @@ happens before包含了inter-thread happens before和synchronizes-with两种关�
 其他线程中所有对M的release operation及其之前的写入都对当前线程从该acq_rel operation开始的操作可见，
 并且截止到该acq_rel operation的所有内存写入都对另外线程对M的acquire operation以及之后的内存操作可见[13]。</p>
 <p>这里是一个例子，关于为什么要有<code>acq_rel</code>可以参考一下：</p>
-<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;thread&gt;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;atomic&gt;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;cassert&gt;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;vector&gt;</span><span class="cp"></span>
+<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;thread&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;atomic&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;cassert&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;vector&gt;</span>
 
-<span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">data</span><span class="p">;</span><span class="w"></span>
-<span class="n">std</span><span class="o">::</span><span class="n">atomic</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">flag</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">0</span><span class="p">};</span><span class="w"></span>
+<span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">data</span><span class="p">;</span>
+<span class="n">std</span><span class="o">::</span><span class="n">atomic</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">flag</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">0</span><span class="p">};</span>
 
-<span class="kt">void</span><span class="w"> </span><span class="nf">thread_1</span><span class="p">()</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="n">data</span><span class="p">.</span><span class="n">push_back</span><span class="p">(</span><span class="mi">42</span><span class="p">);</span><span class="w"></span>
-<span class="w">    </span><span class="n">flag</span><span class="p">.</span><span class="n">store</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">memory_order_release</span><span class="p">);</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">thread_1</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">data</span><span class="p">.</span><span class="n">push_back</span><span class="p">(</span><span class="mi">42</span><span class="p">);</span>
+<span class="w">    </span><span class="n">flag</span><span class="p">.</span><span class="n">store</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">memory_order_release</span><span class="p">);</span>
+<span class="p">}</span>
 
-<span class="kt">void</span><span class="w"> </span><span class="nf">thread_2</span><span class="p">()</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">expected</span><span class="o">=</span><span class="mi">1</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">flag</span><span class="p">.</span><span class="n">compare_exchange_strong</span><span class="p">(</span><span class="n">expected</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">memory_order_acq_rel</span><span class="p">))</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="n">expected</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="p">}</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">thread_2</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">expected</span><span class="o">=</span><span class="mi">1</span><span class="p">;</span>
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">flag</span><span class="p">.</span><span class="n">compare_exchange_strong</span><span class="p">(</span><span class="n">expected</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">memory_order_acq_rel</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">expected</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
 
-<span class="kt">void</span><span class="w"> </span><span class="nf">thread_3</span><span class="p">()</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">flag</span><span class="p">.</span><span class="n">load</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">memory_order_acquire</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span><span class="w"></span>
-<span class="w">        </span><span class="p">;</span><span class="w"></span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">thread_3</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">flag</span><span class="p">.</span><span class="n">load</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">memory_order_acquire</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span>
+<span class="w">        </span><span class="p">;</span>
 <span class="w">    </span><span class="n">assert</span><span class="p">(</span><span class="n">data</span><span class="p">.</span><span class="n">at</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">42</span><span class="p">);</span><span class="w"> </span><span class="c1">// will never fire</span>
-<span class="p">}</span><span class="w"></span>
+<span class="p">}</span>
 
-<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="kr">thread</span><span class="w"> </span><span class="n">a</span><span class="p">(</span><span class="n">thread_1</span><span class="p">);</span><span class="w"></span>
-<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="kr">thread</span><span class="w"> </span><span class="n">b</span><span class="p">(</span><span class="n">thread_2</span><span class="p">);</span><span class="w"></span>
-<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="kr">thread</span><span class="w"> </span><span class="n">c</span><span class="p">(</span><span class="n">thread_3</span><span class="p">);</span><span class="w"></span>
-<span class="w">    </span><span class="n">a</span><span class="p">.</span><span class="n">join</span><span class="p">();</span><span class="w"> </span><span class="n">b</span><span class="p">.</span><span class="n">join</span><span class="p">();</span><span class="w"> </span><span class="n">c</span><span class="p">.</span><span class="n">join</span><span class="p">();</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="kr">thread</span><span class="w"> </span><span class="n">a</span><span class="p">(</span><span class="n">thread_1</span><span class="p">);</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="kr">thread</span><span class="w"> </span><span class="n">b</span><span class="p">(</span><span class="n">thread_2</span><span class="p">);</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="kr">thread</span><span class="w"> </span><span class="n">c</span><span class="p">(</span><span class="n">thread_3</span><span class="p">);</span>
+<span class="w">    </span><span class="n">a</span><span class="p">.</span><span class="n">join</span><span class="p">();</span><span class="w"> </span><span class="n">b</span><span class="p">.</span><span class="n">join</span><span class="p">();</span><span class="w"> </span><span class="n">c</span><span class="p">.</span><span class="n">join</span><span class="p">();</span>
+<span class="p">}</span>
 </code></pre></div>
 
 <h3>2.6 memory order seq_cst</h3>
 <p><code>seq_cst</code>表示顺序一致性内存模型，在这个模型约束下<strong>不仅同一个线程内的执行结果是和程序顺序一致的，
 每个线程间互相看到的执行结果和程序顺序也保持顺序一致</strong>。
 显然，<code>seq_cst</code>的约束是最强的，这意味着要牺牲性能为代价。</p>
-<div class="highlight"><pre><span></span><code><span class="w">        </span><span class="n">atomic</span><span class="w"> </span><span class="nb nb-Type">int</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="p">(</span><span class="mi">0</span><span class="p">);</span><span class="w">               </span><span class="n">atomic</span><span class="w"> </span><span class="nb nb-Type">int</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="p">(</span><span class="mi">0</span><span class="p">);</span><span class="w"></span>
-<span class="w">    </span><span class="n">x</span><span class="o">.</span><span class="w"> </span><span class="n">store</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="n">seq</span><span class="w"> </span><span class="n">cst</span><span class="w"> </span><span class="p">);</span><span class="w">     </span><span class="o">||</span><span class="w">      </span><span class="n">y</span><span class="o">.</span><span class="w"> </span><span class="n">store</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="n">seq</span><span class="w"> </span><span class="n">cst</span><span class="w"> </span><span class="p">);</span><span class="w"></span>
-<span class="w">    </span><span class="nb nb-Type">int</span><span class="w"> </span><span class="n">r1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">y</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="w"> </span><span class="n">seq</span><span class="w"> </span><span class="n">cst</span><span class="w"> </span><span class="p">);</span><span class="w"> </span><span class="o">||</span><span class="w">      </span><span class="nb nb-Type">int</span><span class="w"> </span><span class="n">r2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">x</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="w"> </span><span class="n">seq</span><span class="w"> </span><span class="n">cst</span><span class="w"> </span><span class="p">);</span><span class="w"></span>
-<span class="w">                </span><span class="nb">assert</span><span class="w"> </span><span class="p">(</span><span class="n">r1</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="n">r2</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="w">        </span><span class="n">atomic</span><span class="w"> </span><span class="nb nb-Type">int</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="p">(</span><span class="mi">0</span><span class="p">);</span><span class="w">               </span><span class="n">atomic</span><span class="w"> </span><span class="nb nb-Type">int</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
+<span class="w">    </span><span class="n">x</span><span class="o">.</span><span class="w"> </span><span class="n">store</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="n">seq</span><span class="w"> </span><span class="n">cst</span><span class="w"> </span><span class="p">);</span><span class="w">     </span><span class="o">||</span><span class="w">      </span><span class="n">y</span><span class="o">.</span><span class="w"> </span><span class="n">store</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="n">seq</span><span class="w"> </span><span class="n">cst</span><span class="w"> </span><span class="p">);</span>
+<span class="w">    </span><span class="nb nb-Type">int</span><span class="w"> </span><span class="n">r1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">y</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="w"> </span><span class="n">seq</span><span class="w"> </span><span class="n">cst</span><span class="w"> </span><span class="p">);</span><span class="w"> </span><span class="o">||</span><span class="w">      </span><span class="nb nb-Type">int</span><span class="w"> </span><span class="n">r2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">x</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="w"> </span><span class="n">seq</span><span class="w"> </span><span class="n">cst</span><span class="w"> </span><span class="p">);</span>
+<span class="w">                </span><span class="nb">assert</span><span class="w"> </span><span class="p">(</span><span class="n">r1</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="n">r2</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span>
 </code></pre></div>
 
 <p>下面是一个seq_cst的实例：</p>
-<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;thread&gt;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;atomic&gt;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;cassert&gt;</span><span class="cp"></span>
+<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;thread&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;atomic&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;cassert&gt;</span>
 
-<span class="n">std</span><span class="o">::</span><span class="n">atomic</span><span class="o">&lt;</span><span class="kt">bool</span><span class="o">&gt;</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="nb">false</span><span class="p">};</span><span class="w"></span>
-<span class="n">std</span><span class="o">::</span><span class="n">atomic</span><span class="o">&lt;</span><span class="kt">bool</span><span class="o">&gt;</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="nb">false</span><span class="p">};</span><span class="w"></span>
-<span class="n">std</span><span class="o">::</span><span class="n">atomic</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">z</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">0</span><span class="p">};</span><span class="w"></span>
+<span class="n">std</span><span class="o">::</span><span class="n">atomic</span><span class="o">&lt;</span><span class="kt">bool</span><span class="o">&gt;</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="nb">false</span><span class="p">};</span>
+<span class="n">std</span><span class="o">::</span><span class="n">atomic</span><span class="o">&lt;</span><span class="kt">bool</span><span class="o">&gt;</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="nb">false</span><span class="p">};</span>
+<span class="n">std</span><span class="o">::</span><span class="n">atomic</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">z</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">0</span><span class="p">};</span>
 
-<span class="kt">void</span><span class="w"> </span><span class="nf">write_x</span><span class="p">()</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="n">x</span><span class="p">.</span><span class="n">store</span><span class="p">(</span><span class="nb">true</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">memory_order_seq_cst</span><span class="p">);</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">write_x</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">x</span><span class="p">.</span><span class="n">store</span><span class="p">(</span><span class="nb">true</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">memory_order_seq_cst</span><span class="p">);</span>
+<span class="p">}</span>
 
-<span class="kt">void</span><span class="w"> </span><span class="nf">write_y</span><span class="p">()</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="n">y</span><span class="p">.</span><span class="n">store</span><span class="p">(</span><span class="nb">true</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">memory_order_seq_cst</span><span class="p">);</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">write_y</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">y</span><span class="p">.</span><span class="n">store</span><span class="p">(</span><span class="nb">true</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">memory_order_seq_cst</span><span class="p">);</span>
+<span class="p">}</span>
 
-<span class="kt">void</span><span class="w"> </span><span class="nf">read_x_then_y</span><span class="p">()</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">x</span><span class="p">.</span><span class="n">load</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">memory_order_seq_cst</span><span class="p">))</span><span class="w"></span>
-<span class="w">        </span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">y</span><span class="p">.</span><span class="n">load</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">memory_order_seq_cst</span><span class="p">))</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="o">++</span><span class="n">z</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="p">}</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">read_x_then_y</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">x</span><span class="p">.</span><span class="n">load</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">memory_order_seq_cst</span><span class="p">))</span>
+<span class="w">        </span><span class="p">;</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">y</span><span class="p">.</span><span class="n">load</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">memory_order_seq_cst</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="o">++</span><span class="n">z</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
 
-<span class="kt">void</span><span class="w"> </span><span class="nf">read_y_then_x</span><span class="p">()</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">y</span><span class="p">.</span><span class="n">load</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">memory_order_seq_cst</span><span class="p">))</span><span class="w"></span>
-<span class="w">        </span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">x</span><span class="p">.</span><span class="n">load</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">memory_order_seq_cst</span><span class="p">))</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="o">++</span><span class="n">z</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="p">}</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">read_y_then_x</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">y</span><span class="p">.</span><span class="n">load</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">memory_order_seq_cst</span><span class="p">))</span>
+<span class="w">        </span><span class="p">;</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">x</span><span class="p">.</span><span class="n">load</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">memory_order_seq_cst</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="o">++</span><span class="n">z</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
 
-<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="kr">thread</span><span class="w"> </span><span class="n">a</span><span class="p">(</span><span class="n">write_x</span><span class="p">);</span><span class="w"></span>
-<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="kr">thread</span><span class="w"> </span><span class="n">b</span><span class="p">(</span><span class="n">write_y</span><span class="p">);</span><span class="w"></span>
-<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="kr">thread</span><span class="w"> </span><span class="n">c</span><span class="p">(</span><span class="n">read_x_then_y</span><span class="p">);</span><span class="w"></span>
-<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="kr">thread</span><span class="w"> </span><span class="n">d</span><span class="p">(</span><span class="n">read_y_then_x</span><span class="p">);</span><span class="w"></span>
-<span class="w">    </span><span class="n">a</span><span class="p">.</span><span class="n">join</span><span class="p">();</span><span class="w"> </span><span class="n">b</span><span class="p">.</span><span class="n">join</span><span class="p">();</span><span class="w"> </span><span class="n">c</span><span class="p">.</span><span class="n">join</span><span class="p">();</span><span class="w"> </span><span class="n">d</span><span class="p">.</span><span class="n">join</span><span class="p">();</span><span class="w"></span>
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="kr">thread</span><span class="w"> </span><span class="n">a</span><span class="p">(</span><span class="n">write_x</span><span class="p">);</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="kr">thread</span><span class="w"> </span><span class="n">b</span><span class="p">(</span><span class="n">write_y</span><span class="p">);</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="kr">thread</span><span class="w"> </span><span class="n">c</span><span class="p">(</span><span class="n">read_x_then_y</span><span class="p">);</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="kr">thread</span><span class="w"> </span><span class="n">d</span><span class="p">(</span><span class="n">read_y_then_x</span><span class="p">);</span>
+<span class="w">    </span><span class="n">a</span><span class="p">.</span><span class="n">join</span><span class="p">();</span><span class="w"> </span><span class="n">b</span><span class="p">.</span><span class="n">join</span><span class="p">();</span><span class="w"> </span><span class="n">c</span><span class="p">.</span><span class="n">join</span><span class="p">();</span><span class="w"> </span><span class="n">d</span><span class="p">.</span><span class="n">join</span><span class="p">();</span>
 <span class="w">    </span><span class="n">assert</span><span class="p">(</span><span class="n">z</span><span class="p">.</span><span class="n">load</span><span class="p">()</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span><span class="w">  </span><span class="c1">// will never happen</span>
-<span class="p">}</span><span class="w"></span>
+<span class="p">}</span>
 </code></pre></div>
 
 <h3>2.7 Relationship with volatile</h3>
@@ -538,30 +538,30 @@ happens before包含了inter-thread happens before和synchronizes-with两种关�
 <li>并发的读写volatile变量是会产生数据竞争的，同时non volatile操作可以在volatile操作附近自由地reorder。</li>
 </ul>
 <p>看一个例子，执行下面的并发程序，不出意外的话，你不会得到一个为0的结果。</p>
-<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;thread&gt;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span><span class="cp"></span>
+<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;thread&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span>
 
-<span class="k">volatile</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+<span class="k">volatile</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
 
-<span class="kt">void</span><span class="w"> </span><span class="nf">increase</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">1000000</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="n">count</span><span class="o">++</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="p">}</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">increase</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">1000000</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">count</span><span class="o">++</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
 
-<span class="kt">void</span><span class="w"> </span><span class="nf">decrease</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">1000000</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="n">count</span><span class="o">--</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="p">}</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">decrease</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">1000000</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">count</span><span class="o">--</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
 
-<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="kr">thread</span><span class="w"> </span><span class="n">t1</span><span class="p">(</span><span class="n">increase</span><span class="p">);</span><span class="w"></span>
-<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="kr">thread</span><span class="w"> </span><span class="n">t2</span><span class="p">(</span><span class="n">decrease</span><span class="p">);</span><span class="w"></span>
-<span class="w">    </span><span class="n">t1</span><span class="p">.</span><span class="n">join</span><span class="p">();</span><span class="w"></span>
-<span class="w">    </span><span class="n">t2</span><span class="p">.</span><span class="n">join</span><span class="p">();</span><span class="w"></span>
-<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">count</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="kr">thread</span><span class="w"> </span><span class="n">t1</span><span class="p">(</span><span class="n">increase</span><span class="p">);</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="kr">thread</span><span class="w"> </span><span class="n">t2</span><span class="p">(</span><span class="n">decrease</span><span class="p">);</span>
+<span class="w">    </span><span class="n">t1</span><span class="p">.</span><span class="n">join</span><span class="p">();</span>
+<span class="w">    </span><span class="n">t2</span><span class="p">.</span><span class="n">join</span><span class="p">();</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">count</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="p">}</span>
 </code></pre></div>
 
 <p>如果要进一步理解这个topic，建议可以听一下油管上的大拿视频，可以更好地理解memory model的含义。</p>

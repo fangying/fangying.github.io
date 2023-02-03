@@ -92,9 +92,9 @@
 <h2>重新编译内核</h2>
 <p>编译的时候开启内核参数CONFIG_DEBUG_INFO和CONFIG_GDB_SCRIPTS再进行编译，
 如果硬件支持CONFIG_FRAME_POINTER也一并开启，但要关闭CONFIG_DEBUG_INFO_REDUCED。</p>
-<div class="highlight"><pre><span></span><code><span class="nb">cd</span> /home/fang/Code/opensrc/linux
-make modules -j<span class="sb">`</span>nproc<span class="sb">`</span>
-make -j<span class="sb">`</span>nproc<span class="sb">`</span> 
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>/home/fang/Code/opensrc/linux
+make<span class="w"> </span>modules<span class="w"> </span>-j<span class="sb">`</span>nproc<span class="sb">`</span>
+make<span class="w"> </span>-j<span class="sb">`</span>nproc<span class="sb">`</span><span class="w"> </span>
 </code></pre></div>
 
 <h2>调试内核</h2>
@@ -102,20 +102,20 @@ make -j<span class="sb">`</span>nproc<span class="sb">`</span>
 记得配上<code>nokaslr</code>以免内核段基地址被随机映射．
 这里<code>-S</code>参数可以让QEMU启动后CPU先Pause住不运行，
 <code>-s</code>参数是<code>-gdb tcp::1234</code>的简写，意思是让QEMU侧的gdb server侦听在1234端口等待调试．</p>
-<div class="highlight"><pre><span></span><code>/data/vm/qemu/x86_64-softmmu/qemu-system-x86_64 <span class="se">\</span>
-    -machine pc,accel<span class="o">=</span>kvm <span class="se">\</span>
-    -cpu host <span class="se">\</span>
-    -smp <span class="m">4</span> <span class="se">\</span>
-    -m 4096M <span class="se">\</span>
-    -nodefaults <span class="se">\</span>
-    -nographic <span class="se">\</span>
-    -drive <span class="nv">id</span><span class="o">=</span>test,file<span class="o">=</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span>/fedora33.raw,format<span class="o">=</span>raw,if<span class="o">=</span>none <span class="se">\</span>
-    -device virtio-blk-pci,drive<span class="o">=</span><span class="nb">test</span> <span class="se">\</span>
-    -netdev tap,id<span class="o">=</span>tap,ifname<span class="o">=</span>virbr0-tap,script<span class="o">=</span>no,downscript<span class="o">=</span>no <span class="se">\</span>
-    -device virtio-net-pci,netdev<span class="o">=</span>tap <span class="se">\</span>
-    -kernel /home/fang/Code/opensrc/linux/vmlinux <span class="se">\</span>
-    -append <span class="s2">&quot;nokaslr earlyprintk=ttyS0 console=ttyS0 tsc=realiable root=/dev/vda rw&quot;</span> <span class="se">\</span>
-    -serial stdio -S -s
+<div class="highlight"><pre><span></span><code>/data/vm/qemu/x86_64-softmmu/qemu-system-x86_64<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-machine<span class="w"> </span>pc,accel<span class="o">=</span>kvm<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-cpu<span class="w"> </span>host<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-smp<span class="w"> </span><span class="m">4</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-m<span class="w"> </span>4096M<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-nodefaults<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-nographic<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-drive<span class="w"> </span><span class="nv">id</span><span class="o">=</span>test,file<span class="o">=</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span>/fedora33.raw,format<span class="o">=</span>raw,if<span class="o">=</span>none<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-device<span class="w"> </span>virtio-blk-pci,drive<span class="o">=</span><span class="nb">test</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-netdev<span class="w"> </span>tap,id<span class="o">=</span>tap,ifname<span class="o">=</span>virbr0-tap,script<span class="o">=</span>no,downscript<span class="o">=</span>no<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-device<span class="w"> </span>virtio-net-pci,netdev<span class="o">=</span>tap<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-kernel<span class="w"> </span>/home/fang/Code/opensrc/linux/vmlinux<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-append<span class="w"> </span><span class="s2">&quot;nokaslr earlyprintk=ttyS0 console=ttyS0 tsc=realiable root=/dev/vda rw&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-serial<span class="w"> </span>stdio<span class="w"> </span>-S<span class="w"> </span>-s
 </code></pre></div>
 
 <p>用上面的qemu脚本拉起虚拟机，关键是最后的<code>-S -s</code>参数的含义是让qemu运行内建的gdbserver并监听在本地的1234
@@ -134,72 +134,72 @@ x86_64-softmmu/qemu-system-x86_64
 这个时候的解决办法是打上一个补丁然后重新编译gdb.</p>
 <p>问题处在static void process_g_packet (struct regcache *regcache)函数，6113行，屏蔽对buf_len的判断．</p>
 <p>如果gdb版本低(7.x)打这个补丁:</p>
-<div class="highlight"><pre><span></span><code>    <span class="k">if</span> <span class="o">(</span>buf_len &gt; <span class="m">2</span> * rsa-&gt;sizeof_g_packet<span class="o">)</span>
-    error <span class="o">(</span>_<span class="o">(</span><span class="s2">&quot;Remote &#39;g&#39; packet reply is too long: %s&quot;</span><span class="o">)</span>, rs-&gt;buf<span class="o">)</span><span class="p">;</span>
+<div class="highlight"><pre><span></span><code><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="o">(</span>buf_len<span class="w"> </span>&gt;<span class="w"> </span><span class="m">2</span><span class="w"> </span>*<span class="w"> </span>rsa-&gt;sizeof_g_packet<span class="o">)</span>
+<span class="w">    </span>error<span class="w"> </span><span class="o">(</span>_<span class="o">(</span><span class="s2">&quot;Remote &#39;g&#39; packet reply is too long: %s&quot;</span><span class="o">)</span>,<span class="w"> </span>rs-&gt;buf<span class="o">)</span><span class="p">;</span>
 改为:
-    <span class="k">if</span> <span class="o">(</span>buf_len &gt; <span class="m">2</span> * rsa-&gt;sizeof_g_packet<span class="o">)</span> <span class="o">{</span>
-        rsa-&gt;sizeof_g_packet <span class="o">=</span> buf_len<span class="p">;</span>
-        <span class="k">for</span> <span class="o">(</span><span class="nv">i</span> <span class="o">=</span> <span class="m">0</span><span class="p">;</span> i &lt; gdbarch_num_regs <span class="o">(</span>gdbarch<span class="o">)</span><span class="p">;</span> i++<span class="o">)</span>
-        <span class="o">{</span>
-            <span class="k">if</span> <span class="o">(</span>rsa-&gt;regs<span class="o">[</span>i<span class="o">]</span>.pnum <span class="o">==</span> -1<span class="o">)</span>
-                <span class="k">continue</span><span class="p">;</span>
-            <span class="k">if</span> <span class="o">(</span>rsa-&gt;regs<span class="o">[</span>i<span class="o">]</span>.offset &gt;<span class="o">=</span> rsa-&gt;sizeof_g_packet<span class="o">)</span>
-                rsa-&gt;regs<span class="o">[</span>i<span class="o">]</span>.in_g_packet <span class="o">=</span> <span class="m">0</span><span class="p">;</span>
-            <span class="k">else</span>
-                rsa-&gt;regs<span class="o">[</span>i<span class="o">]</span>.in_g_packet <span class="o">=</span> <span class="m">1</span><span class="p">;</span>
-        <span class="o">}</span>
-    <span class="o">}</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="o">(</span>buf_len<span class="w"> </span>&gt;<span class="w"> </span><span class="m">2</span><span class="w"> </span>*<span class="w"> </span>rsa-&gt;sizeof_g_packet<span class="o">)</span><span class="w"> </span><span class="o">{</span>
+<span class="w">        </span>rsa-&gt;sizeof_g_packet<span class="w"> </span><span class="o">=</span><span class="w"> </span>buf_len<span class="p">;</span>
+<span class="w">        </span><span class="k">for</span><span class="w"> </span><span class="o">(</span><span class="nv">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0</span><span class="p">;</span><span class="w"> </span>i<span class="w"> </span>&lt;<span class="w"> </span>gdbarch_num_regs<span class="w"> </span><span class="o">(</span>gdbarch<span class="o">)</span><span class="p">;</span><span class="w"> </span>i++<span class="o">)</span>
+<span class="w">        </span><span class="o">{</span>
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="o">(</span>rsa-&gt;regs<span class="o">[</span>i<span class="o">]</span>.pnum<span class="w"> </span><span class="o">==</span><span class="w"> </span>-1<span class="o">)</span>
+<span class="w">                </span><span class="k">continue</span><span class="p">;</span>
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="o">(</span>rsa-&gt;regs<span class="o">[</span>i<span class="o">]</span>.offset<span class="w"> </span>&gt;<span class="o">=</span><span class="w"> </span>rsa-&gt;sizeof_g_packet<span class="o">)</span>
+<span class="w">                </span>rsa-&gt;regs<span class="o">[</span>i<span class="o">]</span>.in_g_packet<span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0</span><span class="p">;</span>
+<span class="w">            </span><span class="k">else</span>
+<span class="w">                </span>rsa-&gt;regs<span class="o">[</span>i<span class="o">]</span>.in_g_packet<span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="p">;</span>
+<span class="w">        </span><span class="o">}</span>
+<span class="w">    </span><span class="o">}</span>
 </code></pre></div>
 
 <p>如果gdb版本高(8.x)打这个补丁:</p>
-<div class="highlight"><pre><span></span><code>    <span class="k">if</span> <span class="o">(</span>buf_len &gt; <span class="m">2</span> * rsa-&gt;sizeof_g_packet<span class="o">)</span>
-    error <span class="o">(</span>_<span class="o">(</span><span class="s2">&quot;Remote &#39;g&#39; packet reply is too long: %s&quot;</span><span class="o">)</span>, rs-&gt;buf<span class="o">)</span><span class="p">;</span>
+<div class="highlight"><pre><span></span><code><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="o">(</span>buf_len<span class="w"> </span>&gt;<span class="w"> </span><span class="m">2</span><span class="w"> </span>*<span class="w"> </span>rsa-&gt;sizeof_g_packet<span class="o">)</span>
+<span class="w">    </span>error<span class="w"> </span><span class="o">(</span>_<span class="o">(</span><span class="s2">&quot;Remote &#39;g&#39; packet reply is too long: %s&quot;</span><span class="o">)</span>,<span class="w"> </span>rs-&gt;buf<span class="o">)</span><span class="p">;</span>
 改为:
-    /* Further sanity checks, with knowledge of the architecture.  */
-    <span class="k">if</span> <span class="o">(</span>buf_len &gt; <span class="m">2</span> * rsa-&gt;sizeof_g_packet<span class="o">)</span> <span class="o">{</span>
-        rsa-&gt;sizeof_g_packet <span class="o">=</span> buf_len <span class="p">;</span>
-        <span class="k">for</span> <span class="o">(</span><span class="nv">i</span> <span class="o">=</span> <span class="m">0</span><span class="p">;</span> i &lt; gdbarch_num_regs <span class="o">(</span>gdbarch<span class="o">)</span><span class="p">;</span> i++<span class="o">)</span> <span class="o">{</span>
-            <span class="k">if</span> <span class="o">(</span>rsa-&gt;regs<span class="o">[</span>i<span class="o">]</span>.pnum <span class="o">==</span> -1<span class="o">)</span>
-                <span class="k">continue</span><span class="p">;</span>
-            <span class="k">if</span> <span class="o">(</span>rsa-&gt;regs<span class="o">[</span>i<span class="o">]</span>.offset &gt;<span class="o">=</span> rsa-&gt;sizeof_g_packet<span class="o">)</span>
-                rsa-&gt;regs<span class="o">[</span>i<span class="o">]</span>.in_g_packet <span class="o">=</span> <span class="m">0</span><span class="p">;</span>
-            <span class="k">else</span>
-                rsa-&gt;regs<span class="o">[</span>i<span class="o">]</span>.in_g_packet <span class="o">=</span> <span class="m">1</span><span class="p">;</span>
-        <span class="o">}</span>
-    <span class="o">}</span>
+<span class="w">    </span>/*<span class="w"> </span>Further<span class="w"> </span>sanity<span class="w"> </span>checks,<span class="w"> </span>with<span class="w"> </span>knowledge<span class="w"> </span>of<span class="w"> </span>the<span class="w"> </span>architecture.<span class="w">  </span>*/
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="o">(</span>buf_len<span class="w"> </span>&gt;<span class="w"> </span><span class="m">2</span><span class="w"> </span>*<span class="w"> </span>rsa-&gt;sizeof_g_packet<span class="o">)</span><span class="w"> </span><span class="o">{</span>
+<span class="w">        </span>rsa-&gt;sizeof_g_packet<span class="w"> </span><span class="o">=</span><span class="w"> </span>buf_len<span class="w"> </span><span class="p">;</span>
+<span class="w">        </span><span class="k">for</span><span class="w"> </span><span class="o">(</span><span class="nv">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0</span><span class="p">;</span><span class="w"> </span>i<span class="w"> </span>&lt;<span class="w"> </span>gdbarch_num_regs<span class="w"> </span><span class="o">(</span>gdbarch<span class="o">)</span><span class="p">;</span><span class="w"> </span>i++<span class="o">)</span><span class="w"> </span><span class="o">{</span>
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="o">(</span>rsa-&gt;regs<span class="o">[</span>i<span class="o">]</span>.pnum<span class="w"> </span><span class="o">==</span><span class="w"> </span>-1<span class="o">)</span>
+<span class="w">                </span><span class="k">continue</span><span class="p">;</span>
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="o">(</span>rsa-&gt;regs<span class="o">[</span>i<span class="o">]</span>.offset<span class="w"> </span>&gt;<span class="o">=</span><span class="w"> </span>rsa-&gt;sizeof_g_packet<span class="o">)</span>
+<span class="w">                </span>rsa-&gt;regs<span class="o">[</span>i<span class="o">]</span>.in_g_packet<span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0</span><span class="p">;</span>
+<span class="w">            </span><span class="k">else</span>
+<span class="w">                </span>rsa-&gt;regs<span class="o">[</span>i<span class="o">]</span>.in_g_packet<span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="p">;</span>
+<span class="w">        </span><span class="o">}</span>
+<span class="w">    </span><span class="o">}</span>
 </code></pre></div>
 
 <p>编辑~/.gdbinit文件，让gdb自动加载vmlinux-gdb.py文件，</p>
-<div class="highlight"><pre><span></span><code><span class="n">add</span><span class="o">-</span><span class="n">auto</span><span class="o">-</span><span class="nb">load</span><span class="o">-</span><span class="n">safe</span><span class="o">-</span><span class="n">path</span><span class="w"> </span><span class="o">/</span><span class="n">path</span><span class="o">/</span><span class="n">to</span><span class="o">/</span><span class="n">linux</span><span class="o">-</span><span class="n">build</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="n">add</span><span class="o">-</span><span class="n">auto</span><span class="o">-</span><span class="nb">load</span><span class="o">-</span><span class="n">safe</span><span class="o">-</span><span class="n">path</span><span class="w"> </span><span class="o">/</span><span class="n">path</span><span class="o">/</span><span class="n">to</span><span class="o">/</span><span class="n">linux</span><span class="o">-</span><span class="n">build</span>
 </code></pre></div>
 
 <p>开始愉快地调试内核了:</p>
-<div class="highlight"><pre><span></span><code>$ <span class="nb">cd</span> linux
-$ gdb vmlinux
-$ lx-symbols
-$ 
-<span class="o">(</span>gdb<span class="o">)</span> target remote :1234
-Remote debugging using :1234
-0x000000000000fff0 <span class="k">in</span> cpu_hw_events <span class="o">()</span>
-<span class="o">(</span>gdb<span class="o">)</span> hb start_kernel
-Hardware assisted breakpoint <span class="m">1</span> at 0xffffffff827dabb2: file init/main.c, line <span class="m">538</span>.
-<span class="o">(</span>gdb<span class="o">)</span> c
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span><span class="nb">cd</span><span class="w"> </span>linux
+$<span class="w"> </span>gdb<span class="w"> </span>vmlinux
+$<span class="w"> </span>lx-symbols
+$<span class="w"> </span>
+<span class="o">(</span>gdb<span class="o">)</span><span class="w"> </span>target<span class="w"> </span>remote<span class="w"> </span>:1234
+Remote<span class="w"> </span>debugging<span class="w"> </span>using<span class="w"> </span>:1234
+0x000000000000fff0<span class="w"> </span><span class="k">in</span><span class="w"> </span>cpu_hw_events<span class="w"> </span><span class="o">()</span>
+<span class="o">(</span>gdb<span class="o">)</span><span class="w"> </span>hb<span class="w"> </span>start_kernel
+Hardware<span class="w"> </span>assisted<span class="w"> </span>breakpoint<span class="w"> </span><span class="m">1</span><span class="w"> </span>at<span class="w"> </span>0xffffffff827dabb2:<span class="w"> </span>file<span class="w"> </span>init/main.c,<span class="w"> </span>line<span class="w"> </span><span class="m">538</span>.
+<span class="o">(</span>gdb<span class="o">)</span><span class="w"> </span>c
 Continuing.
 
-Thread <span class="m">1</span> hit Breakpoint <span class="m">1</span>, start_kernel <span class="o">()</span> at init/main.c:538
-<span class="m">538</span> <span class="o">{</span>
-<span class="o">(</span>gdb<span class="o">)</span> l
-<span class="m">533</span> <span class="o">{</span>
-<span class="m">534</span>     rest_init<span class="o">()</span><span class="p">;</span>
-<span class="m">535</span> <span class="o">}</span>
-<span class="m">536</span> 
-<span class="m">537</span> asmlinkage __visible void __init start_kernel<span class="o">(</span>void<span class="o">)</span>
-<span class="m">538</span> <span class="o">{</span>
-<span class="m">539</span>     char *command_line<span class="p">;</span>
-<span class="m">540</span>     char *after_dashes<span class="p">;</span>
-<span class="m">541</span> 
-<span class="m">542</span>     set_task_stack_end_magic<span class="o">(</span><span class="p">&amp;</span>init_task<span class="o">)</span><span class="p">;</span>
-<span class="o">(</span>gdb<span class="o">)</span> 
+Thread<span class="w"> </span><span class="m">1</span><span class="w"> </span>hit<span class="w"> </span>Breakpoint<span class="w"> </span><span class="m">1</span>,<span class="w"> </span>start_kernel<span class="w"> </span><span class="o">()</span><span class="w"> </span>at<span class="w"> </span>init/main.c:538
+<span class="m">538</span><span class="w"> </span><span class="o">{</span>
+<span class="o">(</span>gdb<span class="o">)</span><span class="w"> </span>l
+<span class="m">533</span><span class="w"> </span><span class="o">{</span>
+<span class="m">534</span><span class="w">     </span>rest_init<span class="o">()</span><span class="p">;</span>
+<span class="m">535</span><span class="w"> </span><span class="o">}</span>
+<span class="m">536</span><span class="w"> </span>
+<span class="m">537</span><span class="w"> </span>asmlinkage<span class="w"> </span>__visible<span class="w"> </span>void<span class="w"> </span>__init<span class="w"> </span>start_kernel<span class="o">(</span>void<span class="o">)</span>
+<span class="m">538</span><span class="w"> </span><span class="o">{</span>
+<span class="m">539</span><span class="w">     </span>char<span class="w"> </span>*command_line<span class="p">;</span>
+<span class="m">540</span><span class="w">     </span>char<span class="w"> </span>*after_dashes<span class="p">;</span>
+<span class="m">541</span><span class="w"> </span>
+<span class="m">542</span><span class="w">     </span>set_task_stack_end_magic<span class="o">(</span><span class="p">&amp;</span>init_task<span class="o">)</span><span class="p">;</span>
+<span class="o">(</span>gdb<span class="o">)</span><span class="w"> </span>
 </code></pre></div>
 
 <p>另外可以使用mkinitrd（mkinitramfs）命令来生成initramfs.img文件，例如：</p>

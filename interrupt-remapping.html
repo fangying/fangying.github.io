@@ -106,11 +106,11 @@ Interrupt Remapping是需要硬件来支持的，这里的硬件应该主要是�
 <p>在Interrupt Remapping模式下，外设发起中断请求被IOMMU截获，然后硬件自动查询OS在内存中预设的中断重映射表(Interrupt Remapping Table)根据表里的描述来投递中断。中断重映射表由中断重映射表项(Interrupt Remapping Table Entry)构成，每个<code>IRTE</code>占用16字节（具体格式介绍见文末），中断重映射表的基地址存放在IRTA(Interrupt Remapping Table Address Register)寄存器中。</p>
 <p><img alt="Interrupt Remapping Table Address Register" src="../images/Interrupt-Remapping-Table-Address-Register.png"></p>
 <p>硬件通过下面的方式去计算中断的<code>interrupt_index</code>：</p>
-<div class="highlight"><pre><span></span><code>    <span class="k">if</span> <span class="ss">(</span><span class="nv">address</span>.<span class="nv">SHV</span> <span class="o">==</span> <span class="mi">0</span><span class="ss">)</span> {
-        <span class="nv">interrupt_index</span> <span class="o">=</span> <span class="nv">address</span>.<span class="nv">handle</span><span class="c1">;</span>
-    } <span class="k">else</span> {
-        <span class="nv">interrupt_index</span> <span class="o">=</span> <span class="ss">(</span><span class="nv">address</span>.<span class="nv">handle</span> <span class="o">+</span> <span class="nv">data</span>.<span class="nv">subhandle</span><span class="ss">)</span><span class="c1">;</span>
-    }
+<div class="highlight"><pre><span></span><code><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="ss">(</span><span class="nv">address</span>.<span class="nv">SHV</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="ss">)</span><span class="w"> </span>{
+<span class="w">        </span><span class="nv">interrupt_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">address</span>.<span class="nv">handle</span><span class="c1">;</span>
+<span class="w">    </span>}<span class="w"> </span><span class="k">else</span><span class="w"> </span>{
+<span class="w">        </span><span class="nv">interrupt_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ss">(</span><span class="nv">address</span>.<span class="nv">handle</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="nv">data</span>.<span class="nv">subhandle</span><span class="ss">)</span><span class="c1">;</span>
+<span class="w">    </span>}
 </code></pre></div>
 
 <p>备注：引入subhandle的目的是为了兼容MSI中断场景支持对“单个address多个data”的中断投递方式。</p>

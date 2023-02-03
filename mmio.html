@@ -102,15 +102,15 @@ EXIT_REASON_EPT_MISCONFIG is similar to a &quot;reserved bit set&quot; pagefault
 <h3>1  KVM如何标记EPT是MMIO类型 ?</h3>
 <p><code>hardware_setup</code>时候虚拟机如果开启了ept支持就调用<code>ept_set_mmio_spte_mask</code>初始化<code>shadow_mmio_mask</code>，
 设置EPT页表项最低3bit为：110b就会触发<code>ept_msconfig</code>（110b表示该页可读可写但是还未分配或者不存在，这显然是一个错误的EPT页表项）.</p>
-<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">ept_set_mmio_spte_mask</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">ept_set_mmio_spte_mask</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span>
+<span class="p">{</span>
 <span class="w">    </span><span class="cm">/*</span>
 <span class="cm">     * EPT Misconfigurations can be generated if the value of bits 2:0</span>
 <span class="cm">     * of an EPT paging-structure entry is 110b (write/execute).</span>
 <span class="cm">     */</span><span class="w"> </span>
-<span class="w">    </span><span class="n">kvm_mmu_set_mmio_spte_mask</span><span class="p">(</span><span class="n">VMX_EPT_RWX_MASK</span><span class="p">,</span><span class="w"></span>
-<span class="w">                   </span><span class="n">VMX_EPT_MISCONFIG_WX_VALUE</span><span class="p">);</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="n">kvm_mmu_set_mmio_spte_mask</span><span class="p">(</span><span class="n">VMX_EPT_RWX_MASK</span><span class="p">,</span>
+<span class="w">                   </span><span class="n">VMX_EPT_MISCONFIG_WX_VALUE</span><span class="p">);</span>
+<span class="p">}</span>
 </code></pre></div>
 
 <p>同时还要对EPT的一些特殊位进行标记来标志该spte表示MMIO而不是虚拟机的物理内存，例如这里</p>
@@ -120,129 +120,129 @@ EXIT_REASON_EPT_MISCONFIG is similar to a &quot;reserved bit set&quot; pagefault
 
 <p>关于EPT_MISCONFIG在SDM中有详细说明．</p>
 <p><img alt="EPT_MISCONFIG" src="images/ept_misconfig.png"></p>
-<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">kvm_mmu_set_mmio_spte_mask</span><span class="p">(</span><span class="n">u64</span><span class="w"> </span><span class="n">mmio_mask</span><span class="p">,</span><span class="w"> </span><span class="n">u64</span><span class="w"> </span><span class="n">mmio_value</span><span class="p">)</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="n">BUG_ON</span><span class="p">((</span><span class="n">mmio_mask</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">mmio_value</span><span class="p">)</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">mmio_value</span><span class="p">);</span><span class="w"></span>
-<span class="w">    </span><span class="n">shadow_mmio_value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mmio_value</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">SPTE_SPECIAL_MASK</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="n">shadow_mmio_mask</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mmio_mask</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">SPTE_SPECIAL_MASK</span><span class="p">;</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">kvm_mmu_set_mmio_spte_mask</span><span class="p">(</span><span class="n">u64</span><span class="w"> </span><span class="n">mmio_mask</span><span class="p">,</span><span class="w"> </span><span class="n">u64</span><span class="w"> </span><span class="n">mmio_value</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">BUG_ON</span><span class="p">((</span><span class="n">mmio_mask</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">mmio_value</span><span class="p">)</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">mmio_value</span><span class="p">);</span>
+<span class="w">    </span><span class="n">shadow_mmio_value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mmio_value</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">SPTE_SPECIAL_MASK</span><span class="p">;</span>
+<span class="w">    </span><span class="n">shadow_mmio_mask</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mmio_mask</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">SPTE_SPECIAL_MASK</span><span class="p">;</span>
 <span class="p">}</span><span class="w">       </span>
-<span class="n">EXPORT_SYMBOL_GPL</span><span class="p">(</span><span class="n">kvm_mmu_set_mmio_spte_mask</span><span class="p">);</span><span class="w"></span>
+<span class="n">EXPORT_SYMBOL_GPL</span><span class="p">(</span><span class="n">kvm_mmu_set_mmio_spte_mask</span><span class="p">);</span>
 
-<span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">kvm_set_mmio_spte_mask</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="n">u64</span><span class="w"> </span><span class="n">mask</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">maxphyaddr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">boot_cpu_data</span><span class="p">.</span><span class="n">x86_phys_bits</span><span class="p">;</span><span class="w"></span>
+<span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">kvm_set_mmio_spte_mask</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">u64</span><span class="w"> </span><span class="n">mask</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">maxphyaddr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">boot_cpu_data</span><span class="p">.</span><span class="n">x86_phys_bits</span><span class="p">;</span>
 
 <span class="w">    </span><span class="cm">/* </span>
 <span class="cm">     * Set the reserved bits and the present bit of an paging-structure</span>
 <span class="cm">     * entry to generate page fault with PFER.RSV = 1.</span>
-<span class="cm">     */</span><span class="w"></span>
-<span class="w">     </span><span class="cm">/* Mask the reserved physical address bits. */</span><span class="w"></span>
-<span class="w">    </span><span class="n">mask</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rsvd_bits</span><span class="p">(</span><span class="n">maxphyaddr</span><span class="p">,</span><span class="w"> </span><span class="mi">51</span><span class="p">);</span><span class="w"></span>
+<span class="cm">     */</span>
+<span class="w">     </span><span class="cm">/* Mask the reserved physical address bits. */</span>
+<span class="w">    </span><span class="n">mask</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rsvd_bits</span><span class="p">(</span><span class="n">maxphyaddr</span><span class="p">,</span><span class="w"> </span><span class="mi">51</span><span class="p">);</span>
 
-<span class="w">    </span><span class="cm">/* Set the present bit. */</span><span class="w"></span>
-<span class="w">    </span><span class="n">mask</span><span class="w"> </span><span class="o">|=</span><span class="w"> </span><span class="mi">1ull</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="cm">/* Set the present bit. */</span>
+<span class="w">    </span><span class="n">mask</span><span class="w"> </span><span class="o">|=</span><span class="w"> </span><span class="mi">1ull</span><span class="p">;</span>
 
 <span class="cp">#ifdef CONFIG_X86_64</span>
 <span class="w">    </span><span class="cm">/*</span>
 <span class="cm">     * If reserved bit is not supported, clear the present bit to disable</span>
 <span class="cm">     * mmio page fault.</span>
-<span class="cm">     */</span><span class="w"></span>
-<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">maxphyaddr</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">52</span><span class="p">)</span><span class="w"></span>
-<span class="w">        </span><span class="n">mask</span><span class="w"> </span><span class="o">&amp;=</span><span class="w"> </span><span class="o">~</span><span class="mi">1ull</span><span class="p">;</span><span class="w"></span>
+<span class="cm">     */</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">maxphyaddr</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">52</span><span class="p">)</span>
+<span class="w">        </span><span class="n">mask</span><span class="w"> </span><span class="o">&amp;=</span><span class="w"> </span><span class="o">~</span><span class="mi">1ull</span><span class="p">;</span>
 <span class="cp">#endif</span>
 
-<span class="w">    </span><span class="n">kvm_mmu_set_mmio_spte_mask</span><span class="p">(</span><span class="n">mask</span><span class="p">,</span><span class="w"> </span><span class="n">mask</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">kvm_mmu_set_mmio_spte_mask</span><span class="p">(</span><span class="n">mask</span><span class="p">,</span><span class="w"> </span><span class="n">mask</span><span class="p">);</span>
 <span class="p">}</span><span class="w">       </span>
 </code></pre></div>
 
 <p>KVM在建立EPT页表项之后设置了这些标志位再访问对应页的时候会触发EPT_MISCONFIG退出了，然后调用<code>handle_ept_misconfig</code> --&gt; <code>handle_mmio_page_fault</code>来完成MMIO处理操作．</p>
-<div class="highlight"><pre><span></span><code><span class="n">KVM内核相关代码</span><span class="err">：</span><span class="w"></span>
-<span class="n">handle_ept_misconfig</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">kvm_emulate_instruction</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">x86_emulate_instruction</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">x86_emulate_insn</span><span class="w"></span>
-<span class="n">writeback</span><span class="w"></span>
-<span class="w">    </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">segmented_write</span><span class="w"></span>
-<span class="w">        </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">emulator_write_emulated</span><span class="w"></span>
-<span class="w">            </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">emulator_read_write</span><span class="w"></span>
-<span class="w">              </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">emulator_read_write_onepage</span><span class="w"></span>
-<span class="w">                </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">ops</span><span class="o">-&gt;</span><span class="n">read_write_mmio</span><span class="w"> </span><span class="p">[</span><span class="n">write_mmio</span><span class="p">]</span><span class="w"></span>
-<span class="w">                  </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">vcpu_mmio_write</span><span class="w"></span>
-<span class="w">                    </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">kvm_io_bus_write</span><span class="w"></span>
-<span class="w">                      </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">__kvm_io_bus_write</span><span class="w"></span>
-<span class="w">                        </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">kvm_iodevice_write</span><span class="w"></span>
-<span class="w">                          </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">dev</span><span class="o">-&gt;</span><span class="n">ops</span><span class="o">-&gt;</span><span class="n">write</span><span class="w"> </span><span class="p">[</span><span class="n">ioeventfd_write</span><span class="p">]</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="n">KVM内核相关代码</span><span class="err">：</span>
+<span class="n">handle_ept_misconfig</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">kvm_emulate_instruction</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">x86_emulate_instruction</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">x86_emulate_insn</span>
+<span class="n">writeback</span>
+<span class="w">    </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">segmented_write</span>
+<span class="w">        </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">emulator_write_emulated</span>
+<span class="w">            </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">emulator_read_write</span>
+<span class="w">              </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">emulator_read_write_onepage</span>
+<span class="w">                </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">ops</span><span class="o">-&gt;</span><span class="n">read_write_mmio</span><span class="w"> </span><span class="p">[</span><span class="n">write_mmio</span><span class="p">]</span>
+<span class="w">                  </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">vcpu_mmio_write</span>
+<span class="w">                    </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">kvm_io_bus_write</span>
+<span class="w">                      </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">__kvm_io_bus_write</span>
+<span class="w">                        </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">kvm_iodevice_write</span>
+<span class="w">                          </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">dev</span><span class="o">-&gt;</span><span class="n">ops</span><span class="o">-&gt;</span><span class="n">write</span><span class="w"> </span><span class="p">[</span><span class="n">ioeventfd_write</span><span class="p">]</span>
 
-<span class="n">最后会调用到ioeventfd_write</span><span class="err">，</span><span class="n">写eventfd给QEMU发送通知事件</span><span class="w"></span>
-<span class="cm">/* MMIO/PIO writes trigger an event if the addr/val match */</span><span class="w"></span>
-<span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"></span>
-<span class="n">ioeventfd_write</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="p">,</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_io_device</span><span class="w"> </span><span class="o">*</span><span class="n">this</span><span class="p">,</span><span class="w"> </span><span class="n">gpa_t</span><span class="w"> </span><span class="n">addr</span><span class="p">,</span><span class="w"></span>
-<span class="w">                </span><span class="kt">int</span><span class="w"> </span><span class="n">len</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">val</span><span class="p">)</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="k">struct</span><span class="w"> </span><span class="nc">_ioeventfd</span><span class="w"> </span><span class="o">*</span><span class="n">p</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">to_ioeventfd</span><span class="p">(</span><span class="n">this</span><span class="p">);</span><span class="w"></span>
+<span class="n">最后会调用到ioeventfd_write</span><span class="err">，</span><span class="n">写eventfd给QEMU发送通知事件</span>
+<span class="cm">/* MMIO/PIO writes trigger an event if the addr/val match */</span>
+<span class="k">static</span><span class="w"> </span><span class="kt">int</span>
+<span class="n">ioeventfd_write</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="p">,</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_io_device</span><span class="w"> </span><span class="o">*</span><span class="n">this</span><span class="p">,</span><span class="w"> </span><span class="n">gpa_t</span><span class="w"> </span><span class="n">addr</span><span class="p">,</span>
+<span class="w">                </span><span class="kt">int</span><span class="w"> </span><span class="n">len</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">val</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">        </span><span class="k">struct</span><span class="w"> </span><span class="nc">_ioeventfd</span><span class="w"> </span><span class="o">*</span><span class="n">p</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">to_ioeventfd</span><span class="p">(</span><span class="n">this</span><span class="p">);</span>
 
-<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">ioeventfd_in_range</span><span class="p">(</span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="n">addr</span><span class="p">,</span><span class="w"> </span><span class="n">len</span><span class="p">,</span><span class="w"> </span><span class="n">val</span><span class="p">))</span><span class="w"></span>
-<span class="w">                </span><span class="k">return</span><span class="w"> </span><span class="o">-</span><span class="n">EOPNOTSUPP</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">ioeventfd_in_range</span><span class="p">(</span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="n">addr</span><span class="p">,</span><span class="w"> </span><span class="n">len</span><span class="p">,</span><span class="w"> </span><span class="n">val</span><span class="p">))</span>
+<span class="w">                </span><span class="k">return</span><span class="w"> </span><span class="o">-</span><span class="n">EOPNOTSUPP</span><span class="p">;</span>
 
-<span class="w">        </span><span class="n">eventfd_signal</span><span class="p">(</span><span class="n">p</span><span class="o">-&gt;</span><span class="n">eventfd</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span><span class="w"></span>
-<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="n">eventfd_signal</span><span class="p">(</span><span class="n">p</span><span class="o">-&gt;</span><span class="n">eventfd</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
 </code></pre></div>
 
 <h3>2  QEMU如何标记设备的MMIO ?</h3>
 <p>这里以e1000网卡模拟为例，设备初始化MMIO时候时候注册的MemoryRegion为IO类型（不是RAM类型）．</p>
-<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"></span>
-<span class="nf">e1000_mmio_setup</span><span class="p">(</span><span class="n">E1000State</span><span class="w"> </span><span class="o">*</span><span class="n">d</span><span class="p">)</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">excluded_regs</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="n">E1000_MDIC</span><span class="p">,</span><span class="w"> </span><span class="n">E1000_ICR</span><span class="p">,</span><span class="w"> </span><span class="n">E1000_ICS</span><span class="p">,</span><span class="w"> </span><span class="n">E1000_IMS</span><span class="p">,</span><span class="w"></span>
-<span class="w">        </span><span class="n">E1000_IMC</span><span class="p">,</span><span class="w"> </span><span class="n">E1000_TCTL</span><span class="p">,</span><span class="w"> </span><span class="n">E1000_TDT</span><span class="p">,</span><span class="w"> </span><span class="n">PNPMMIO_SIZE</span><span class="w"></span>
-<span class="w">    </span><span class="p">};</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">void</span>
+<span class="nf">e1000_mmio_setup</span><span class="p">(</span><span class="n">E1000State</span><span class="w"> </span><span class="o">*</span><span class="n">d</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="p">;</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">excluded_regs</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">E1000_MDIC</span><span class="p">,</span><span class="w"> </span><span class="n">E1000_ICR</span><span class="p">,</span><span class="w"> </span><span class="n">E1000_ICS</span><span class="p">,</span><span class="w"> </span><span class="n">E1000_IMS</span><span class="p">,</span>
+<span class="w">        </span><span class="n">E1000_IMC</span><span class="p">,</span><span class="w"> </span><span class="n">E1000_TCTL</span><span class="p">,</span><span class="w"> </span><span class="n">E1000_TDT</span><span class="p">,</span><span class="w"> </span><span class="n">PNPMMIO_SIZE</span>
+<span class="w">    </span><span class="p">};</span>
 <span class="w">    </span><span class="c1">// 这里注册MMIO，调用memory_region_init_io，mr-&gt;ram = false！！！</span>
-<span class="w">    </span><span class="n">memory_region_init_io</span><span class="p">(</span><span class="o">&amp;</span><span class="n">d</span><span class="o">-&gt;</span><span class="n">mmio</span><span class="p">,</span><span class="w"> </span><span class="n">OBJECT</span><span class="p">(</span><span class="n">d</span><span class="p">),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">e1000_mmio_ops</span><span class="p">,</span><span class="w"> </span><span class="n">d</span><span class="p">,</span><span class="w"></span>
-<span class="w">                          </span><span class="s">&quot;e1000-mmio&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">PNPMMIO_SIZE</span><span class="p">);</span><span class="w"></span>
-<span class="w">    </span><span class="n">memory_region_add_coalescing</span><span class="p">(</span><span class="o">&amp;</span><span class="n">d</span><span class="o">-&gt;</span><span class="n">mmio</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">excluded_regs</span><span class="p">[</span><span class="mi">0</span><span class="p">]);</span><span class="w"></span>
-<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">excluded_regs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">PNPMMIO_SIZE</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"></span>
-<span class="w">        </span><span class="n">memory_region_add_coalescing</span><span class="p">(</span><span class="o">&amp;</span><span class="n">d</span><span class="o">-&gt;</span><span class="n">mmio</span><span class="p">,</span><span class="w"> </span><span class="n">excluded_regs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span><span class="w"></span>
-<span class="w">                                     </span><span class="n">excluded_regs</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">excluded_regs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">4</span><span class="p">);</span><span class="w"></span>
-<span class="w">    </span><span class="n">memory_region_init_io</span><span class="p">(</span><span class="o">&amp;</span><span class="n">d</span><span class="o">-&gt;</span><span class="n">io</span><span class="p">,</span><span class="w"> </span><span class="n">OBJECT</span><span class="p">(</span><span class="n">d</span><span class="p">),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">e1000_io_ops</span><span class="p">,</span><span class="w"> </span><span class="n">d</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;e1000-io&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">IOPORT_SIZE</span><span class="p">);</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="n">memory_region_init_io</span><span class="p">(</span><span class="o">&amp;</span><span class="n">d</span><span class="o">-&gt;</span><span class="n">mmio</span><span class="p">,</span><span class="w"> </span><span class="n">OBJECT</span><span class="p">(</span><span class="n">d</span><span class="p">),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">e1000_mmio_ops</span><span class="p">,</span><span class="w"> </span><span class="n">d</span><span class="p">,</span>
+<span class="w">                          </span><span class="s">&quot;e1000-mmio&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">PNPMMIO_SIZE</span><span class="p">);</span>
+<span class="w">    </span><span class="n">memory_region_add_coalescing</span><span class="p">(</span><span class="o">&amp;</span><span class="n">d</span><span class="o">-&gt;</span><span class="n">mmio</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">excluded_regs</span><span class="p">[</span><span class="mi">0</span><span class="p">]);</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">excluded_regs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">PNPMMIO_SIZE</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span>
+<span class="w">        </span><span class="n">memory_region_add_coalescing</span><span class="p">(</span><span class="o">&amp;</span><span class="n">d</span><span class="o">-&gt;</span><span class="n">mmio</span><span class="p">,</span><span class="w"> </span><span class="n">excluded_regs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span>
+<span class="w">                                     </span><span class="n">excluded_regs</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">excluded_regs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">4</span><span class="p">);</span>
+<span class="w">    </span><span class="n">memory_region_init_io</span><span class="p">(</span><span class="o">&amp;</span><span class="n">d</span><span class="o">-&gt;</span><span class="n">io</span><span class="p">,</span><span class="w"> </span><span class="n">OBJECT</span><span class="p">(</span><span class="n">d</span><span class="p">),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">e1000_io_ops</span><span class="p">,</span><span class="w"> </span><span class="n">d</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;e1000-io&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">IOPORT_SIZE</span><span class="p">);</span>
+<span class="p">}</span>
 </code></pre></div>
 
 <p>结合QEMU-KVM内存管理知识我们知道，
 QEMU调用<code>kvm_set_phys_mem</code>注册虚拟机的物理内存到KVM相关的数据结构中的时候
 会调用<code>memory_region_is_ram</code>来判断该段物理地址空间是否是RAM设备，
 如果不是RAM设备直接return了．</p>
-<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">kvm_set_phys_mem</span><span class="p">(</span><span class="n">KVMMemoryListener</span><span class="w"> </span><span class="o">*</span><span class="n">kml</span><span class="p">,</span><span class="w"></span>
-<span class="w">                             </span><span class="n">MemoryRegionSection</span><span class="w"> </span><span class="o">*</span><span class="n">section</span><span class="p">,</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">add</span><span class="p">)</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="p">......</span><span class="w"></span>
-<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">memory_region_is_ram</span><span class="p">(</span><span class="n">mr</span><span class="p">))</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">writeable</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="o">!</span><span class="n">kvm_readonly_mem_allowed</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">kvm_set_phys_mem</span><span class="p">(</span><span class="n">KVMMemoryListener</span><span class="w"> </span><span class="o">*</span><span class="n">kml</span><span class="p">,</span>
+<span class="w">                             </span><span class="n">MemoryRegionSection</span><span class="w"> </span><span class="o">*</span><span class="n">section</span><span class="p">,</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">add</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="p">......</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">memory_region_is_ram</span><span class="p">(</span><span class="n">mr</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">writeable</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="o">!</span><span class="n">kvm_readonly_mem_allowed</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
 <span class="w">            </span><span class="k">return</span><span class="p">;</span><span class="w">     </span><span class="c1">// 设备MR不是RAM但可以写，那么这里直接return不注册到kvm里面</span>
-<span class="w">        </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">mr</span><span class="o">-&gt;</span><span class="n">romd_mode</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">mr</span><span class="o">-&gt;</span><span class="n">romd_mode</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
 <span class="w">            </span><span class="cm">/* If the memory device is not in romd_mode, then we actually want</span>
-<span class="cm">             * to remove the kvm memory slot so all accesses will trap. */</span><span class="w"></span>
-<span class="w">            </span><span class="n">add</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span><span class="w"></span>
-<span class="w">        </span><span class="p">}</span><span class="w"></span>
-<span class="w">    </span><span class="p">}</span><span class="w"></span>
-<span class="w">    </span><span class="p">......</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="cm">             * to remove the kvm memory slot so all accesses will trap. */</span>
+<span class="w">            </span><span class="n">add</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="p">......</span>
+<span class="p">}</span>
 </code></pre></div>
 
 <p>对于MMIO类型的内存QEMU不会调用<code>kvm_set_user_memory_region</code>对其进行注册，
 那么KVM会认为该段内存的pfn类型为<code>KVM_PFN_NOSLOT</code>，
 进而调用<code>set_mmio_spte</code>来设置该段地址对应到spte，
 而该函数中会判断pfn是否为NOSLOT标记以确认这段地址空间为MMIO．</p>
-<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="nf">set_mmio_spte</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="p">,</span><span class="w"> </span><span class="n">u64</span><span class="w"> </span><span class="o">*</span><span class="n">sptep</span><span class="p">,</span><span class="w"> </span><span class="n">gfn_t</span><span class="w"> </span><span class="n">gfn</span><span class="p">,</span><span class="w"></span>
-<span class="w">              </span><span class="n">kvm_pfn_t</span><span class="w"> </span><span class="n">pfn</span><span class="p">,</span><span class="w"> </span><span class="kt">unsigned</span><span class="w"> </span><span class="n">access</span><span class="p">)</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">unlikely</span><span class="p">(</span><span class="n">is_noslot_pfn</span><span class="p">(</span><span class="n">pfn</span><span class="p">)))</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="n">mark_mmio_spte</span><span class="p">(</span><span class="n">vcpu</span><span class="p">,</span><span class="w"> </span><span class="n">sptep</span><span class="p">,</span><span class="w"> </span><span class="n">gfn</span><span class="p">,</span><span class="w"> </span><span class="n">access</span><span class="p">);</span><span class="w"></span>
-<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="nf">set_mmio_spte</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="p">,</span><span class="w"> </span><span class="n">u64</span><span class="w"> </span><span class="o">*</span><span class="n">sptep</span><span class="p">,</span><span class="w"> </span><span class="n">gfn_t</span><span class="w"> </span><span class="n">gfn</span><span class="p">,</span>
+<span class="w">              </span><span class="n">kvm_pfn_t</span><span class="w"> </span><span class="n">pfn</span><span class="p">,</span><span class="w"> </span><span class="kt">unsigned</span><span class="w"> </span><span class="n">access</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">unlikely</span><span class="p">(</span><span class="n">is_noslot_pfn</span><span class="p">(</span><span class="n">pfn</span><span class="p">)))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">mark_mmio_spte</span><span class="p">(</span><span class="n">vcpu</span><span class="p">,</span><span class="w"> </span><span class="n">sptep</span><span class="p">,</span><span class="w"> </span><span class="n">gfn</span><span class="p">,</span><span class="w"> </span><span class="n">access</span><span class="p">);</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
 
-<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+<span class="p">}</span>
 </code></pre></div>
 
 <h3>3　总结</h3>

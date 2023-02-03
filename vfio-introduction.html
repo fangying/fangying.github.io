@@ -98,19 +98,19 @@ VFIO使用DMA Remapping为每个Domain建立独立的IOMMU Page Table将直通�
 使用Interrupt Remapping来完成中断重映射和Interrupt Posting来达到中断隔离和中断直接投递的目的。</p>
 <h4>1. VFIO 框架简介</h4>
 <p>整个VFIO框架设计十分简洁清晰，可以用下面的一幅图描述：</p>
-<div class="highlight"><pre><span></span><code><span class="nb">+-------------------------------------------+</span><span class="c"></span>
+<div class="highlight"><pre><span></span><code><span class="nb">+-------------------------------------------+</span>
 <span class="c">|                                           |</span>
 <span class="c">|             VFIO Interface                |</span>
 <span class="c">|                                           |</span>
-<span class="nb">+---------------------+---------------------+</span><span class="c"></span>
+<span class="nb">+---------------------+---------------------+</span>
 <span class="c">|                     |                     |</span>
 <span class="c">|     vfio_iommu      |      vfio_pci       |</span>
 <span class="c">|                     |                     |</span>
-<span class="nb">+---------------------+---------------------+</span><span class="c"></span>
+<span class="nb">+---------------------+---------------------+</span>
 <span class="c">|                     |                     |</span>
 <span class="c">|    iommu driver     |    pci_bus driver   |</span>
 <span class="c">|                     |                     |</span>
-<span class="nb">+---------------------+---------------------+</span><span class="c"></span>
+<span class="nb">+---------------------+---------------------+</span>
 </code></pre></div>
 
 <p>最上层的是VFIO Interface Layer，它负责向用户态提供统一访问的接口，用户态通过约定的ioctl设置和调用VFIO的各种能力。

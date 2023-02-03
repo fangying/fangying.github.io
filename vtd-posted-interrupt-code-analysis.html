@@ -100,50 +100,50 @@
 <li>NV：是主机上配合Poste Interrupt工作的一个中断vector（它的值只能是wakeup_vector或者notification vector）；</li>
 <li>NDST：存放当前vCPU所在PCPU的apicid（由VMM负责刷新，确保中断可以自动迁移到目的pCPU上）。</li>
 </ul>
-<div class="highlight"><pre><span></span><code><span class="cm">/* Posted-Interrupt Descriptor */</span><span class="w"></span>
-<span class="k">struct</span><span class="w"> </span><span class="nc">pi_desc</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="n">u32</span><span class="w"> </span><span class="n">pir</span><span class="p">[</span><span class="mi">8</span><span class="p">];</span><span class="w">     </span><span class="cm">/* Posted interrupt requested */</span><span class="w"></span>
-<span class="w">    </span><span class="k">union</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="k">struct</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">                </span><span class="cm">/* bit 256 - Outstanding Notification */</span><span class="w"></span>
-<span class="w">            </span><span class="n">u16</span><span class="w"> </span><span class="n">on</span><span class="w">  </span><span class="o">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"></span>
-<span class="w">                </span><span class="cm">/* bit 257 - Suppress Notification */</span><span class="w"></span>
-<span class="w">                </span><span class="nl">sn</span><span class="w">  </span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"></span>
-<span class="w">                </span><span class="cm">/* bit 271:258 - Reserved */</span><span class="w"></span>
-<span class="w">                </span><span class="nl">rsvd_1</span><span class="w">  </span><span class="p">:</span><span class="w"> </span><span class="mi">14</span><span class="p">;</span><span class="w"></span>
-<span class="w">                </span><span class="cm">/* bit 279:272 - Notification Vector */</span><span class="w"></span>
-<span class="w">            </span><span class="n">u8</span><span class="w">  </span><span class="n">nv</span><span class="p">;</span><span class="w"></span>
-<span class="w">                </span><span class="cm">/* bit 287:280 - Reserved */</span><span class="w"></span>
-<span class="w">            </span><span class="n">u8</span><span class="w">  </span><span class="n">rsvd_2</span><span class="p">;</span><span class="w"></span>
-<span class="w">                </span><span class="cm">/* bit 319:288 - Notification Destination */</span><span class="w"></span>
-<span class="w">            </span><span class="n">u32</span><span class="w"> </span><span class="n">ndst</span><span class="p">;</span><span class="w"></span>
-<span class="w">        </span><span class="p">};</span><span class="w"></span>
-<span class="w">        </span><span class="n">u64</span><span class="w"> </span><span class="n">control</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="p">};</span><span class="w"></span>
-<span class="w">    </span><span class="n">u32</span><span class="w"> </span><span class="n">rsvd</span><span class="p">[</span><span class="mi">6</span><span class="p">];</span><span class="w"></span>
-<span class="p">}</span><span class="w"> </span><span class="n">__aligned</span><span class="p">(</span><span class="mi">64</span><span class="p">);</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="cm">/* Posted-Interrupt Descriptor */</span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">pi_desc</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">u32</span><span class="w"> </span><span class="n">pir</span><span class="p">[</span><span class="mi">8</span><span class="p">];</span><span class="w">     </span><span class="cm">/* Posted interrupt requested */</span>
+<span class="w">    </span><span class="k">union</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">struct</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="cm">/* bit 256 - Outstanding Notification */</span>
+<span class="w">            </span><span class="n">u16</span><span class="w"> </span><span class="n">on</span><span class="w">  </span><span class="o">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">                </span><span class="cm">/* bit 257 - Suppress Notification */</span>
+<span class="w">                </span><span class="nl">sn</span><span class="w">  </span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">                </span><span class="cm">/* bit 271:258 - Reserved */</span>
+<span class="w">                </span><span class="nl">rsvd_1</span><span class="w">  </span><span class="p">:</span><span class="w"> </span><span class="mi">14</span><span class="p">;</span>
+<span class="w">                </span><span class="cm">/* bit 279:272 - Notification Vector */</span>
+<span class="w">            </span><span class="n">u8</span><span class="w">  </span><span class="n">nv</span><span class="p">;</span>
+<span class="w">                </span><span class="cm">/* bit 287:280 - Reserved */</span>
+<span class="w">            </span><span class="n">u8</span><span class="w">  </span><span class="n">rsvd_2</span><span class="p">;</span>
+<span class="w">                </span><span class="cm">/* bit 319:288 - Notification Destination */</span>
+<span class="w">            </span><span class="n">u32</span><span class="w"> </span><span class="n">ndst</span><span class="p">;</span>
+<span class="w">        </span><span class="p">};</span>
+<span class="w">        </span><span class="n">u64</span><span class="w"> </span><span class="n">control</span><span class="p">;</span>
+<span class="w">    </span><span class="p">};</span>
+<span class="w">    </span><span class="n">u32</span><span class="w"> </span><span class="n">rsvd</span><span class="p">[</span><span class="mi">6</span><span class="p">];</span>
+<span class="p">}</span><span class="w"> </span><span class="n">__aligned</span><span class="p">(</span><span class="mi">64</span><span class="p">);</span>
 </code></pre></div>
 
 <p>首先要明确<code>pi_desc</code>是per-vcpu的，所以在每个vCPU的数据结构struct <code>vcpu_vmx</code>里面会包含一个<code>pi_desc</code>数据结构。</p>
-<div class="highlight"><pre><span></span><code><span class="k">struct</span><span class="w"> </span><span class="nc">vcpu_vmx</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="cm">/* Posted interrupt descriptor */</span><span class="w"></span>
-<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">pi_desc</span><span class="w"> </span><span class="n">pi_desc</span><span class="p">;</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="k">struct</span><span class="w"> </span><span class="nc">vcpu_vmx</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="cm">/* Posted interrupt descriptor */</span>
+<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">pi_desc</span><span class="w"> </span><span class="n">pi_desc</span><span class="p">;</span>
+<span class="p">}</span>
 </code></pre></div>
 
 <p>vCPU创建的时候会将NV置成POSTED_INTR_VECTOR也就是notification event的中断号，同时把SN置1（因为这时候vCPU还没有运行）。
 <code>kvm_vm_ioctl_create_vcpu</code> =&gt; <code>kvm_arch_vcpu_create</code> =&gt; <code>vmx_vcpu_create</code>，这里会注册vCPU的preempt notifier，
 当调度器选中vCPU线程的时候VMM会收到通知，VMM调用回调函数进行处理。</p>
-<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vmx_create_vcpu</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm</span><span class="w"> </span><span class="o">*</span><span class="n">kvm</span><span class="p">,</span><span class="w"> </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">id</span><span class="p">)</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="n">preempt_notifier_init</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">preempt_notifier</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">kvm_preempt_ops</span><span class="p">);</span><span class="w"> </span><span class="err">#</span><span class="n">注册vcpu的preempt</span><span class="w"> </span><span class="n">notifier</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vmx_create_vcpu</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm</span><span class="w"> </span><span class="o">*</span><span class="n">kvm</span><span class="p">,</span><span class="w"> </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">id</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">preempt_notifier_init</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">preempt_notifier</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">kvm_preempt_ops</span><span class="p">);</span><span class="w"> </span><span class="err">#</span><span class="n">注册vcpu的preempt</span><span class="w"> </span><span class="n">notifier</span>
 <span class="w">    </span><span class="cm">/*</span>
 <span class="cm">     * Enforce invariant: pi_desc.nv is always either POSTED_INTR_VECTOR</span>
 <span class="cm">     * or POSTED_INTR_WAKEUP_VECTOR.</span>
-<span class="cm">     */</span><span class="w"></span>
-<span class="w">    </span><span class="n">vmx</span><span class="o">-&gt;</span><span class="n">pi_desc</span><span class="p">.</span><span class="n">nv</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">POSTED_INTR_VECTOR</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="n">vmx</span><span class="o">-&gt;</span><span class="n">pi_desc</span><span class="p">.</span><span class="n">sn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="cm">     */</span>
+<span class="w">    </span><span class="n">vmx</span><span class="o">-&gt;</span><span class="n">pi_desc</span><span class="p">.</span><span class="n">nv</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">POSTED_INTR_VECTOR</span><span class="p">;</span>
+<span class="w">    </span><span class="n">vmx</span><span class="o">-&gt;</span><span class="n">pi_desc</span><span class="p">.</span><span class="n">sn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span>
 </code></pre></div>
 
 <p>同时<code>kvm_vm_ioctl_create_vcpu</code> =&gt; <code>kvm_arch_vcpu_setup</code> =&gt; <code>vcpu_load</code>, <code>vcpu_put</code>会对pi_desc做一些修改，
@@ -160,36 +160,36 @@
 <p><img alt="posted interrupt scheduler" src="images/posted-interrupt-sched.png"></p>
 <h3>vCPU 从 Runnable =&gt; Running</h3>
 <p>当vCPU被调度器选中运行之前会调用VMM的回调函数，在kvm中这个函数时<code>kvm_sched_in</code>。</p>
-<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">kvm_sched_in</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">preempt_notifier</span><span class="w"> </span><span class="o">*</span><span class="n">pn</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">cpu</span><span class="p">)</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">preempt_notifier_to_vcpu</span><span class="p">(</span><span class="n">pn</span><span class="p">);</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">kvm_sched_in</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">preempt_notifier</span><span class="w"> </span><span class="o">*</span><span class="n">pn</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">cpu</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">preempt_notifier_to_vcpu</span><span class="p">(</span><span class="n">pn</span><span class="p">);</span>
 
-<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">preempted</span><span class="p">)</span><span class="w"></span>
-<span class="w">        </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">preempted</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span><span class="w">  </span><span class="err">#</span><span class="n">将vcpu被抢占的标志位清零</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">preempted</span><span class="p">)</span>
+<span class="w">        </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">preempted</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span><span class="w">  </span><span class="err">#</span><span class="n">将vcpu被抢占的标志位清零</span>
 
-<span class="w">    </span><span class="n">kvm_arch_sched_in</span><span class="p">(</span><span class="n">vcpu</span><span class="p">,</span><span class="w"> </span><span class="n">cpu</span><span class="p">);</span><span class="w"> </span><span class="err">#</span><span class="n">调整一下ple</span><span class="w"> </span><span class="n">window</span><span class="w"></span>
+<span class="w">    </span><span class="n">kvm_arch_sched_in</span><span class="p">(</span><span class="n">vcpu</span><span class="p">,</span><span class="w"> </span><span class="n">cpu</span><span class="p">);</span><span class="w"> </span><span class="err">#</span><span class="n">调整一下ple</span><span class="w"> </span><span class="n">window</span>
 <span class="w">    </span><span class="cp">#将VMCS加载到pCPU上准备运行了（这里可能是调度到其他pCPU上运行，也可能是继续在原来pCPU上运行）</span>
 <span class="w">    </span><span class="n">kvm_arch_vcpu_load</span><span class="p">(</span><span class="n">vcpu</span><span class="p">,</span><span class="w"> </span><span class="n">cpu</span><span class="p">);</span><span class="w"> </span>
-<span class="p">}</span><span class="w"></span>
+<span class="p">}</span>
 </code></pre></div>
 
 <p><code>kvm_sched_in</code> =&gt; <code>kvm_arch_vcpu_load</code> =&gt; <code>vmx_vcpu_load</code> =&gt; <code>vmx_vcpu_pi_load</code>，
 vCPU要从Runnable状态切换到Running状态了，
 这时候要:刷新NDST为vCPU要运行到的pCPU的apic id，并设置SN=0（告知硬件我现在可以接收Posted Interrupt了）。</p>
-<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">vmx_vcpu_pi_load</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">cpu</span><span class="p">)</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">pi_desc</span><span class="w"> </span><span class="o">*</span><span class="n">pi_desc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vcpu_to_pi_desc</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span><span class="w"></span>
-<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">pi_desc</span><span class="w"> </span><span class="n">old</span><span class="p">,</span><span class="w"> </span><span class="n">new</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">dest</span><span class="p">;</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">vmx_vcpu_pi_load</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">cpu</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">pi_desc</span><span class="w"> </span><span class="o">*</span><span class="n">pi_desc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vcpu_to_pi_desc</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
+<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">pi_desc</span><span class="w"> </span><span class="n">old</span><span class="p">,</span><span class="w"> </span><span class="n">new</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">dest</span><span class="p">;</span>
 
 <span class="w">    </span><span class="cm">/*</span>
 <span class="cm">     * In case of hot-plug or hot-unplug, we may have to undo</span>
 <span class="cm">     * vmx_vcpu_pi_put even if there is no assigned device.  And we</span>
 <span class="cm">     * always keep PI.NDST up to date for simplicity: it makes the</span>
 <span class="cm">     * code easier, and CPU migration is not a fast path.</span>
-<span class="cm">     */</span><span class="w"></span>
-<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">pi_test_sn</span><span class="p">(</span><span class="n">pi_desc</span><span class="p">)</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">cpu</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">cpu</span><span class="p">)</span><span class="w"></span>
-<span class="w">        </span><span class="k">return</span><span class="p">;</span><span class="w"></span>
+<span class="cm">     */</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">pi_test_sn</span><span class="p">(</span><span class="n">pi_desc</span><span class="p">)</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">cpu</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">cpu</span><span class="p">)</span>
+<span class="w">        </span><span class="k">return</span><span class="p">;</span>
 
 <span class="w">    </span><span class="cm">/*</span>
 <span class="cm">     * First handle the simple case where no cmpxchg is necessary; just</span>
@@ -199,132 +199,132 @@ vCPU要从Runnable状态切换到Running状态了，
 <span class="cm">     * PI.NDST: pi_post_block will do it for us and the wakeup_handler</span>
 <span class="cm">     * expects the VCPU to be on the blocked_vcpu_list that matches</span>
 <span class="cm">     * PI.NDST.</span>
-<span class="cm">     */</span><span class="w"></span>
-<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">pi_desc</span><span class="o">-&gt;</span><span class="n">nv</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">POSTED_INTR_WAKEUP_VECTOR</span><span class="w"> </span><span class="o">||</span><span class="w"></span>
-<span class="w">        </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">cpu</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">cpu</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="n">pi_clear_sn</span><span class="p">(</span><span class="n">pi_desc</span><span class="p">);</span><span class="w"></span>
-<span class="w">        </span><span class="k">return</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="cm">     */</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">pi_desc</span><span class="o">-&gt;</span><span class="n">nv</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">POSTED_INTR_WAKEUP_VECTOR</span><span class="w"> </span><span class="o">||</span>
+<span class="w">        </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">cpu</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">cpu</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">pi_clear_sn</span><span class="p">(</span><span class="n">pi_desc</span><span class="p">);</span>
+<span class="w">        </span><span class="k">return</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
 
-<span class="w">    </span><span class="cm">/* The full case.  */</span><span class="w"></span>
-<span class="w">    </span><span class="k">do</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="n">old</span><span class="p">.</span><span class="n">control</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">new</span><span class="p">.</span><span class="n">control</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pi_desc</span><span class="o">-&gt;</span><span class="n">control</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="cm">/* The full case.  */</span>
+<span class="w">    </span><span class="k">do</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">old</span><span class="p">.</span><span class="n">control</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">new</span><span class="p">.</span><span class="n">control</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pi_desc</span><span class="o">-&gt;</span><span class="n">control</span><span class="p">;</span>
 
-<span class="w">        </span><span class="n">dest</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cpu_physical_id</span><span class="p">(</span><span class="n">cpu</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="n">dest</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cpu_physical_id</span><span class="p">(</span><span class="n">cpu</span><span class="p">);</span>
 
-<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">x2apic_enabled</span><span class="p">())</span><span class="w"></span>
-<span class="w">            </span><span class="n">new</span><span class="p">.</span><span class="n">ndst</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">dest</span><span class="p">;</span><span class="w"></span>
-<span class="w">        </span><span class="k">else</span><span class="w"></span>
-<span class="w">            </span><span class="n">new</span><span class="p">.</span><span class="n">ndst</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">dest</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="mi">8</span><span class="p">)</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="mh">0xFF00</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">x2apic_enabled</span><span class="p">())</span>
+<span class="w">            </span><span class="n">new</span><span class="p">.</span><span class="n">ndst</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">dest</span><span class="p">;</span>
+<span class="w">        </span><span class="k">else</span>
+<span class="w">            </span><span class="n">new</span><span class="p">.</span><span class="n">ndst</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">dest</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="mi">8</span><span class="p">)</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="mh">0xFF00</span><span class="p">;</span>
 
-<span class="w">        </span><span class="n">new</span><span class="p">.</span><span class="n">sn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">cmpxchg64</span><span class="p">(</span><span class="o">&amp;</span><span class="n">pi_desc</span><span class="o">-&gt;</span><span class="n">control</span><span class="p">,</span><span class="w"> </span><span class="n">old</span><span class="p">.</span><span class="n">control</span><span class="p">,</span><span class="w"></span>
-<span class="w">               </span><span class="n">new</span><span class="p">.</span><span class="n">control</span><span class="p">)</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">old</span><span class="p">.</span><span class="n">control</span><span class="p">);</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="n">new</span><span class="p">.</span><span class="n">sn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">cmpxchg64</span><span class="p">(</span><span class="o">&amp;</span><span class="n">pi_desc</span><span class="o">-&gt;</span><span class="n">control</span><span class="p">,</span><span class="w"> </span><span class="n">old</span><span class="p">.</span><span class="n">control</span><span class="p">,</span>
+<span class="w">               </span><span class="n">new</span><span class="p">.</span><span class="n">control</span><span class="p">)</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">old</span><span class="p">.</span><span class="n">control</span><span class="p">);</span>
+<span class="p">}</span>
 </code></pre></div>
 
 <h3>vCPU 从 Running =&gt; Runnable</h3>
 <p>当vCPU被抢占或者时间片到期的时候vCPU被调度出来，这时候会触发回调函数<code>kvm_sched_out</code>。</p>
-<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">kvm_sched_out</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">preempt_notifier</span><span class="w"> </span><span class="o">*</span><span class="n">pn</span><span class="p">,</span><span class="w"></span>
-<span class="w">              </span><span class="k">struct</span><span class="w"> </span><span class="nc">task_struct</span><span class="w"> </span><span class="o">*</span><span class="n">next</span><span class="p">)</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">preempt_notifier_to_vcpu</span><span class="p">(</span><span class="n">pn</span><span class="p">);</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">kvm_sched_out</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">preempt_notifier</span><span class="w"> </span><span class="o">*</span><span class="n">pn</span><span class="p">,</span>
+<span class="w">              </span><span class="k">struct</span><span class="w"> </span><span class="nc">task_struct</span><span class="w"> </span><span class="o">*</span><span class="n">next</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">preempt_notifier_to_vcpu</span><span class="p">(</span><span class="n">pn</span><span class="p">);</span>
 
-<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">current</span><span class="o">-&gt;</span><span class="n">state</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">TASK_RUNNING</span><span class="p">)</span><span class="w"></span>
-<span class="w">        </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">preempted</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span><span class="w">     </span><span class="err">#</span><span class="n">置上vcpu被抢占标志位</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">current</span><span class="o">-&gt;</span><span class="n">state</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">TASK_RUNNING</span><span class="p">)</span>
+<span class="w">        </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">preempted</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span><span class="w">     </span><span class="err">#</span><span class="n">置上vcpu被抢占标志位</span>
 
 <span class="w">    </span><span class="cp">#将vCPU的VMCS从当前pCPU上拿下来，并且保存一下vCPU的相关信息到VMCS中</span>
 <span class="w">    </span><span class="n">kvm_arch_vcpu_put</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span><span class="w">        </span>
-<span class="p">}</span><span class="w"></span>
+<span class="p">}</span>
 </code></pre></div>
 
 <p><code>kvm_sched_out</code> =&gt; <code>vmx_vcpu_put</code> =&gt; <code>vmx_vcpu_pi_put</code>，这里vCPU要被调度出来的，
 那么要把SN bit置位（中断抑制），告诉硬件我不在运行了，先别给我投递中断，我暂时无法处理。</p>
-<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">vmx_vcpu_pi_put</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="p">)</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">pi_desc</span><span class="w"> </span><span class="o">*</span><span class="n">pi_desc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vcpu_to_pi_desc</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">vmx_vcpu_pi_put</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">pi_desc</span><span class="w"> </span><span class="o">*</span><span class="n">pi_desc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vcpu_to_pi_desc</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
 
-<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">kvm_arch_has_assigned_device</span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">kvm</span><span class="p">)</span><span class="w"> </span><span class="o">||</span><span class="w"></span>
-<span class="w">        </span><span class="o">!</span><span class="n">irq_remapping_cap</span><span class="p">(</span><span class="n">IRQ_POSTING_CAP</span><span class="p">)</span><span class="w">  </span><span class="o">||</span><span class="w"></span>
-<span class="w">        </span><span class="o">!</span><span class="n">kvm_vcpu_apicv_active</span><span class="p">(</span><span class="n">vcpu</span><span class="p">))</span><span class="w"></span>
-<span class="w">        </span><span class="k">return</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">kvm_arch_has_assigned_device</span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">kvm</span><span class="p">)</span><span class="w"> </span><span class="o">||</span>
+<span class="w">        </span><span class="o">!</span><span class="n">irq_remapping_cap</span><span class="p">(</span><span class="n">IRQ_POSTING_CAP</span><span class="p">)</span><span class="w">  </span><span class="o">||</span>
+<span class="w">        </span><span class="o">!</span><span class="n">kvm_vcpu_apicv_active</span><span class="p">(</span><span class="n">vcpu</span><span class="p">))</span>
+<span class="w">        </span><span class="k">return</span><span class="p">;</span>
 
-<span class="w">    </span><span class="cm">/* Set SN when the vCPU is preempted */</span><span class="w"></span>
-<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">preempted</span><span class="p">)</span><span class="w"></span>
-<span class="w">        </span><span class="n">pi_set_sn</span><span class="p">(</span><span class="n">pi_desc</span><span class="p">);</span><span class="w">  </span><span class="err">#</span><span class="w"> </span><span class="n">set</span><span class="w"> </span><span class="n">SN</span><span class="w"> </span><span class="n">bit</span><span class="w"> </span><span class="n">here</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="cm">/* Set SN when the vCPU is preempted */</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">preempted</span><span class="p">)</span>
+<span class="w">        </span><span class="n">pi_set_sn</span><span class="p">(</span><span class="n">pi_desc</span><span class="p">);</span><span class="w">  </span><span class="err">#</span><span class="w"> </span><span class="n">set</span><span class="w"> </span><span class="n">SN</span><span class="w"> </span><span class="n">bit</span><span class="w"> </span><span class="n">here</span>
+<span class="p">}</span>
 </code></pre></div>
 
 <h3>vCPU 从 Running =&gt; Blocked</h3>
 <p>当vCPU在Running状态下非根模式执行hlt指令后会被VMM截获发生VM Exit（肯定不能让vCPU在非根模式下中止，这样会浪费CPU资源），
 这时候会调用<code>vcpu_block</code>函数来处理。</p>
-<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kr">inline</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="nf">vcpu_block</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm</span><span class="w"> </span><span class="o">*</span><span class="n">kvm</span><span class="p">,</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="p">)</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">kvm_arch_vcpu_runnable</span><span class="p">(</span><span class="n">vcpu</span><span class="p">)</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"></span>
-<span class="w">        </span><span class="p">(</span><span class="o">!</span><span class="n">kvm_x86_ops</span><span class="o">-&gt;</span><span class="n">pre_block</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="n">kvm_x86_ops</span><span class="o">-&gt;</span><span class="n">pre_block</span><span class="p">(</span><span class="n">vcpu</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">))</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="n">srcu_read_unlock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">kvm</span><span class="o">-&gt;</span><span class="n">srcu</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">srcu_idx</span><span class="p">);</span><span class="w"></span>
-<span class="w">        </span><span class="n">kvm_vcpu_block</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span><span class="w"></span>
-<span class="w">        </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">srcu_idx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">srcu_read_lock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">kvm</span><span class="o">-&gt;</span><span class="n">srcu</span><span class="p">);</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kr">inline</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="nf">vcpu_block</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm</span><span class="w"> </span><span class="o">*</span><span class="n">kvm</span><span class="p">,</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">kvm_arch_vcpu_runnable</span><span class="p">(</span><span class="n">vcpu</span><span class="p">)</span><span class="w"> </span><span class="o">&amp;&amp;</span>
+<span class="w">        </span><span class="p">(</span><span class="o">!</span><span class="n">kvm_x86_ops</span><span class="o">-&gt;</span><span class="n">pre_block</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="n">kvm_x86_ops</span><span class="o">-&gt;</span><span class="n">pre_block</span><span class="p">(</span><span class="n">vcpu</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">srcu_read_unlock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">kvm</span><span class="o">-&gt;</span><span class="n">srcu</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">srcu_idx</span><span class="p">);</span>
+<span class="w">        </span><span class="n">kvm_vcpu_block</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
+<span class="w">        </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">srcu_idx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">srcu_read_lock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">kvm</span><span class="o">-&gt;</span><span class="n">srcu</span><span class="p">);</span>
 
-<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_x86_ops</span><span class="o">-&gt;</span><span class="n">post_block</span><span class="p">)</span><span class="w"></span>
-<span class="w">            </span><span class="n">kvm_x86_ops</span><span class="o">-&gt;</span><span class="n">post_block</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_x86_ops</span><span class="o">-&gt;</span><span class="n">post_block</span><span class="p">)</span>
+<span class="w">            </span><span class="n">kvm_x86_ops</span><span class="o">-&gt;</span><span class="n">post_block</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
 
-<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">kvm_check_request</span><span class="p">(</span><span class="n">KVM_REQ_UNHALT</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">))</span><span class="w"></span>
-<span class="w">            </span><span class="k">return</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">kvm_check_request</span><span class="p">(</span><span class="n">KVM_REQ_UNHALT</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">))</span>
+<span class="w">            </span><span class="k">return</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
 
-<span class="w">    </span><span class="n">kvm_apic_accept_events</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span><span class="w"></span>
-<span class="w">    </span><span class="k">switch</span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">mp_state</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="k">case</span><span class="w"> </span><span class="nl">KVM_MP_STATE_HALTED</span><span class="p">:</span><span class="w"></span>
-<span class="w">        </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">pv</span><span class="p">.</span><span class="n">pv_unhalted</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span><span class="w"></span>
-<span class="w">        </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">mp_state</span><span class="w"> </span><span class="o">=</span><span class="w"></span>
-<span class="w">            </span><span class="n">KVM_MP_STATE_RUNNABLE</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="k">case</span><span class="w"> </span><span class="nl">KVM_MP_STATE_RUNNABLE</span><span class="p">:</span><span class="w"></span>
-<span class="w">        </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">apf</span><span class="p">.</span><span class="n">halted</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span><span class="w"></span>
-<span class="w">        </span><span class="k">break</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="k">case</span><span class="w"> </span><span class="nl">KVM_MP_STATE_INIT_RECEIVED</span><span class="p">:</span><span class="w"></span>
-<span class="w">        </span><span class="k">break</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="k">default</span><span class="o">:</span><span class="w"></span>
-<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="o">-</span><span class="n">EINTR</span><span class="p">;</span><span class="w"></span>
-<span class="w">        </span><span class="k">break</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="p">}</span><span class="w"></span>
-<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="n">kvm_apic_accept_events</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
+<span class="w">    </span><span class="k">switch</span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">mp_state</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">case</span><span class="w"> </span><span class="no">KVM_MP_STATE_HALTED</span><span class="p">:</span>
+<span class="w">        </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">pv</span><span class="p">.</span><span class="n">pv_unhalted</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+<span class="w">        </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">mp_state</span><span class="w"> </span><span class="o">=</span>
+<span class="w">            </span><span class="n">KVM_MP_STATE_RUNNABLE</span><span class="p">;</span>
+<span class="w">    </span><span class="k">case</span><span class="w"> </span><span class="no">KVM_MP_STATE_RUNNABLE</span><span class="p">:</span>
+<span class="w">        </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">apf</span><span class="p">.</span><span class="n">halted</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+<span class="w">        </span><span class="k">break</span><span class="p">;</span>
+<span class="w">    </span><span class="k">case</span><span class="w"> </span><span class="no">KVM_MP_STATE_INIT_RECEIVED</span><span class="p">:</span>
+<span class="w">        </span><span class="k">break</span><span class="p">;</span>
+<span class="w">    </span><span class="k">default</span><span class="o">:</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="o">-</span><span class="n">EINTR</span><span class="p">;</span>
+<span class="w">        </span><span class="k">break</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span>
 </code></pre></div>
 
 <p>vcpu_block细分为3个阶段Pre Block, Block 和 Post Block。Pre Block阶段会调用<code>pi_pre_block</code>，
 这里会将vCPU添加到一个per pCPU的等待链表（waiting list）上，
 这个链表记录了所有在这个pCPU上休眠的vCPU列表，然后更新NDST域。</p>
-<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="nf">pi_pre_block</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="p">)</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">dest</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">pi_desc</span><span class="w"> </span><span class="n">old</span><span class="p">,</span><span class="w"> </span><span class="n">new</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">pi_desc</span><span class="w"> </span><span class="o">*</span><span class="n">pi_desc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vcpu_to_pi_desc</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="nf">pi_pre_block</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">dest</span><span class="p">;</span>
+<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">pi_desc</span><span class="w"> </span><span class="n">old</span><span class="p">,</span><span class="w"> </span><span class="n">new</span><span class="p">;</span>
+<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">pi_desc</span><span class="w"> </span><span class="o">*</span><span class="n">pi_desc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vcpu_to_pi_desc</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
 <span class="w">    </span><span class="cp"># 虚拟机没有配置直通设备 || 不支持Posted Interrupt =&gt; 直接返回</span>
-<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">kvm_arch_has_assigned_device</span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">kvm</span><span class="p">)</span><span class="w"> </span><span class="o">||</span><span class="w"></span>
-<span class="w">        </span><span class="o">!</span><span class="n">irq_remapping_cap</span><span class="p">(</span><span class="n">IRQ_POSTING_CAP</span><span class="p">)</span><span class="w">  </span><span class="o">||</span><span class="w"></span>
-<span class="w">        </span><span class="o">!</span><span class="n">kvm_vcpu_apicv_active</span><span class="p">(</span><span class="n">vcpu</span><span class="p">))</span><span class="w"></span>
-<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">kvm_arch_has_assigned_device</span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">kvm</span><span class="p">)</span><span class="w"> </span><span class="o">||</span>
+<span class="w">        </span><span class="o">!</span><span class="n">irq_remapping_cap</span><span class="p">(</span><span class="n">IRQ_POSTING_CAP</span><span class="p">)</span><span class="w">  </span><span class="o">||</span>
+<span class="w">        </span><span class="o">!</span><span class="n">kvm_vcpu_apicv_active</span><span class="p">(</span><span class="n">vcpu</span><span class="p">))</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
 
 <span class="w">    </span><span class="cp"># 关中断， 将当前vCPU线程加入到上次运行的pCPU的等待列表中</span>
-<span class="w">    </span><span class="n">WARN_ON</span><span class="p">(</span><span class="n">irqs_disabled</span><span class="p">());</span><span class="w"></span>
+<span class="w">    </span><span class="n">WARN_ON</span><span class="p">(</span><span class="n">irqs_disabled</span><span class="p">());</span>
 <span class="w">    </span><span class="n">local_irq_disable</span><span class="p">();</span><span class="w">  </span>
-<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">WARN_ON_ONCE</span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">pre_pcpu</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="mi">-1</span><span class="p">))</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">pre_pcpu</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">cpu</span><span class="p">;</span><span class="w"></span>
-<span class="w">        </span><span class="n">spin_lock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">per_cpu</span><span class="p">(</span><span class="n">blocked_vcpu_on_cpu_lock</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">pre_pcpu</span><span class="p">));</span><span class="w"></span>
-<span class="w">        </span><span class="n">list_add_tail</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">blocked_vcpu_list</span><span class="p">,</span><span class="w"></span>
-<span class="w">                  </span><span class="o">&amp;</span><span class="n">per_cpu</span><span class="p">(</span><span class="n">blocked_vcpu_on_cpu</span><span class="p">,</span><span class="w"></span>
-<span class="w">                       </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">pre_pcpu</span><span class="p">));</span><span class="w"></span>
-<span class="w">        </span><span class="n">spin_unlock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">per_cpu</span><span class="p">(</span><span class="n">blocked_vcpu_on_cpu_lock</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">pre_pcpu</span><span class="p">));</span><span class="w"></span>
-<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">WARN_ON_ONCE</span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">pre_pcpu</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="mi">-1</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">pre_pcpu</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">cpu</span><span class="p">;</span>
+<span class="w">        </span><span class="n">spin_lock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">per_cpu</span><span class="p">(</span><span class="n">blocked_vcpu_on_cpu_lock</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">pre_pcpu</span><span class="p">));</span>
+<span class="w">        </span><span class="n">list_add_tail</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">blocked_vcpu_list</span><span class="p">,</span>
+<span class="w">                  </span><span class="o">&amp;</span><span class="n">per_cpu</span><span class="p">(</span><span class="n">blocked_vcpu_on_cpu</span><span class="p">,</span>
+<span class="w">                       </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">pre_pcpu</span><span class="p">));</span>
+<span class="w">        </span><span class="n">spin_unlock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">per_cpu</span><span class="p">(</span><span class="n">blocked_vcpu_on_cpu_lock</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">pre_pcpu</span><span class="p">));</span>
+<span class="w">    </span><span class="p">}</span>
 
 <span class="w">    </span><span class="cp">#刷新NDST，更新NV为wakeup vector</span>
-<span class="w">    </span><span class="k">do</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="n">old</span><span class="p">.</span><span class="n">control</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">new</span><span class="p">.</span><span class="n">control</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pi_desc</span><span class="o">-&gt;</span><span class="n">control</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="k">do</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">old</span><span class="p">.</span><span class="n">control</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">new</span><span class="p">.</span><span class="n">control</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pi_desc</span><span class="o">-&gt;</span><span class="n">control</span><span class="p">;</span>
 
-<span class="w">        </span><span class="n">WARN</span><span class="p">((</span><span class="n">pi_desc</span><span class="o">-&gt;</span><span class="n">sn</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">1</span><span class="p">),</span><span class="w"></span>
-<span class="w">             </span><span class="s">&quot;Warning: SN field of posted-interrupts &quot;</span><span class="w"></span>
-<span class="w">             </span><span class="s">&quot;is set before blocking</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="n">WARN</span><span class="p">((</span><span class="n">pi_desc</span><span class="o">-&gt;</span><span class="n">sn</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">1</span><span class="p">),</span>
+<span class="w">             </span><span class="s">&quot;Warning: SN field of posted-interrupts &quot;</span>
+<span class="w">             </span><span class="s">&quot;is set before blocking</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
 
 <span class="w">        </span><span class="cm">/*</span>
 <span class="cm">         * Since vCPU can be preempted during this process,</span>
@@ -333,27 +333,27 @@ vCPU要从Runnable状态切换到Running状态了，
 <span class="cm">         * notification event, then we can find the right vCPU</span>
 <span class="cm">         * to wakeup in wakeup handler if interrupts happen</span>
 <span class="cm">         * when the vCPU is in blocked state.</span>
-<span class="cm">         */</span><span class="w"></span>
-<span class="w">        </span><span class="n">dest</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cpu_physical_id</span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">pre_pcpu</span><span class="p">);</span><span class="w"></span>
+<span class="cm">         */</span>
+<span class="w">        </span><span class="n">dest</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cpu_physical_id</span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">pre_pcpu</span><span class="p">);</span>
 
-<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">x2apic_enabled</span><span class="p">())</span><span class="w"></span>
-<span class="w">            </span><span class="n">new</span><span class="p">.</span><span class="n">ndst</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">dest</span><span class="p">;</span><span class="w"></span>
-<span class="w">        </span><span class="k">else</span><span class="w"></span>
-<span class="w">            </span><span class="n">new</span><span class="p">.</span><span class="n">ndst</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">dest</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="mi">8</span><span class="p">)</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="mh">0xFF00</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">x2apic_enabled</span><span class="p">())</span>
+<span class="w">            </span><span class="n">new</span><span class="p">.</span><span class="n">ndst</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">dest</span><span class="p">;</span>
+<span class="w">        </span><span class="k">else</span>
+<span class="w">            </span><span class="n">new</span><span class="p">.</span><span class="n">ndst</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">dest</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="mi">8</span><span class="p">)</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="mh">0xFF00</span><span class="p">;</span>
 
-<span class="w">        </span><span class="cm">/* set &#39;NV&#39; to &#39;wakeup vector&#39; */</span><span class="w"></span>
-<span class="w">        </span><span class="n">new</span><span class="p">.</span><span class="n">nv</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">POSTED_INTR_WAKEUP_VECTOR</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">cmpxchg64</span><span class="p">(</span><span class="o">&amp;</span><span class="n">pi_desc</span><span class="o">-&gt;</span><span class="n">control</span><span class="p">,</span><span class="w"> </span><span class="n">old</span><span class="p">.</span><span class="n">control</span><span class="p">,</span><span class="w"></span>
-<span class="w">               </span><span class="n">new</span><span class="p">.</span><span class="n">control</span><span class="p">)</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">old</span><span class="p">.</span><span class="n">control</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="cm">/* set &#39;NV&#39; to &#39;wakeup vector&#39; */</span>
+<span class="w">        </span><span class="n">new</span><span class="p">.</span><span class="n">nv</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">POSTED_INTR_WAKEUP_VECTOR</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">cmpxchg64</span><span class="p">(</span><span class="o">&amp;</span><span class="n">pi_desc</span><span class="o">-&gt;</span><span class="n">control</span><span class="p">,</span><span class="w"> </span><span class="n">old</span><span class="p">.</span><span class="n">control</span><span class="p">,</span>
+<span class="w">               </span><span class="n">new</span><span class="p">.</span><span class="n">control</span><span class="p">)</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">old</span><span class="p">.</span><span class="n">control</span><span class="p">);</span>
 
 <span class="w">    </span><span class="cp">#如果在pre block阶段收到了中断，那么就不block了，直接转导Runnable状态去</span>
-<span class="w">    </span><span class="cm">/* We should not block the vCPU if an interrupt is posted for it.  */</span><span class="w"></span>
-<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">pi_test_on</span><span class="p">(</span><span class="n">pi_desc</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="w"></span>
-<span class="w">        </span><span class="n">__pi_post_block</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="cm">/* We should not block the vCPU if an interrupt is posted for it.  */</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">pi_test_on</span><span class="p">(</span><span class="n">pi_desc</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span>
+<span class="w">        </span><span class="n">__pi_post_block</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
 
-<span class="w">    </span><span class="n">local_irq_enable</span><span class="p">();</span><span class="w"></span>
-<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">pre_pcpu</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">-1</span><span class="p">);</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="n">local_irq_enable</span><span class="p">();</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">pre_pcpu</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">-1</span><span class="p">);</span>
+<span class="p">}</span>
 </code></pre></div>
 
 <p>Pre Block阶段过后会调用<code>kvm_vcpu_block</code>，在这个函数中会调用schdule()主动把vCPU调度出去（休眠），让出pCPU执行其他vCPU的代码。</p>
@@ -371,7 +371,7 @@ vcpu1还处于休眠状态，这是外部设备产生了一个中断需要注入
 <span class="cm"> */</span><span class="w">                                                                             </span>
 <span class="kt">void</span><span class="w"> </span><span class="nf">pi_wakeup_handler</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w">                                                                                                   </span>
 <span class="p">{</span><span class="w">                                                                               </span>
-<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="p">;</span>
 <span class="w">    </span><span class="c1">// 获取当前物理CPU的id                                                      </span>
 <span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">cpu</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">smp_processor_id</span><span class="p">();</span><span class="w">                                               </span>
 
@@ -391,36 +391,36 @@ vcpu1还处于休眠状态，这是外部设备产生了一个中断需要注入
 
 <p>当vCPU休眠结束之后会调用<code>vmx_post_block</code> =&gt; <code>__pi_post_block</code>这时候vCPU结束睡眠被重新调度。
 注意这里会更新NDST并将vCPU从pCPU等待链表上删除，并且把NV置位<code>POSTED_INTR_VECTOR</code>。</p>
-<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">__pi_post_block</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="p">)</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">pi_desc</span><span class="w"> </span><span class="o">*</span><span class="n">pi_desc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vcpu_to_pi_desc</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span><span class="w"></span>
-<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">pi_desc</span><span class="w"> </span><span class="n">old</span><span class="p">,</span><span class="w"> </span><span class="n">new</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">dest</span><span class="p">;</span><span class="w"></span>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">__pi_post_block</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">pi_desc</span><span class="w"> </span><span class="o">*</span><span class="n">pi_desc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vcpu_to_pi_desc</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
+<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">pi_desc</span><span class="w"> </span><span class="n">old</span><span class="p">,</span><span class="w"> </span><span class="n">new</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">dest</span><span class="p">;</span>
 <span class="w">    </span><span class="cp">#再度更新NDST，因为block睡眠之后被再调度出来执行的时候可能换了pCPU！</span>
-<span class="w">    </span><span class="k">do</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="n">old</span><span class="p">.</span><span class="n">control</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">new</span><span class="p">.</span><span class="n">control</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pi_desc</span><span class="o">-&gt;</span><span class="n">control</span><span class="p">;</span><span class="w"></span>
-<span class="w">        </span><span class="n">WARN</span><span class="p">(</span><span class="n">old</span><span class="p">.</span><span class="n">nv</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">POSTED_INTR_WAKEUP_VECTOR</span><span class="p">,</span><span class="w"></span>
-<span class="w">             </span><span class="s">&quot;Wakeup handler not enabled while the VCPU is blocked</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="k">do</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">old</span><span class="p">.</span><span class="n">control</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">new</span><span class="p">.</span><span class="n">control</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pi_desc</span><span class="o">-&gt;</span><span class="n">control</span><span class="p">;</span>
+<span class="w">        </span><span class="n">WARN</span><span class="p">(</span><span class="n">old</span><span class="p">.</span><span class="n">nv</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">POSTED_INTR_WAKEUP_VECTOR</span><span class="p">,</span>
+<span class="w">             </span><span class="s">&quot;Wakeup handler not enabled while the VCPU is blocked</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
 
-<span class="w">        </span><span class="n">dest</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cpu_physical_id</span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">cpu</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="n">dest</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cpu_physical_id</span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">cpu</span><span class="p">);</span>
 
-<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">x2apic_enabled</span><span class="p">())</span><span class="w"></span>
-<span class="w">            </span><span class="n">new</span><span class="p">.</span><span class="n">ndst</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">dest</span><span class="p">;</span><span class="w"></span>
-<span class="w">        </span><span class="k">else</span><span class="w"></span>
-<span class="w">            </span><span class="n">new</span><span class="p">.</span><span class="n">ndst</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">dest</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="mi">8</span><span class="p">)</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="mh">0xFF00</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">x2apic_enabled</span><span class="p">())</span>
+<span class="w">            </span><span class="n">new</span><span class="p">.</span><span class="n">ndst</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">dest</span><span class="p">;</span>
+<span class="w">        </span><span class="k">else</span>
+<span class="w">            </span><span class="n">new</span><span class="p">.</span><span class="n">ndst</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">dest</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="mi">8</span><span class="p">)</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="mh">0xFF00</span><span class="p">;</span>
 
-<span class="w">        </span><span class="cm">/* set &#39;NV&#39; to &#39;notification vector&#39; */</span><span class="w"></span>
-<span class="w">        </span><span class="n">new</span><span class="p">.</span><span class="n">nv</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">POSTED_INTR_VECTOR</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">cmpxchg64</span><span class="p">(</span><span class="o">&amp;</span><span class="n">pi_desc</span><span class="o">-&gt;</span><span class="n">control</span><span class="p">,</span><span class="w"> </span><span class="n">old</span><span class="p">.</span><span class="n">control</span><span class="p">,</span><span class="w"></span>
-<span class="w">               </span><span class="n">new</span><span class="p">.</span><span class="n">control</span><span class="p">)</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">old</span><span class="p">.</span><span class="n">control</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="cm">/* set &#39;NV&#39; to &#39;notification vector&#39; */</span>
+<span class="w">        </span><span class="n">new</span><span class="p">.</span><span class="n">nv</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">POSTED_INTR_VECTOR</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">cmpxchg64</span><span class="p">(</span><span class="o">&amp;</span><span class="n">pi_desc</span><span class="o">-&gt;</span><span class="n">control</span><span class="p">,</span><span class="w"> </span><span class="n">old</span><span class="p">.</span><span class="n">control</span><span class="p">,</span>
+<span class="w">               </span><span class="n">new</span><span class="p">.</span><span class="n">control</span><span class="p">)</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">old</span><span class="p">.</span><span class="n">control</span><span class="p">);</span>
 <span class="w">    </span><span class="cp">#将vCPU从等待列表中删除掉</span>
-<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">WARN_ON_ONCE</span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">pre_pcpu</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">-1</span><span class="p">))</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="n">spin_lock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">per_cpu</span><span class="p">(</span><span class="n">blocked_vcpu_on_cpu_lock</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">pre_pcpu</span><span class="p">));</span><span class="w"></span>
-<span class="w">        </span><span class="n">list_del</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">blocked_vcpu_list</span><span class="p">);</span><span class="w"></span>
-<span class="w">        </span><span class="n">spin_unlock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">per_cpu</span><span class="p">(</span><span class="n">blocked_vcpu_on_cpu_lock</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">pre_pcpu</span><span class="p">));</span><span class="w"></span>
-<span class="w">        </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">pre_pcpu</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="p">}</span><span class="w"></span>
-<span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">WARN_ON_ONCE</span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">pre_pcpu</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">-1</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">spin_lock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">per_cpu</span><span class="p">(</span><span class="n">blocked_vcpu_on_cpu_lock</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">pre_pcpu</span><span class="p">));</span>
+<span class="w">        </span><span class="n">list_del</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">blocked_vcpu_list</span><span class="p">);</span>
+<span class="w">        </span><span class="n">spin_unlock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">per_cpu</span><span class="p">(</span><span class="n">blocked_vcpu_on_cpu_lock</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">pre_pcpu</span><span class="p">));</span>
+<span class="w">        </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">pre_pcpu</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
 </code></pre></div>
 
 <p>剩下一种状态转换路径 vCPU从 Runable =&gt; Blocked状态，这和从Running状态切换成Blocked状态一致，这里不再赘述！</p>

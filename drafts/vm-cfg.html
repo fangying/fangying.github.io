@@ -94,35 +94,35 @@
 对于UEFI而言type配置成'pflash'，这样每个UEFI虚拟机都可以再额外配置自己的启动参数（一般利用NVRAM来完成）。
 对于seabios而言配置成'rom'，表示从bios-256k.bin被映射到ROM空间。</p>
 <p>例如我们可以配置UEFI启动为：</p>
-<div class="highlight"><pre><span></span><code>  <span class="nt">&lt;os&gt;</span>
-    <span class="nt">&lt;type</span> <span class="na">arch=</span><span class="s">&#39;x86the _64&#39;</span> <span class="na">machine=</span><span class="s">&#39;pc-i44fx-4.0&#39;</span><span class="nt">&gt;</span>hvm<span class="nt">&lt;type&gt;</span>
-    <span class="nt">&lt;loader</span> <span class="na">readonly=</span><span class="s">&#39;yes&#39;</span> <span class="na">type=</span><span class="s">&#39;pflash&#39;</span><span class="nt">&gt;</span>/usr/share/edk2/ovmf/OVMF_CODE.fd<span class="nt">&lt;/loader&gt;</span>
-    <span class="nt">&lt;nvram&gt;</span>/usr/share/edk2/ovmf/OVMF_VARS.fd<span class="nt">&lt;/nvram&gt;</span>
-  <span class="nt">&lt;/os&gt;</span>
+<div class="highlight"><pre><span></span><code><span class="w">  </span><span class="nt">&lt;os&gt;</span>
+<span class="w">    </span><span class="nt">&lt;type</span><span class="w"> </span><span class="na">arch=</span><span class="s">&#39;x86the _64&#39;</span><span class="w"> </span><span class="na">machine=</span><span class="s">&#39;pc-i44fx-4.0&#39;</span><span class="nt">&gt;</span>hvm<span class="nt">&lt;type&gt;</span>
+<span class="w">    </span><span class="nt">&lt;loader</span><span class="w"> </span><span class="na">readonly=</span><span class="s">&#39;yes&#39;</span><span class="w"> </span><span class="na">type=</span><span class="s">&#39;pflash&#39;</span><span class="nt">&gt;</span>/usr/share/edk2/ovmf/OVMF_CODE.fd<span class="nt">&lt;/loader&gt;</span>
+<span class="w">    </span><span class="nt">&lt;nvram&gt;</span>/usr/share/edk2/ovmf/OVMF_VARS.fd<span class="nt">&lt;/nvram&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/os&gt;</span>
 </code></pre></div>
 
 <p>其中，OVMF_CODE.fd是UEFI的二进制启动文件，OVMF_VARS.fd是用来保存uefi启动参数的文件。
 值得注意的是，尽管UEFI启动的是也可以配置type='rom'，但这样以来我们无法为每个虚拟机指定uefi参数文件。</p>
 <p>当然也可以用cmdline来拉起一个UEFI虚拟机：</p>
-<div class="highlight"><pre><span></span><code><span class="nv">qemu</span><span class="o">-</span><span class="nv">kvm</span> \
-  <span class="o">-</span><span class="nv">m</span> <span class="mi">2048</span> \
-  <span class="o">--</span><span class="nv">machine</span> <span class="nv">pc</span><span class="o">-</span><span class="nv">q35</span><span class="o">-</span><span class="mi">4</span>.<span class="mi">0</span> \
-  <span class="o">-</span><span class="nv">drive</span> <span class="k">if</span><span class="o">=</span><span class="nv">pflash</span>,<span class="nv">format</span><span class="o">=</span><span class="nv">raw</span>,<span class="nv">readonly</span>,<span class="nv">file</span><span class="o">=</span>.<span class="o">/</span><span class="nv">OVMF_CODE</span>.<span class="nv">fd</span> \
-  <span class="o">-</span><span class="nv">drive</span> <span class="k">if</span><span class="o">=</span><span class="nv">pflash</span>,<span class="nv">format</span><span class="o">=</span><span class="nv">raw</span>,<span class="nv">file</span><span class="o">=</span>.<span class="o">/</span><span class="nv">OVMF_VARS</span>.<span class="nv">fd</span> \
-  <span class="o">-</span><span class="nv">drive</span> <span class="nv">file</span><span class="o">=/</span><span class="nv">home</span><span class="o">/</span><span class="nv">this</span><span class="o">-</span><span class="nv">vim</span>.<span class="nv">img</span>,<span class="nv">format</span><span class="o">=</span><span class="nv">raw</span>,<span class="nv">index</span><span class="o">=</span><span class="mi">0</span>,<span class="nv">media</span><span class="o">=</span><span class="nv">disk</span> \
-  <span class="o">-</span><span class="nv">boot</span> <span class="nv">menu</span><span class="o">=</span><span class="nv">on</span>
+<div class="highlight"><pre><span></span><code><span class="nv">qemu</span><span class="o">-</span><span class="nv">kvm</span><span class="w"> </span>\
+<span class="w">  </span><span class="o">-</span><span class="nv">m</span><span class="w"> </span><span class="mi">2048</span><span class="w"> </span>\
+<span class="w">  </span><span class="o">--</span><span class="nv">machine</span><span class="w"> </span><span class="nv">pc</span><span class="o">-</span><span class="nv">q35</span><span class="o">-</span><span class="mi">4</span>.<span class="mi">0</span><span class="w"> </span>\
+<span class="w">  </span><span class="o">-</span><span class="nv">drive</span><span class="w"> </span><span class="k">if</span><span class="o">=</span><span class="nv">pflash</span>,<span class="nv">format</span><span class="o">=</span><span class="nv">raw</span>,<span class="nv">readonly</span>,<span class="nv">file</span><span class="o">=</span>.<span class="o">/</span><span class="nv">OVMF_CODE</span>.<span class="nv">fd</span><span class="w"> </span>\
+<span class="w">  </span><span class="o">-</span><span class="nv">drive</span><span class="w"> </span><span class="k">if</span><span class="o">=</span><span class="nv">pflash</span>,<span class="nv">format</span><span class="o">=</span><span class="nv">raw</span>,<span class="nv">file</span><span class="o">=</span>.<span class="o">/</span><span class="nv">OVMF_VARS</span>.<span class="nv">fd</span><span class="w"> </span>\
+<span class="w">  </span><span class="o">-</span><span class="nv">drive</span><span class="w"> </span><span class="nv">file</span><span class="o">=/</span><span class="nv">home</span><span class="o">/</span><span class="nv">this</span><span class="o">-</span><span class="nv">vim</span>.<span class="nv">img</span>,<span class="nv">format</span><span class="o">=</span><span class="nv">raw</span>,<span class="nv">index</span><span class="o">=</span><span class="mi">0</span>,<span class="nv">media</span><span class="o">=</span><span class="nv">disk</span><span class="w"> </span>\
+<span class="w">  </span><span class="o">-</span><span class="nv">boot</span><span class="w"> </span><span class="nv">menu</span><span class="o">=</span><span class="nv">on</span>
 </code></pre></div>
 
 <h4>2.为虚拟机配置网卡</h4>
 <p>第一种是ovs网桥上挂载的网卡，配置如下：</p>
-<div class="highlight"><pre><span></span><code><span class="nt">&lt;interface</span> <span class="na">type=</span><span class="s">&#39;bridge&#39;</span><span class="nt">&gt;</span>
-  <span class="nt">&lt;mac</span> <span class="na">address=</span><span class="s">&#39;52:24:01:d9:dc:56&#39;</span><span class="nt">/&gt;</span>
-  <span class="nt">&lt;source</span> <span class="na">bridge=</span><span class="s">&#39;br0&#39;</span><span class="nt">/&gt;</span>
-  <span class="nt">&lt;virtualport</span> <span class="na">type=</span><span class="s">&#39;openvswitch&#39;</span><span class="nt">&gt;</span>
-  <span class="nt">&lt;/virtualport&gt;</span>
-  <span class="nt">&lt;target</span> <span class="na">dev=</span><span class="s">&#39;vnet2&#39;</span><span class="nt">/&gt;</span>
-  <span class="nt">&lt;model</span> <span class="na">type=</span><span class="s">&#39;virtio&#39;</span><span class="nt">/&gt;</span>
-  <span class="nt">&lt;alias</span> <span class="na">name=</span><span class="s">&#39;net0&#39;</span><span class="nt">/&gt;</span>
+<div class="highlight"><pre><span></span><code><span class="nt">&lt;interface</span><span class="w"> </span><span class="na">type=</span><span class="s">&#39;bridge&#39;</span><span class="nt">&gt;</span>
+<span class="w">  </span><span class="nt">&lt;mac</span><span class="w"> </span><span class="na">address=</span><span class="s">&#39;52:24:01:d9:dc:56&#39;</span><span class="nt">/&gt;</span>
+<span class="w">  </span><span class="nt">&lt;source</span><span class="w"> </span><span class="na">bridge=</span><span class="s">&#39;br0&#39;</span><span class="nt">/&gt;</span>
+<span class="w">  </span><span class="nt">&lt;virtualport</span><span class="w"> </span><span class="na">type=</span><span class="s">&#39;openvswitch&#39;</span><span class="nt">&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/virtualport&gt;</span>
+<span class="w">  </span><span class="nt">&lt;target</span><span class="w"> </span><span class="na">dev=</span><span class="s">&#39;vnet2&#39;</span><span class="nt">/&gt;</span>
+<span class="w">  </span><span class="nt">&lt;model</span><span class="w"> </span><span class="na">type=</span><span class="s">&#39;virtio&#39;</span><span class="nt">/&gt;</span>
+<span class="w">  </span><span class="nt">&lt;alias</span><span class="w"> </span><span class="na">name=</span><span class="s">&#39;net0&#39;</span><span class="nt">/&gt;</span>
 <span class="nt">&lt;/interface&gt;</span>
 </code></pre></div>
 

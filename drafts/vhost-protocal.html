@@ -100,23 +100,23 @@
 <p>收包：底层设备通过socket唤醒worker线程调度收报处理函数，接受完成之后写eventfd向虚拟机注入中断。
 发包：vCPU退出写eventfd唤醒worker线程调度，调用发包函数发包</p>
 <p>关键数据结构，对象抽象： vhost_dev, vhost_net, vhost_poll, vhost_work, vhost_virtqueue</p>
-<div class="highlight"><pre><span></span><code><span class="nv">struct</span> <span class="nv">vhost_dev</span> {
-        <span class="nv">struct</span> <span class="nv">mm_struct</span> <span class="o">*</span><span class="nv">mm</span><span class="c1">;</span>
-        <span class="nv">struct</span> <span class="nv">mutex</span> <span class="nv">mutex</span><span class="c1">;</span>
-        <span class="nv">struct</span> <span class="nv">vhost_virtqueue</span> <span class="o">**</span><span class="nv">vqs</span><span class="c1">;</span>
-        <span class="nv">int</span> <span class="nv">nvqs</span><span class="c1">;</span>
-        <span class="nv">struct</span> <span class="nv">eventfd_ctx</span> <span class="o">*</span><span class="nv">log_ctx</span><span class="c1">;</span>
-        <span class="nv">struct</span> <span class="nv">llist_head</span> <span class="nv">work_list</span><span class="c1">;</span>
-        <span class="nv">struct</span> <span class="nv">task_struct</span> <span class="o">*</span><span class="nv">worker</span><span class="c1">;</span>
-        <span class="nv">struct</span> <span class="nv">vhost_umem</span> <span class="o">*</span><span class="nv">umem</span><span class="c1">;</span>
-        <span class="nv">struct</span> <span class="nv">vhost_umem</span> <span class="o">*</span><span class="nv">iotlb</span><span class="c1">;</span>
-        <span class="nv">spinlock_t</span> <span class="nv">iotlb_lock</span><span class="c1">;</span>
-        <span class="nv">struct</span> <span class="nv">list_head</span> <span class="nv">read_list</span><span class="c1">;</span>
-        <span class="nv">struct</span> <span class="nv">list_head</span> <span class="nv">pending_list</span><span class="c1">;</span>
-        <span class="nv">wait_queue_head_t</span> <span class="k">wait</span><span class="c1">;</span>
-        <span class="nv">int</span> <span class="nv">iov_limit</span><span class="c1">;</span>
-        <span class="nv">int</span> <span class="nv">weight</span><span class="c1">;</span>
-        <span class="nv">int</span> <span class="nv">byte_weight</span><span class="c1">;</span>
+<div class="highlight"><pre><span></span><code><span class="nv">struct</span><span class="w"> </span><span class="nv">vhost_dev</span><span class="w"> </span>{
+<span class="w">        </span><span class="nv">struct</span><span class="w"> </span><span class="nv">mm_struct</span><span class="w"> </span><span class="o">*</span><span class="nv">mm</span><span class="c1">;</span>
+<span class="w">        </span><span class="nv">struct</span><span class="w"> </span><span class="nv">mutex</span><span class="w"> </span><span class="nv">mutex</span><span class="c1">;</span>
+<span class="w">        </span><span class="nv">struct</span><span class="w"> </span><span class="nv">vhost_virtqueue</span><span class="w"> </span><span class="o">**</span><span class="nv">vqs</span><span class="c1">;</span>
+<span class="w">        </span><span class="nv">int</span><span class="w"> </span><span class="nv">nvqs</span><span class="c1">;</span>
+<span class="w">        </span><span class="nv">struct</span><span class="w"> </span><span class="nv">eventfd_ctx</span><span class="w"> </span><span class="o">*</span><span class="nv">log_ctx</span><span class="c1">;</span>
+<span class="w">        </span><span class="nv">struct</span><span class="w"> </span><span class="nv">llist_head</span><span class="w"> </span><span class="nv">work_list</span><span class="c1">;</span>
+<span class="w">        </span><span class="nv">struct</span><span class="w"> </span><span class="nv">task_struct</span><span class="w"> </span><span class="o">*</span><span class="nv">worker</span><span class="c1">;</span>
+<span class="w">        </span><span class="nv">struct</span><span class="w"> </span><span class="nv">vhost_umem</span><span class="w"> </span><span class="o">*</span><span class="nv">umem</span><span class="c1">;</span>
+<span class="w">        </span><span class="nv">struct</span><span class="w"> </span><span class="nv">vhost_umem</span><span class="w"> </span><span class="o">*</span><span class="nv">iotlb</span><span class="c1">;</span>
+<span class="w">        </span><span class="nv">spinlock_t</span><span class="w"> </span><span class="nv">iotlb_lock</span><span class="c1">;</span>
+<span class="w">        </span><span class="nv">struct</span><span class="w"> </span><span class="nv">list_head</span><span class="w"> </span><span class="nv">read_list</span><span class="c1">;</span>
+<span class="w">        </span><span class="nv">struct</span><span class="w"> </span><span class="nv">list_head</span><span class="w"> </span><span class="nv">pending_list</span><span class="c1">;</span>
+<span class="w">        </span><span class="nv">wait_queue_head_t</span><span class="w"> </span><span class="k">wait</span><span class="c1">;</span>
+<span class="w">        </span><span class="nv">int</span><span class="w"> </span><span class="nv">iov_limit</span><span class="c1">;</span>
+<span class="w">        </span><span class="nv">int</span><span class="w"> </span><span class="nv">weight</span><span class="c1">;</span>
+<span class="w">        </span><span class="nv">int</span><span class="w"> </span><span class="nv">byte_weight</span><span class="c1">;</span>
 }<span class="c1">; </span>
 </code></pre></div>
 
@@ -125,7 +125,7 @@
 <span class="w">        </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">net_init_tap</span><span class="w"> </span>
 <span class="w">                </span><span class="k">for</span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">queues</span><span class="p">)</span><span class="w"> </span><span class="c1">// 每个queue初始化一个tap设备 </span>
 <span class="w">                </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">fd</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">net_tap_init</span><span class="p">(</span><span class="n">ifname</span><span class="p">)</span><span class="w"> </span><span class="c1">//根据传入的ifname，打开/dev/net/tup创建tap设备返回fd</span>
-<span class="w">                </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">net_init_tap_one</span><span class="p">(</span><span class="n">fd</span><span class="p">)</span><span class="w"></span>
+<span class="w">                </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">net_init_tap_one</span><span class="p">(</span><span class="n">fd</span><span class="p">)</span>
 <span class="w">                        </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">vhostfd</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">open</span><span class="p">(</span><span class="s">&quot;/dev/vhost-net&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">O_RDWR</span><span class="p">)</span><span class="w"> </span><span class="c1">// 打开vhost-net获得驱动fd</span>
 <span class="w">                        </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">net_tap_fd_init</span><span class="w">      </span><span class="c1">// 设置tap offload参数，header信息等</span>
 <span class="w">                        </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">tap_set_sndbuf</span><span class="w">       </span><span class="c1">// 设置tap发送buffer大小</span>
@@ -135,30 +135,30 @@
 <p>vhost_net初始化流程</p>
 <div class="highlight"><pre><span></span><code><span class="n">virtio_pci_common_write</span><span class="w"> </span><span class="c1">// 写MMIO退出</span>
 <span class="w">    </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">virtio_set_status</span><span class="w"> </span>
-<span class="w">        </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">virtio_net_set_status</span><span class="w"></span>
-<span class="w">            </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">virtio_net_vhost_status</span><span class="w"></span>
-<span class="w">                </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">vhost_net_start</span><span class="w"></span>
-<span class="w">                    </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">vhost_net_start_one</span><span class="w"></span>
-<span class="w">                        </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">vhost_dev_start</span><span class="w"></span>
+<span class="w">        </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">virtio_net_set_status</span>
+<span class="w">            </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">virtio_net_vhost_status</span>
+<span class="w">                </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">vhost_net_start</span>
+<span class="w">                    </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">vhost_net_start_one</span>
+<span class="w">                        </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">vhost_dev_start</span>
 
-<span class="n">vhost_dev_start</span><span class="w"></span>
-<span class="w">        </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">vhost_dev_set_features</span><span class="w"> </span><span class="n">设置feature</span><span class="w"></span>
-<span class="w">        </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">vhost_set_mem_table</span><span class="w"> </span><span class="n">设置mem</span><span class="w"> </span><span class="n">table</span><span class="w"> </span><span class="p">(</span><span class="n">memslot共享</span><span class="p">)</span><span class="w"></span>
-<span class="w">        </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">vhost_virtqueue_start</span><span class="w"> </span><span class="n">vring地址共享</span><span class="p">,</span><span class="n">创建eventfds消息机制</span><span class="err">，</span><span class="w"></span>
-<span class="w">            </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">virtio_queue_get_desc_addr</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">vhost_memory_map</span><span class="w"></span>
-<span class="w">            </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">virtio_queue_get_avail_addr</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">vhost_memory_map</span><span class="w"></span>
-<span class="w">            </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">virtio_queue_get_used_size</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">vhost_memory_map</span><span class="w"></span>
-<span class="w">            </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">vhost_virtqueue_set_addr</span><span class="w"></span>
-<span class="w">                </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">vhost_kernel_set_vring_addr</span><span class="w"></span>
-<span class="w">            </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">vhost_set_vring_kick</span><span class="w"> </span><span class="n">设置vring_kick</span><span class="w"> </span><span class="n">fd</span><span class="w"></span>
-<span class="w">            </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">vhost_set_vring_call</span><span class="w"> </span><span class="n">设置vring_call</span><span class="w"> </span><span class="n">fd</span><span class="w"></span>
+<span class="n">vhost_dev_start</span>
+<span class="w">        </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">vhost_dev_set_features</span><span class="w"> </span><span class="n">设置feature</span>
+<span class="w">        </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">vhost_set_mem_table</span><span class="w"> </span><span class="n">设置mem</span><span class="w"> </span><span class="n">table</span><span class="w"> </span><span class="p">(</span><span class="n">memslot共享</span><span class="p">)</span>
+<span class="w">        </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">vhost_virtqueue_start</span><span class="w"> </span><span class="n">vring地址共享</span><span class="p">,</span><span class="n">创建eventfds消息机制</span><span class="err">，</span>
+<span class="w">            </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">virtio_queue_get_desc_addr</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">vhost_memory_map</span>
+<span class="w">            </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">virtio_queue_get_avail_addr</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">vhost_memory_map</span>
+<span class="w">            </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">virtio_queue_get_used_size</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">vhost_memory_map</span>
+<span class="w">            </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">vhost_virtqueue_set_addr</span>
+<span class="w">                </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">vhost_kernel_set_vring_addr</span>
+<span class="w">            </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">vhost_set_vring_kick</span><span class="w"> </span><span class="n">设置vring_kick</span><span class="w"> </span><span class="n">fd</span>
+<span class="w">            </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">vhost_set_vring_call</span><span class="w"> </span><span class="n">设置vring_call</span><span class="w"> </span><span class="n">fd</span>
 </code></pre></div>
 
 <h2>2. vhost-net 发包流程分析</h2>
 <p>发包流程：</p>
 <div class="highlight"><pre><span></span><code><span class="n">iov</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">eventfd_kick</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">worker</span><span class="w"> </span>
 <span class="w">        </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">handle_tx_kick</span><span class="w"> </span>
-<span class="w">        </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">handle_tx</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">handle_tx_copy</span><span class="w"></span>
+<span class="w">        </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">handle_tx</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">handle_tx_copy</span>
 </code></pre></div>
 
 <p>随后又会为网卡实例初始化收发包的virtqueue队列，<code>virtnet_probe</code> -&gt; <code>init_vqs</code> -&gt;  <code>virtnet_alloc_queues</code>。</p>
@@ -167,20 +167,20 @@
 <span class="c1">// 平时是中断方式，当有数据到达时，会触发中断处理函数执行，中断处理函数关闭中断开始处理。</span>
 <span class="c1">// 如果此时有数据到达，则没必要再触发中断了，因为中断处理函数中会轮询处理数据，直到没有新数据时才打开中断。</span>
 <span class="c1">// NAPI工作在各大网卡厂商驱动的上层</span>
-<span class="w">        </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">max_queue_pairs</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">                </span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">rq</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">pages</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span><span class="w"></span>
-<span class="w">                </span><span class="n">netif_napi_add</span><span class="p">(</span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">dev</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">rq</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">napi</span><span class="p">,</span><span class="w"> </span><span class="n">virtnet_poll</span><span class="p">,</span><span class="w"></span>
-<span class="w">                                  </span><span class="n">napi_weight</span><span class="p">);</span><span class="w"></span>
-<span class="w">                </span><span class="n">netif_tx_napi_add</span><span class="p">(</span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">dev</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">sq</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">napi</span><span class="p">,</span><span class="w"> </span><span class="n">virtnet_poll_tx</span><span class="p">,</span><span class="w"></span>
-<span class="w">                                  </span><span class="n">napi_tx</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">napi_weight</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">max_queue_pairs</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">rq</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">pages</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
+<span class="w">                </span><span class="n">netif_napi_add</span><span class="p">(</span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">dev</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">rq</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">napi</span><span class="p">,</span><span class="w"> </span><span class="n">virtnet_poll</span><span class="p">,</span>
+<span class="w">                                  </span><span class="n">napi_weight</span><span class="p">);</span>
+<span class="w">                </span><span class="n">netif_tx_napi_add</span><span class="p">(</span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">dev</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">sq</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">napi</span><span class="p">,</span><span class="w"> </span><span class="n">virtnet_poll_tx</span><span class="p">,</span>
+<span class="w">                                  </span><span class="n">napi_tx</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">napi_weight</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span>
 
-<span class="w">                </span><span class="n">sg_init_table</span><span class="p">(</span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">rq</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">sg</span><span class="p">,</span><span class="w"> </span><span class="n">ARRAY_SIZE</span><span class="p">(</span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">rq</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">sg</span><span class="p">));</span><span class="w"></span>
-<span class="w">                </span><span class="n">ewma_pkt_len_init</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">rq</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">mrg_avg_pkt_len</span><span class="p">);</span><span class="w"></span>
-<span class="w">                </span><span class="n">sg_init_table</span><span class="p">(</span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">sq</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">sg</span><span class="p">,</span><span class="w"> </span><span class="n">ARRAY_SIZE</span><span class="p">(</span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">sq</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">sg</span><span class="p">));</span><span class="w"></span>
+<span class="w">                </span><span class="n">sg_init_table</span><span class="p">(</span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">rq</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">sg</span><span class="p">,</span><span class="w"> </span><span class="n">ARRAY_SIZE</span><span class="p">(</span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">rq</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">sg</span><span class="p">));</span>
+<span class="w">                </span><span class="n">ewma_pkt_len_init</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">rq</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">mrg_avg_pkt_len</span><span class="p">);</span>
+<span class="w">                </span><span class="n">sg_init_table</span><span class="p">(</span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">sq</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">sg</span><span class="p">,</span><span class="w"> </span><span class="n">ARRAY_SIZE</span><span class="p">(</span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">sq</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">sg</span><span class="p">));</span>
 
-<span class="w">                </span><span class="n">u64_stats_init</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">rq</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">stats</span><span class="p">.</span><span class="n">syncp</span><span class="p">);</span><span class="w"></span>
-<span class="w">                </span><span class="n">u64_stats_init</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">sq</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">stats</span><span class="p">.</span><span class="n">syncp</span><span class="p">);</span><span class="w"></span>
-<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">                </span><span class="n">u64_stats_init</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">rq</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">stats</span><span class="p">.</span><span class="n">syncp</span><span class="p">);</span>
+<span class="w">                </span><span class="n">u64_stats_init</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">sq</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">stats</span><span class="p">.</span><span class="n">syncp</span><span class="p">);</span>
+<span class="w">        </span><span class="p">}</span>
 </code></pre></div>
 
 <p><code>virtnet_alloc_queues</code>在分配队列的时候，注册了一组NAPI poll回调函数，即<code>virtnet_poll_tx</code>（收包）和<code>virtnet_poll</code>（发包）。</p>
