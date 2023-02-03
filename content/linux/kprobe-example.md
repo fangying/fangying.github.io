@@ -1,4 +1,4 @@
-Title: kprobe/kretprobe使用方法
+Title: kprobe kretprobe的使用方法
 Date: 2017-9-17 23:00
 Modified: 2019-9-6 23:00
 Tags: linux
@@ -6,7 +6,7 @@ Slug: kprobe
 Authors: Yori Fang
 Summary: kprobe kretprobe example
 
-有时候想知道下发某个操作后内核在做些什么，这个时候就要内内核进行调试， 然而KGDB这种方法操作起来相对麻烦，这个时候我们就可以使用kprobe来探测内核的行为。
+有时候想知道下发某个操作后内核在做些什么，这个时候就要内内核进行调试，然而KGDB这种方法操作起来相对麻烦，这个时候我们就可以使用kprobe来探测内核的行为。
 
 介绍kprobe和kretprobe的文档为:<https://www.kernel.org/doc/Documentation/kprobes.txt>
 
