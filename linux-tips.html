@@ -154,10 +154,10 @@ cat<span class="w"> </span>per_cpu/cpu2/trace<span class="w"> </span>&gt;<span c
 
 <h4>测试NUMA NODE内存性能</h4>
 <p>这里以加压100M为例</p>
-<div class="highlight"><pre><span></span><code>#关闭NMI watchdog，防止压力过大把系统搞死
+<div class="highlight"><pre><span></span><code><span class="gh">#</span>关闭NMI watchdog，防止压力过大把系统搞死
 echo 0 &gt; /proc/sys/kernel/nmi_watchdog
 
-#打开shell的cgroup隔离
+<span class="gh">#</span>打开shell的cgroup隔离
 echo $$ &gt; /sys/fs/cgroup/cpuset/tasks
 
 获取Stream加压工具
@@ -165,7 +165,7 @@ git clone https://github.com/jeffhammond/STREAM
 cd STREAM-master
 gcc -O -DSTREAM_ARRAY_SIZE=100000000 stream.c -o stream.100M
 
-#获取pcm带宽测试工具
+<span class="gh">#</span>获取pcm带宽测试工具
 git clone https://github.com/opcm/pcm
 chmod +x ./pcm-memory.x
 ./pcm-memory.x 查看带宽
@@ -200,16 +200,16 @@ perf kvm stat report
 </code></pre></div>
 
 <h4>查询设备/设备类属性</h4>
-<div class="highlight"><pre><span></span><code> 设备属性
- virsh qemu-monitor-command vmname &#39;{&quot;arguments&quot;: {&quot;typename&quot;: &quot;virtio-net-pci&quot;}, &quot;execute&quot;:&quot;device-list-properties&quot;}&#39;
- 设备类属性
- virsh qemu-monitor-command vmname &#39;{&quot;arguments&quot;: {&quot;typename&quot;: &quot;virtio-net-pci&quot;}, &quot;execute&quot;:&quot;qom-list-properties&quot;}&#39;
- 设备实例的属性
- virsh qemu-monitor-command fangying --hmp &quot;info qtree&quot; | less
+<div class="highlight"><pre><span></span><code><span class="w"> </span><span class="nx">设备属性</span>
+<span class="w"> </span><span class="nx">virsh</span><span class="w"> </span><span class="nx">qemu</span><span class="o">-</span><span class="nx">monitor</span><span class="o">-</span><span class="nx">command</span><span class="w"> </span><span class="nx">vmname</span><span class="w"> </span><span class="err">&#39;</span><span class="p">{</span><span class="s">&quot;arguments&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="s">&quot;typename&quot;</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;virtio-net-pci&quot;</span><span class="p">},</span><span class="w"> </span><span class="s">&quot;execute&quot;</span><span class="p">:</span><span class="s">&quot;device-list-properties&quot;</span><span class="p">}</span><span class="err">&#39;</span>
+<span class="w"> </span><span class="nx">设备类属性</span>
+<span class="w"> </span><span class="nx">virsh</span><span class="w"> </span><span class="nx">qemu</span><span class="o">-</span><span class="nx">monitor</span><span class="o">-</span><span class="nx">command</span><span class="w"> </span><span class="nx">vmname</span><span class="w"> </span><span class="err">&#39;</span><span class="p">{</span><span class="s">&quot;arguments&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="s">&quot;typename&quot;</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;virtio-net-pci&quot;</span><span class="p">},</span><span class="w"> </span><span class="s">&quot;execute&quot;</span><span class="p">:</span><span class="s">&quot;qom-list-properties&quot;</span><span class="p">}</span><span class="err">&#39;</span>
+<span class="w"> </span><span class="nx">设备实例的属性</span>
+<span class="w"> </span><span class="nx">virsh</span><span class="w"> </span><span class="nx">qemu</span><span class="o">-</span><span class="nx">monitor</span><span class="o">-</span><span class="nx">command</span><span class="w"> </span><span class="nx">fangying</span><span class="w"> </span><span class="o">--</span><span class="nx">hmp</span><span class="w"> </span><span class="s">&quot;info qtree&quot;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="nx">less</span>
 </code></pre></div>
 
 <h4>配置yum proxy</h4>
-<div class="highlight"><pre><span></span><code># append to /etc/yum.conf
+<div class="highlight"><pre><span></span><code><span class="gh">#</span> append to /etc/yum.conf
 proxy=http://xxxx
 proxy_username=xxxx
 proxy_password=xxxx
@@ -623,19 +623,19 @@ echo &quot;0000:00:1f.6&quot; &gt; /sys/bus/pci/drivers_probe
 </code></pre></div>
 
 <p>启动虚拟机了：</p>
-<div class="highlight"><pre><span></span><code>gdb --args /home/fang/code/fang/qemu/build/x86_64-softmmu/qemu-system-x86_64 \
-        -enable-kvm -m 2048 \
-        -boot c \
-        -drive driver=qcow2,file=$PWD/centos7.qcow2 \
-        -netdev tap,id=tap0,ifname=$E1000_TAP_NAME,script=no \
-        -device e1000,netdev=tap0,id=net0 \
-        -netdev tap,id=tap1,ifname=$VIRTIO_NET_TAP_NAME,script=no \
-        -device virtio-net-pci,netdev=tap1,id=net1,addr=05.0 \
-        -device piix3-usb-uhci,id=uhci,addr=04.0 \
-        -smp cpus=4 \
-        -vnc :88 \
-        -cdrom virtio-win-0.1.141.iso \
-        -device vfio-pci,host=0000:00:1f.6,id=hostdev0
+<div class="highlight"><pre><span></span><code><span class="nx">gdb</span><span class="w"> </span><span class="o">--</span><span class="nx">args</span><span class="w"> </span><span class="o">/</span><span class="nx">home</span><span class="o">/</span><span class="nx">fang</span><span class="o">/</span><span class="nx">code</span><span class="o">/</span><span class="nx">fang</span><span class="o">/</span><span class="nx">qemu</span><span class="o">/</span><span class="nx">build</span><span class="o">/</span><span class="nx">x86_64</span><span class="o">-</span><span class="nx">softmmu</span><span class="o">/</span><span class="nx">qemu</span><span class="o">-</span><span class="nx">system</span><span class="o">-</span><span class="nx">x86_64</span><span class="w"> </span>\
+<span class="w">        </span><span class="o">-</span><span class="nx">enable</span><span class="o">-</span><span class="nx">kvm</span><span class="w"> </span><span class="o">-</span><span class="nx">m</span><span class="w"> </span><span class="mi">2048</span><span class="w"> </span>\
+<span class="w">        </span><span class="o">-</span><span class="nx">boot</span><span class="w"> </span><span class="nx">c</span><span class="w"> </span>\
+<span class="w">        </span><span class="o">-</span><span class="nx">drive</span><span class="w"> </span><span class="nx">driver</span><span class="p">=</span><span class="nx">qcow2</span><span class="p">,</span><span class="nx">file</span><span class="p">=</span><span class="err">$</span><span class="nx">PWD</span><span class="o">/</span><span class="nx">centos7</span><span class="p">.</span><span class="nx">qcow2</span><span class="w"> </span>\
+<span class="w">        </span><span class="o">-</span><span class="nx">netdev</span><span class="w"> </span><span class="nx">tap</span><span class="p">,</span><span class="nx">id</span><span class="p">=</span><span class="nx">tap0</span><span class="p">,</span><span class="nx">ifname</span><span class="p">=</span><span class="err">$</span><span class="nx">E1000_TAP_NAME</span><span class="p">,</span><span class="nx">script</span><span class="p">=</span><span class="nx">no</span><span class="w"> </span>\
+<span class="w">        </span><span class="o">-</span><span class="nx">device</span><span class="w"> </span><span class="nx">e1000</span><span class="p">,</span><span class="nx">netdev</span><span class="p">=</span><span class="nx">tap0</span><span class="p">,</span><span class="nx">id</span><span class="p">=</span><span class="nx">net0</span><span class="w"> </span>\
+<span class="w">        </span><span class="o">-</span><span class="nx">netdev</span><span class="w"> </span><span class="nx">tap</span><span class="p">,</span><span class="nx">id</span><span class="p">=</span><span class="nx">tap1</span><span class="p">,</span><span class="nx">ifname</span><span class="p">=</span><span class="err">$</span><span class="nx">VIRTIO_NET_TAP_NAME</span><span class="p">,</span><span class="nx">script</span><span class="p">=</span><span class="nx">no</span><span class="w"> </span>\
+<span class="w">        </span><span class="o">-</span><span class="nx">device</span><span class="w"> </span><span class="nx">virtio</span><span class="o">-</span><span class="nx">net</span><span class="o">-</span><span class="nx">pci</span><span class="p">,</span><span class="nx">netdev</span><span class="p">=</span><span class="nx">tap1</span><span class="p">,</span><span class="nx">id</span><span class="p">=</span><span class="nx">net1</span><span class="p">,</span><span class="kd">addr</span><span class="p">=</span><span class="m m-Double">05.0</span><span class="w"> </span>\
+<span class="w">        </span><span class="o">-</span><span class="nx">device</span><span class="w"> </span><span class="nx">piix3</span><span class="o">-</span><span class="nx">usb</span><span class="o">-</span><span class="nx">uhci</span><span class="p">,</span><span class="nx">id</span><span class="p">=</span><span class="nx">uhci</span><span class="p">,</span><span class="kd">addr</span><span class="p">=</span><span class="m m-Double">04.0</span><span class="w"> </span>\
+<span class="w">        </span><span class="o">-</span><span class="nx">smp</span><span class="w"> </span><span class="nx">cpus</span><span class="p">=</span><span class="mi">4</span><span class="w"> </span>\
+<span class="w">        </span><span class="o">-</span><span class="nx">vnc</span><span class="w"> </span><span class="p">:</span><span class="mi">88</span><span class="w"> </span>\
+<span class="w">        </span><span class="o">-</span><span class="nx">cdrom</span><span class="w"> </span><span class="nx">virtio</span><span class="o">-</span><span class="nx">win</span><span class="o">-</span><span class="m m-Double">0.1.141</span><span class="p">.</span><span class="nx">iso</span><span class="w"> </span>\
+<span class="w">        </span><span class="o">-</span><span class="nx">device</span><span class="w"> </span><span class="nx">vfio</span><span class="o">-</span><span class="nx">pci</span><span class="p">,</span><span class="nx">host</span><span class="p">=</span><span class="mi">0000</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">1</span><span class="nx">f</span><span class="m m-Double">.6</span><span class="p">,</span><span class="nx">id</span><span class="p">=</span><span class="nx">hostdev0</span>
 </code></pre></div>
 
 <h3>PL011 串口调试</h3>
@@ -657,18 +657,18 @@ echo &quot;0000:00:1f.6&quot; &gt; /sys/bus/pci/drivers_probe
 </code></pre></div>
 
 <h2>x86 Direct Boot microvm</h2>
-<div class="highlight"><pre><span></span><code><span class="nv">qemu</span><span class="o">-</span><span class="nv">system</span><span class="o">-</span><span class="nv">x86_64</span><span class="w"> </span>\
-<span class="w">   </span><span class="o">-</span><span class="nv">M</span><span class="w"> </span><span class="nv">microvm</span>,<span class="nv">x</span><span class="o">-</span><span class="nv">option</span><span class="o">-</span><span class="nv">roms</span><span class="o">=</span><span class="nv">off</span>,<span class="nv">pit</span><span class="o">=</span><span class="nv">off</span>,<span class="nv">pic</span><span class="o">=</span><span class="nv">off</span>,<span class="nv">isa</span><span class="o">-</span><span class="nv">serial</span><span class="o">=</span><span class="nv">off</span>,<span class="nv">rtc</span><span class="o">=</span><span class="nv">off</span><span class="w"> </span>\
-<span class="w">   </span><span class="o">-</span><span class="nv">enable</span><span class="o">-</span><span class="nv">kvm</span><span class="w"> </span><span class="o">-</span><span class="nv">cpu</span><span class="w"> </span><span class="nv">host</span><span class="w"> </span><span class="o">-</span><span class="nv">m</span><span class="w"> </span><span class="mi">512</span><span class="nv">m</span><span class="w"> </span><span class="o">-</span><span class="nv">smp</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span>\
-<span class="w">   </span><span class="o">-</span><span class="nv">kernel</span><span class="w"> </span><span class="nv">vmlinux</span><span class="w"> </span><span class="o">-</span><span class="nv">append</span><span class="w"> </span><span class="s2">&quot;console=hvc0 root=/dev/vda&quot;</span><span class="w"> </span>\
-<span class="w">   </span><span class="o">-</span><span class="nv">nodefaults</span><span class="w"> </span><span class="o">-</span><span class="nv">no</span><span class="o">-</span><span class="nv">user</span><span class="o">-</span><span class="nv">config</span><span class="w"> </span><span class="o">-</span><span class="nv">nographic</span><span class="w"> </span>\
-<span class="w">   </span><span class="o">-</span><span class="nv">chardev</span><span class="w"> </span><span class="nv">stdio</span>,<span class="nv">id</span><span class="o">=</span><span class="nv">virtiocon0</span><span class="w"> </span>\
-<span class="w">   </span><span class="o">-</span><span class="nv">device</span><span class="w"> </span><span class="nv">virtio</span><span class="o">-</span><span class="nv">serial</span><span class="o">-</span><span class="nv">device</span><span class="w"> </span>\
-<span class="w">   </span><span class="o">-</span><span class="nv">device</span><span class="w"> </span><span class="nv">virtconsole</span>,<span class="nv">chardev</span><span class="o">=</span><span class="nv">virtiocon0</span><span class="w"> </span>\
-<span class="w">   </span><span class="o">-</span><span class="nv">drive</span><span class="w"> </span><span class="nv">id</span><span class="o">=</span><span class="nv">test</span>,<span class="nv">file</span><span class="o">=</span><span class="nv">test</span>.<span class="nv">img</span>,<span class="nv">format</span><span class="o">=</span><span class="nv">raw</span>,<span class="k">if</span><span class="o">=</span><span class="nv">none</span><span class="w"> </span>\
-<span class="w">   </span><span class="o">-</span><span class="nv">device</span><span class="w"> </span><span class="nv">virtio</span><span class="o">-</span><span class="nv">blk</span><span class="o">-</span><span class="nv">device</span>,<span class="nv">drive</span><span class="o">=</span><span class="nv">test</span><span class="w"> </span>\
-<span class="w">   </span><span class="o">-</span><span class="nv">netdev</span><span class="w"> </span><span class="nv">tap</span>,<span class="nv">id</span><span class="o">=</span><span class="nv">tap0</span>,<span class="nv">script</span><span class="o">=</span><span class="nv">no</span>,<span class="nv">downscript</span><span class="o">=</span><span class="nv">no</span><span class="w"> </span>\
-<span class="w">   </span><span class="o">-</span><span class="nv">device</span><span class="w"> </span><span class="nv">virtio</span><span class="o">-</span><span class="nv">net</span><span class="o">-</span><span class="nv">device</span>,<span class="nv">netdev</span><span class="o">=</span><span class="nv">tap0</span>
+<div class="highlight"><pre><span></span><code>qemu-system-x86_64 \
+   -M microvm,x-option-roms=off,pit=off,pic=off,isa-serial=off,rtc=off \
+   -enable-kvm -cpu host -m 512m -smp 2 \
+   -kernel vmlinux -append &quot;console=hvc0 root=/dev/vda&quot; \
+   -nodefaults -no-user-config -nographic \
+   -chardev stdio,id=virtiocon0 \
+   -device virtio-serial-device \
+   -device virtconsole,chardev=virtiocon0 \
+   -drive id=test,file=test.img,format=raw,if=none \
+   -device virtio-blk-device,drive=test \
+   -netdev tap,id=tap0,script=no,downscript=no \
+   -device virtio-net-device,netdev=tap0
 </code></pre></div>
 
 <h3>Rust调试</h3>
@@ -783,22 +783,22 @@ src/libvirt_public.syms 增加定义
 </code></pre></div>
 
 <h2>x86 UEFI Direct Boot</h2>
-<div class="highlight"><pre><span></span><code><span class="nv">qemu</span><span class="o">-</span><span class="nv">system</span><span class="o">-</span><span class="nv">x86_64</span><span class="w"> </span>\<span class="w">                                                            </span>
-<span class="w">    </span><span class="o">-</span><span class="nv">M</span><span class="w"> </span><span class="nv">pc</span><span class="w"> </span>\<span class="w">                                                                     </span>
-<span class="w">    </span><span class="o">-</span><span class="nv">cpu</span><span class="w"> </span><span class="nv">host</span><span class="w"> </span>\<span class="w">                                                                 </span>
-<span class="w">    </span><span class="o">-</span><span class="nv">smp</span><span class="w"> </span><span class="nv">cpus</span><span class="o">=</span><span class="mi">4</span><span class="w"> </span>\<span class="w">                                                               </span>
-<span class="w">    </span><span class="o">-</span><span class="nv">enable</span><span class="o">-</span><span class="nv">kvm</span><span class="w"> </span>\<span class="w">                                                               </span>
-<span class="w">    </span><span class="o">-</span><span class="nv">m</span><span class="w"> </span><span class="mi">2048</span><span class="w"> </span>\<span class="w">                                                                   </span>
-<span class="w">    </span><span class="o">-</span><span class="nv">nographic</span><span class="w"> </span>\<span class="w">                                                                </span>
-<span class="w">    </span><span class="o">-</span><span class="nv">net</span><span class="w"> </span><span class="nv">none</span><span class="w"> </span>\<span class="w">                                                                 </span>
-<span class="w">    </span><span class="o">-</span><span class="nv">drive</span><span class="w"> </span><span class="k">if</span><span class="o">=</span><span class="nv">pflash</span>,<span class="nv">format</span><span class="o">=</span><span class="nv">raw</span>,<span class="nv">unit</span><span class="o">=</span><span class="mi">0</span>,<span class="nv">file</span><span class="o">=/</span><span class="nv">home</span><span class="o">/</span><span class="nv">fang</span><span class="o">/</span><span class="nv">code</span><span class="o">/</span><span class="nv">opensrc</span><span class="o">/</span><span class="nv">edk2</span><span class="o">/</span><span class="nv">Build</span><span class="o">/</span><span class="nv">OvmfX64</span><span class="o">/</span><span class="nv">DEBUG_GCC5</span><span class="o">/</span><span class="nv">FV</span><span class="o">/</span><span class="nv">OVMF_CODE</span>.<span class="nv">fd</span>,<span class="nv">readonly</span><span class="o">=</span><span class="nv">on</span><span class="w"> </span>\<span class="w">                                   </span>
-<span class="w">    </span><span class="o">-</span><span class="nv">drive</span><span class="w"> </span><span class="k">if</span><span class="o">=</span><span class="nv">pflash</span>,<span class="nv">format</span><span class="o">=</span><span class="nv">raw</span>,<span class="nv">unit</span><span class="o">=</span><span class="mi">1</span>,<span class="nv">file</span><span class="o">=/</span><span class="nv">home</span><span class="o">/</span><span class="nv">fang</span><span class="o">/</span><span class="nv">code</span><span class="o">/</span><span class="nv">opensrc</span><span class="o">/</span><span class="nv">edk2</span><span class="o">/</span><span class="nv">Build</span><span class="o">/</span><span class="nv">OvmfX64</span><span class="o">/</span><span class="nv">DEBUG_GCC5</span><span class="o">/</span><span class="nv">FV</span><span class="o">/</span><span class="nv">OVMF_VARS</span>.<span class="nv">fd</span><span class="w"> </span>\
-<span class="w">    </span><span class="o">-</span><span class="nv">device</span><span class="w"> </span><span class="nv">virtio</span><span class="o">-</span><span class="nv">blk</span><span class="o">-</span><span class="nv">pci</span>,<span class="nv">id</span><span class="o">=</span><span class="nv">blk0</span>,<span class="nv">drive</span><span class="o">=</span><span class="nv">image</span><span class="w"> </span>\<span class="w">                                </span>
-<span class="w">    </span><span class="o">-</span><span class="nv">device</span><span class="w"> </span><span class="nv">piix3</span><span class="o">-</span><span class="nv">usb</span><span class="o">-</span><span class="nv">uhci</span>,<span class="nv">id</span><span class="o">=</span><span class="nv">uhci</span><span class="w"> </span>\<span class="w">                                            </span>
-<span class="w">    </span><span class="o">-</span><span class="nv">device</span><span class="w"> </span><span class="nv">usb</span><span class="o">-</span><span class="nv">tablet</span><span class="w"> </span>\<span class="w">                                                        </span>
-<span class="w">    </span><span class="o">-</span><span class="nv">drive</span><span class="w"> </span><span class="k">if</span><span class="o">=</span><span class="nv">none</span>,<span class="nv">id</span><span class="o">=</span><span class="nv">image</span>,<span class="nv">file</span><span class="o">=</span>$<span class="nv">PWD</span><span class="o">/</span><span class="nv">dummy</span>.<span class="nv">raw</span>,<span class="nv">format</span><span class="o">=</span><span class="nv">raw</span><span class="w"> </span>\<span class="w">                    </span>
-<span class="w">    </span><span class="o">-</span><span class="nv">monitor</span><span class="w"> </span><span class="nv">telnet</span>::<span class="mi">12345</span>,<span class="nv">server</span>,<span class="nv">nowait</span><span class="w"> </span>\<span class="w">                                      </span>
-<span class="w">    </span><span class="o">-</span><span class="nv">serial</span><span class="w"> </span><span class="nv">stdio</span>
+<div class="highlight"><pre><span></span><code>qemu-system-x86_64 \                                                            
+    -M pc \                                                                     
+    -cpu host \                                                                 
+    -smp cpus=4 \                                                               
+    -enable-kvm \                                                               
+    -m 2048 \                                                                   
+    -nographic \                                                                
+    -net none \                                                                 
+    -drive if=pflash,format=raw,unit=0,file=/home/fang/code/opensrc/edk2/Build/OvmfX64/DEBUG_GCC5/FV/OVMF_CODE.fd,readonly=on \                                   
+    -drive if=pflash,format=raw,unit=1,file=/home/fang/code/opensrc/edk2/Build/OvmfX64/DEBUG_GCC5/FV/OVMF_VARS.fd \
+    -device virtio-blk-pci,id=blk0,drive=image \                                
+    -device piix3-usb-uhci,id=uhci \                                            
+    -device usb-tablet \                                                        
+    -drive if=none,id=image,file=$PWD/dummy.raw,format=raw \                    
+    -monitor telnet::12345,server,nowait \                                      
+    -serial stdio
 </code></pre></div>
 
 <h2>Make rootfs using installroot</h2>
@@ -807,11 +807,11 @@ sed -i &quot;s|root:x|root:|&quot; etc/password
 </code></pre></div>
 
 <h2>QOM qmp example</h2>
-<div class="highlight"><pre><span></span><code>virsh qemu-monitor-command vmname &#39;{&quot;execute&quot;: &quot;qom-list-types}&quot;&#39; --pretty
-virsh qemu-monitor-command vmname &#39;{&quot;execute&quot;: &quot;qom-list&quot;, &quot;arguments&quot;: {&quot;path&quot;: &quot;/machine/&quot;}}&#39; --pretty
-virsh qemu-monitor-command vmname &#39;{&quot;execute&quot;: &quot;qom-list&quot;, &quot;arguments&quot;: {&quot;path&quot;: &quot;/machine/peripheral&quot;}}&#39; --pretty
-virsh qemu-monitor-command vmname &#39;{&quot;execute&quot;: &quot;qom-list&quot;, &quot;arguments&quot;: {&quot;path&quot;: &quot;/machine/unattached&quot;}}&#39; --pretty
-virsh qemu-monitor-command vmname &#39;{&quot;execute&quot;: &quot;device-list-properities, &quot;arguments&quot;: {&quot;typename&quot;: &quot;virtio-serial-pci&quot;}}&#39; --pretty
+<div class="highlight"><pre><span></span><code><span class="nx">virsh</span><span class="w"> </span><span class="nx">qemu</span><span class="o">-</span><span class="nx">monitor</span><span class="o">-</span><span class="nx">command</span><span class="w"> </span><span class="nx">vmname</span><span class="w"> </span><span class="err">&#39;</span><span class="p">{</span><span class="s">&quot;execute&quot;</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;qom-list-types}&quot;</span><span class="err">&#39;</span><span class="w"> </span><span class="o">--</span><span class="nx">pretty</span>
+<span class="nx">virsh</span><span class="w"> </span><span class="nx">qemu</span><span class="o">-</span><span class="nx">monitor</span><span class="o">-</span><span class="nx">command</span><span class="w"> </span><span class="nx">vmname</span><span class="w"> </span><span class="err">&#39;</span><span class="p">{</span><span class="s">&quot;execute&quot;</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;qom-list&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;arguments&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="s">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/machine/&quot;</span><span class="p">}}</span><span class="err">&#39;</span><span class="w"> </span><span class="o">--</span><span class="nx">pretty</span>
+<span class="nx">virsh</span><span class="w"> </span><span class="nx">qemu</span><span class="o">-</span><span class="nx">monitor</span><span class="o">-</span><span class="nx">command</span><span class="w"> </span><span class="nx">vmname</span><span class="w"> </span><span class="err">&#39;</span><span class="p">{</span><span class="s">&quot;execute&quot;</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;qom-list&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;arguments&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="s">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/machine/peripheral&quot;</span><span class="p">}}</span><span class="err">&#39;</span><span class="w"> </span><span class="o">--</span><span class="nx">pretty</span>
+<span class="nx">virsh</span><span class="w"> </span><span class="nx">qemu</span><span class="o">-</span><span class="nx">monitor</span><span class="o">-</span><span class="nx">command</span><span class="w"> </span><span class="nx">vmname</span><span class="w"> </span><span class="err">&#39;</span><span class="p">{</span><span class="s">&quot;execute&quot;</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;qom-list&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;arguments&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="s">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/machine/unattached&quot;</span><span class="p">}}</span><span class="err">&#39;</span><span class="w"> </span><span class="o">--</span><span class="nx">pretty</span>
+<span class="nx">virsh</span><span class="w"> </span><span class="nx">qemu</span><span class="o">-</span><span class="nx">monitor</span><span class="o">-</span><span class="nx">command</span><span class="w"> </span><span class="nx">vmname</span><span class="w"> </span><span class="err">&#39;</span><span class="p">{</span><span class="s">&quot;execute&quot;</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;device-list-properities, &quot;</span><span class="nx">arguments</span><span class="s">&quot;: {&quot;</span><span class="nx">typename</span><span class="s">&quot;: &quot;</span><span class="nx">virtio</span><span class="o">-</span><span class="nx">serial</span><span class="o">-</span><span class="nx">pci</span><span class="err">&quot;</span><span class="p">}}</span><span class="err">&#39;</span><span class="w"> </span><span class="o">--</span><span class="nx">pretty</span>
 </code></pre></div>
 
 <h2>使用 Virsh console 登陆虚拟机</h2>

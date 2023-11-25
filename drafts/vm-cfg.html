@@ -104,13 +104,13 @@
 <p>其中，OVMF_CODE.fd是UEFI的二进制启动文件，OVMF_VARS.fd是用来保存uefi启动参数的文件。
 值得注意的是，尽管UEFI启动的是也可以配置type='rom'，但这样以来我们无法为每个虚拟机指定uefi参数文件。</p>
 <p>当然也可以用cmdline来拉起一个UEFI虚拟机：</p>
-<div class="highlight"><pre><span></span><code><span class="nv">qemu</span><span class="o">-</span><span class="nv">kvm</span><span class="w"> </span>\
-<span class="w">  </span><span class="o">-</span><span class="nv">m</span><span class="w"> </span><span class="mi">2048</span><span class="w"> </span>\
-<span class="w">  </span><span class="o">--</span><span class="nv">machine</span><span class="w"> </span><span class="nv">pc</span><span class="o">-</span><span class="nv">q35</span><span class="o">-</span><span class="mi">4</span>.<span class="mi">0</span><span class="w"> </span>\
-<span class="w">  </span><span class="o">-</span><span class="nv">drive</span><span class="w"> </span><span class="k">if</span><span class="o">=</span><span class="nv">pflash</span>,<span class="nv">format</span><span class="o">=</span><span class="nv">raw</span>,<span class="nv">readonly</span>,<span class="nv">file</span><span class="o">=</span>.<span class="o">/</span><span class="nv">OVMF_CODE</span>.<span class="nv">fd</span><span class="w"> </span>\
-<span class="w">  </span><span class="o">-</span><span class="nv">drive</span><span class="w"> </span><span class="k">if</span><span class="o">=</span><span class="nv">pflash</span>,<span class="nv">format</span><span class="o">=</span><span class="nv">raw</span>,<span class="nv">file</span><span class="o">=</span>.<span class="o">/</span><span class="nv">OVMF_VARS</span>.<span class="nv">fd</span><span class="w"> </span>\
-<span class="w">  </span><span class="o">-</span><span class="nv">drive</span><span class="w"> </span><span class="nv">file</span><span class="o">=/</span><span class="nv">home</span><span class="o">/</span><span class="nv">this</span><span class="o">-</span><span class="nv">vim</span>.<span class="nv">img</span>,<span class="nv">format</span><span class="o">=</span><span class="nv">raw</span>,<span class="nv">index</span><span class="o">=</span><span class="mi">0</span>,<span class="nv">media</span><span class="o">=</span><span class="nv">disk</span><span class="w"> </span>\
-<span class="w">  </span><span class="o">-</span><span class="nv">boot</span><span class="w"> </span><span class="nv">menu</span><span class="o">=</span><span class="nv">on</span>
+<div class="highlight"><pre><span></span><code>qemu-kvm \
+  -m 2048 \
+  --machine pc-q35-4.0 \
+  -drive if=pflash,format=raw,readonly,file=./OVMF_CODE.fd \
+  -drive if=pflash,format=raw,file=./OVMF_VARS.fd \
+  -drive file=/home/this-vim.img,format=raw,index=0,media=disk \
+  -boot menu=on
 </code></pre></div>
 
 <h4>2.为虚拟机配置网卡</h4>

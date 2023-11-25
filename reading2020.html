@@ -125,17 +125,17 @@ ACPI提供了CPU热插拔、内存热插拔以及pci/pcie 热插拔相关接口�
 其中主要包括：device bootorder，ACPI和SMBIOS tables，VM UUID，SMP/NUMA，
 kenerl/initrd images for direct (Linux) kernel booting等（fw_cfg直接把硬件信息报告给OS）。</p>
 <p>fw_cfg设备对外提供了3个关键寄存器用来完成设备操作，x86上使用PIO方式，arm上使用MMIO方式访问寄存器。</p>
-<div class="highlight"><pre><span></span><code>=== x86, x86_64 Register Locations ===
+<div class="highlight"><pre><span></span><code><span class="o">==</span><span class="p">=</span><span class="w"> </span><span class="nx">x86</span><span class="p">,</span><span class="w"> </span><span class="nx">x86_64</span><span class="w"> </span><span class="nx">Register</span><span class="w"> </span><span class="nx">Locations</span><span class="w"> </span><span class="o">==</span><span class="p">=</span>
 
-Selector Register IOport: 0x510
-Data Register IOport:     0x511
-DMA Address IOport:       0x514
+<span class="nx">Selector</span><span class="w"> </span><span class="nx">Register</span><span class="w"> </span><span class="nx">IOport</span><span class="p">:</span><span class="w"> </span><span class="mh">0x510</span>
+<span class="nx">Data</span><span class="w"> </span><span class="nx">Register</span><span class="w"> </span><span class="nx">IOport</span><span class="p">:</span><span class="w">     </span><span class="mh">0x511</span>
+<span class="nx">DMA</span><span class="w"> </span><span class="nx">Address</span><span class="w"> </span><span class="nx">IOport</span><span class="p">:</span><span class="w">       </span><span class="mh">0x514</span>
 
-=== ARM Register Locations ===
+<span class="o">==</span><span class="p">=</span><span class="w"> </span><span class="nx">ARM</span><span class="w"> </span><span class="nx">Register</span><span class="w"> </span><span class="nx">Locations</span><span class="w"> </span><span class="o">==</span><span class="p">=</span>
 
-Selector Register address: Base + 8 (2 bytes)
-Data Register address:     Base + 0 (8 bytes)
-DMA Address address:       Base + 16 (8 bytes)
+<span class="nx">Selector</span><span class="w"> </span><span class="nx">Register</span><span class="w"> </span><span class="nx">address</span><span class="p">:</span><span class="w"> </span><span class="nx">Base</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">8</span><span class="w"> </span><span class="p">(</span><span class="mi">2</span><span class="w"> </span><span class="nx">bytes</span><span class="p">)</span>
+<span class="nx">Data</span><span class="w"> </span><span class="nx">Register</span><span class="w"> </span><span class="nx">address</span><span class="p">:</span><span class="w">     </span><span class="nx">Base</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="p">(</span><span class="mi">8</span><span class="w"> </span><span class="nx">bytes</span><span class="p">)</span>
+<span class="nx">DMA</span><span class="w"> </span><span class="nx">Address</span><span class="w"> </span><span class="nx">address</span><span class="p">:</span><span class="w">       </span><span class="nx">Base</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">16</span><span class="w"> </span><span class="p">(</span><span class="mi">8</span><span class="w"> </span><span class="nx">bytes</span><span class="p">)</span>
 </code></pre></div>
 
 <p>Select Register是Write Only的，通过写这个寄存器来选择要操作的Firmware。

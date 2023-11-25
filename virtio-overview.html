@@ -192,16 +192,16 @@ virtio legacy（virtio 0.95）协议规定，对应的配置数据结构（virti
 
 <p>以上的每种配置结构是直接映射到virtio设备的BAR空间内，那么如何指定每种配置结构的位置呢？
 答案是通过<code>PCI Capability list</code>方式去指定，这和物理PCI设备是一样的，体现了virtio-pci的协议兼容性。</p>
-<div class="highlight"><pre><span></span><code><span class="nt">struct</span><span class="w"> </span><span class="nt">virtio_pci_cap</span><span class="w"> </span><span class="p">{</span><span class="w"> </span>
-<span class="w">        </span><span class="err">u8</span><span class="w"> </span><span class="err">cap_vndr</span><span class="p">;</span><span class="w">    </span><span class="c">/* Generic PCI field: PCI_CAP_ID_VNDR */</span><span class="w"> </span>
-<span class="w">        </span><span class="err">u8</span><span class="w"> </span><span class="err">cap_next</span><span class="p">;</span><span class="w">    </span><span class="c">/* Generic PCI field: next ptr. */</span><span class="w"> </span>
-<span class="w">        </span><span class="err">u8</span><span class="w"> </span><span class="err">cap_len</span><span class="p">;</span><span class="w">     </span><span class="c">/* Generic PCI field: capability length */</span><span class="w"> </span>
-<span class="w">        </span><span class="err">u8</span><span class="w"> </span><span class="err">cfg_type</span><span class="p">;</span><span class="w">    </span><span class="c">/* Identifies the structure. */</span><span class="w"> </span>
-<span class="w">        </span><span class="err">u8</span><span class="w"> </span><span class="err">bar</span><span class="p">;</span><span class="w">         </span><span class="c">/* Where to find it. */</span><span class="w"> </span>
-<span class="w">        </span><span class="err">u8</span><span class="w"> </span><span class="err">padding</span><span class="cp">[</span><span class="mi">3</span><span class="cp">]</span><span class="p">;</span><span class="w">  </span><span class="c">/* Pad to full dword. */</span><span class="w"> </span>
-<span class="w">        </span><span class="err">le32</span><span class="w"> </span><span class="err">offset</span><span class="p">;</span><span class="w">    </span><span class="c">/* Offset within bar. */</span><span class="w"> </span>
-<span class="w">        </span><span class="err">le32</span><span class="w"> </span><span class="err">length</span><span class="p">;</span><span class="w">    </span><span class="c">/* Length of the structure, in bytes. */</span><span class="w"> </span>
-<span class="p">}</span><span class="o">;</span>
+<div class="highlight"><pre><span></span><code><span class="nx">struct</span><span class="w"> </span><span class="nx">virtio_pci_cap</span><span class="w"> </span><span class="p">{</span><span class="w"> </span>
+<span class="w">        </span><span class="kt">u8</span><span class="w"> </span><span class="nx">cap_vndr</span><span class="p">;</span><span class="w">    </span><span class="cm">/* Generic PCI field: PCI_CAP_ID_VNDR */</span><span class="w"> </span>
+<span class="w">        </span><span class="kt">u8</span><span class="w"> </span><span class="nx">cap_next</span><span class="p">;</span><span class="w">    </span><span class="cm">/* Generic PCI field: next ptr. */</span><span class="w"> </span>
+<span class="w">        </span><span class="kt">u8</span><span class="w"> </span><span class="nx">cap_len</span><span class="p">;</span><span class="w">     </span><span class="cm">/* Generic PCI field: capability length */</span><span class="w"> </span>
+<span class="w">        </span><span class="kt">u8</span><span class="w"> </span><span class="nx">cfg_type</span><span class="p">;</span><span class="w">    </span><span class="cm">/* Identifies the structure. */</span><span class="w"> </span>
+<span class="w">        </span><span class="kt">u8</span><span class="w"> </span><span class="nx">bar</span><span class="p">;</span><span class="w">         </span><span class="cm">/* Where to find it. */</span><span class="w"> </span>
+<span class="w">        </span><span class="kt">u8</span><span class="w"> </span><span class="nx">padding</span><span class="p">[</span><span class="mi">3</span><span class="p">];</span><span class="w">  </span><span class="cm">/* Pad to full dword. */</span><span class="w"> </span>
+<span class="w">        </span><span class="nx">le32</span><span class="w"> </span><span class="nx">offset</span><span class="p">;</span><span class="w">    </span><span class="cm">/* Offset within bar. */</span><span class="w"> </span>
+<span class="w">        </span><span class="nx">le32</span><span class="w"> </span><span class="nx">length</span><span class="p">;</span><span class="w">    </span><span class="cm">/* Length of the structure, in bytes. */</span><span class="w"> </span>
+<span class="p">};</span>
 </code></pre></div>
 
 <p>只是略微不同的是，virtio-pci的Capability有一个统一的结构，
@@ -568,11 +568,11 @@ Virtio前后端通信概括起来只有两个方向，即GuestOS通知QEMU和QEM
 最后通过KVM的ioctl投递中断？
 从代码路径上来看，后者明显路径更长，谁知道原因告诉我一下!!!。
 https://patchwork.kernel.org/patch/9531577/</p>
-<div class="highlight"><pre><span></span><code><span class="nv">Once</span><span class="w"> </span><span class="nv">in</span><span class="w"> </span><span class="nv">virtio_notify_irqfd</span>,<span class="w"> </span><span class="nv">once</span><span class="w"> </span><span class="nv">in</span><span class="w"> </span><span class="nv">virtio_queue_guest_notifier_read</span>.
+<div class="highlight"><pre><span></span><code>Once in virtio_notify_irqfd, once in virtio_queue_guest_notifier_read.
 
-<span class="nv">Unfortunately</span>,<span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="nv">virtio</span><span class="o">-</span><span class="nv">blk</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="nv">MSI</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="nv">KVM</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="nv">old</span><span class="w"> </span><span class="nv">Windows</span><span class="w"> </span><span class="nv">drivers</span><span class="w"> </span><span class="nv">we</span><span class="w"> </span><span class="nv">need</span><span class="w"> </span><span class="nv">the</span><span class="w"> </span><span class="nv">one</span><span class="w"> </span><span class="nv">in</span><span class="w"> </span><span class="nv">virtio_notify_irqfd</span>.
-<span class="k">For</span><span class="w"> </span><span class="nv">virtio</span><span class="o">-</span><span class="nv">net</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="nv">vhost</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="nv">INTx</span><span class="w"> </span><span class="nv">we</span><span class="w"> </span><span class="nv">need</span><span class="w"> </span><span class="nv">the</span><span class="w"> </span><span class="nv">one</span><span class="w"> </span><span class="nv">in</span><span class="w"> </span><span class="nv">virtio_queue_guest_notifier_read</span>.<span class="w"> </span>
-这显然路径更长啊。<span class="w"> </span>
+Unfortunately, for virtio-blk + MSI + KVM + old Windows drivers we need the one in virtio_notify_irqfd.
+For virtio-net + vhost + INTx we need the one in virtio_queue_guest_notifier_read. 
+这显然路径更长啊。 
 </code></pre></div>
 
 <p>Ok，到这里virtio前后端通信机制已经明了，最后一个小节我们以virtio-net为例，梳理一下virtio中的部分核心代码流程。</p>
@@ -756,14 +756,14 @@ virtqueue队列的中断服务程序是 <code>vp_vring_interrupt</code>。</p>
 
 <p>不难想到中断服务程序里面会调用队列上的callback。
 我们再回过头来看下<code>virtnet_find_vqs</code>，原来接受队列的回调函数是<code>skb_recv_done</code>，发送队列的回调函数是<code>skb_xmit_done</code>。</p>
-<div class="highlight"><pre><span></span><code><span class="n">static</span><span class="w"> </span><span class="n">int</span><span class="w"> </span><span class="n">virtnet_find_vqs</span><span class="p">(</span><span class="n">struct</span><span class="w"> </span><span class="n">virtnet_info</span><span class="w"> </span><span class="o">*</span><span class="n">vi</span><span class="p">)</span>
-<span class="p">{</span>
-<span class="w">       </span><span class="cm">/* Allocate/initialize parameters for send/receive virtqueues */</span>
-<span class="w">        </span><span class="n">for</span><span class="w"> </span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">vi</span><span class="o">-&gt;</span><span class="n">max_queue_pairs</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">        </span><span class="n">callbacks</span><span class="p">[</span><span class="n">rxq2vq</span><span class="p">(</span><span class="n">i</span><span class="p">)]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">skb_recv_done</span><span class="p">;</span>
-<span class="w">        </span><span class="n">callbacks</span><span class="p">[</span><span class="n">txq2vq</span><span class="p">(</span><span class="n">i</span><span class="p">)]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">skb_xmit_done</span><span class="p">;</span>
-<span class="w">    </span><span class="p">}</span>
-<span class="p">}</span>
+<div class="highlight"><pre><span></span><code>static int virtnet_find_vqs(struct virtnet_info <span class="gs">*vi)</span>
+<span class="gs">{</span>
+<span class="gs">       /*</span> Allocate/initialize parameters for send/receive virtqueues */
+        for (i = 0; i &lt; vi-&gt;max_queue_pairs; i++) {
+        callbacks[rxq2vq(i)] = skb_recv_done;
+        callbacks[txq2vq(i)] = skb_xmit_done;
+    }
+}
 </code></pre></div>
 
 <p>OK，这个小节就到这里。Are you clear ?</p>
@@ -931,7 +931,7 @@ Qemu主循环收到POLL_IN事件调用回调函数收包。</p>
             <nav>
             <ul class="articles-timeline">
                 <li class="previous-article">« <a href="https://kernelgo.org/armv8-virt-guide.html" title="Previous: ARMv8 Virtualization Overview">ARMv8 Virtualization Overview</a></li>
-                <li class="next-article"><a href="https://kernelgo.org/x86_apicv.html" title="Next: Discuss On X86 APIC Virtualization">Discuss On X86 APIC Virtualization</a> »</li>
+                <li class="next-article"><a href="https://kernelgo.org/vfio-mdev.html" title="Next: VFIO Mediated Devices Introduction">VFIO Mediated Devices Introduction</a> »</li>
             </ul>
             </nav>
             </aside>

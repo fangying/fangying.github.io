@@ -100,24 +100,24 @@
 <p>收包：底层设备通过socket唤醒worker线程调度收报处理函数，接受完成之后写eventfd向虚拟机注入中断。
 发包：vCPU退出写eventfd唤醒worker线程调度，调用发包函数发包</p>
 <p>关键数据结构，对象抽象： vhost_dev, vhost_net, vhost_poll, vhost_work, vhost_virtqueue</p>
-<div class="highlight"><pre><span></span><code><span class="nv">struct</span><span class="w"> </span><span class="nv">vhost_dev</span><span class="w"> </span>{
-<span class="w">        </span><span class="nv">struct</span><span class="w"> </span><span class="nv">mm_struct</span><span class="w"> </span><span class="o">*</span><span class="nv">mm</span><span class="c1">;</span>
-<span class="w">        </span><span class="nv">struct</span><span class="w"> </span><span class="nv">mutex</span><span class="w"> </span><span class="nv">mutex</span><span class="c1">;</span>
-<span class="w">        </span><span class="nv">struct</span><span class="w"> </span><span class="nv">vhost_virtqueue</span><span class="w"> </span><span class="o">**</span><span class="nv">vqs</span><span class="c1">;</span>
-<span class="w">        </span><span class="nv">int</span><span class="w"> </span><span class="nv">nvqs</span><span class="c1">;</span>
-<span class="w">        </span><span class="nv">struct</span><span class="w"> </span><span class="nv">eventfd_ctx</span><span class="w"> </span><span class="o">*</span><span class="nv">log_ctx</span><span class="c1">;</span>
-<span class="w">        </span><span class="nv">struct</span><span class="w"> </span><span class="nv">llist_head</span><span class="w"> </span><span class="nv">work_list</span><span class="c1">;</span>
-<span class="w">        </span><span class="nv">struct</span><span class="w"> </span><span class="nv">task_struct</span><span class="w"> </span><span class="o">*</span><span class="nv">worker</span><span class="c1">;</span>
-<span class="w">        </span><span class="nv">struct</span><span class="w"> </span><span class="nv">vhost_umem</span><span class="w"> </span><span class="o">*</span><span class="nv">umem</span><span class="c1">;</span>
-<span class="w">        </span><span class="nv">struct</span><span class="w"> </span><span class="nv">vhost_umem</span><span class="w"> </span><span class="o">*</span><span class="nv">iotlb</span><span class="c1">;</span>
-<span class="w">        </span><span class="nv">spinlock_t</span><span class="w"> </span><span class="nv">iotlb_lock</span><span class="c1">;</span>
-<span class="w">        </span><span class="nv">struct</span><span class="w"> </span><span class="nv">list_head</span><span class="w"> </span><span class="nv">read_list</span><span class="c1">;</span>
-<span class="w">        </span><span class="nv">struct</span><span class="w"> </span><span class="nv">list_head</span><span class="w"> </span><span class="nv">pending_list</span><span class="c1">;</span>
-<span class="w">        </span><span class="nv">wait_queue_head_t</span><span class="w"> </span><span class="k">wait</span><span class="c1">;</span>
-<span class="w">        </span><span class="nv">int</span><span class="w"> </span><span class="nv">iov_limit</span><span class="c1">;</span>
-<span class="w">        </span><span class="nv">int</span><span class="w"> </span><span class="nv">weight</span><span class="c1">;</span>
-<span class="w">        </span><span class="nv">int</span><span class="w"> </span><span class="nv">byte_weight</span><span class="c1">;</span>
-}<span class="c1">; </span>
+<div class="highlight"><pre><span></span><code>struct vhost_dev {
+        struct mm_struct <span class="gs">*mm;</span>
+<span class="gs">        struct mutex mutex;</span>
+<span class="gs">        struct vhost_virtqueue *</span>*vqs;
+        int nvqs;
+        struct eventfd_ctx *log_ctx;
+        struct llist_head work_list;
+        struct task_struct *worker;
+        struct vhost_umem *umem;
+        struct vhost_umem *iotlb;
+        spinlock_t iotlb_lock;
+        struct list_head read_list;
+        struct list_head pending_list;
+        wait_queue_head_t wait;
+        int iov_limit;
+        int weight;
+        int byte_weight;
+}; 
 </code></pre></div>
 
 <p>tap设备的初始化流程</p>
