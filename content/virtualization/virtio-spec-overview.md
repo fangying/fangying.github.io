@@ -659,15 +659,20 @@ static int vp_find_vqs_msix(struct virtio_device *vdev, unsigned nvqs,
 		const bool *ctx,
 		struct irq_affinity *desc)
 {
-        /* 为configuration change申请MSIx中断 */
-	err = vp_request_msix_vectors(vdev, nvectors, per_vq_vectors,
+
+
+        // 为每个vq分配一个MSIx中断号， per_vq_vectors = true
+        // 同时为configuration change申请单独一个MSIx中断，一并设置了cfg的中断处理函数
+	    err = vp_request_msix_vectors(vdev, nvectors, per_vq_vectors,
 			      per_vq_vectors ? desc : NULL);
+
         for (i = 0; i < nvqs; ++i) {
-		 // 创建队列 --> vring_create_virtqueue --> vring_create_virtqueue_split --> vring_alloc_queue
-	         vqs[i] = vp_setup_vq(vdev, queue_idx++, callbacks[i], names[i],
+                // 创建队列 --> vring_create_virtqueue --> vring_create_virtqueue_split --> vring_alloc_queue
+                vqs[i] = vp_setup_vq(vdev, queue_idx++, callbacks[i], names[i],
                                 ctx ? ctx[i] : false,
                                 msix_vec);
-		// 每个队列申请一个MSIx中断
+
+		        // 每个队列设置对应的MSIx中断处理函数
                 err = request_irq(pci_irq_vector(vp_dev->pci_dev, msix_vec),
                                   vring_interrupt, 0,
                                   vp_dev->msix_names[msix_vec],
