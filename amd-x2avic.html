@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://kernelgo.org/theme/css/style.min.css?fc5adb95">
+
+        <link rel="dns-prefetch" href="//fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin>
+
+        <meta name="author" content="Yori Fang" />
+
+        <meta name="description" content="AMD x2avic summary
+" />
+        <meta property="og:type" content="article" />
+        <meta name="twitter:card" content="summary">
+
+<meta name="keywords" content="virtualization, virtualization, " />
+
+<meta property="og:title" content="AMD x2avic details "/>
+<meta property="og:url" content="https://kernelgo.org/amd-x2avic.html" />
+<meta property="og:description" content="AMD x2avic summary" />
+<meta property="og:site_name" content="kernelgo" />
+<meta property="og:article:author" content="Yori Fang" />
+<meta property="og:article:published_time" content="2026-02-18T23:00:00+08:00" />
+<meta property="og:article:modified_time" content="2026-02-18T23:00:00+08:00" />
+<meta name="twitter:title" content="AMD x2avic details ">
+<meta name="twitter:description" content="AMD x2avic summary">
+
+        <title>AMD x2avic details  · kernelgo
+</title>
+<script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+     (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+     m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+     })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+    ga('create', 'UA-107392039-1', 'auto');
+    ga('send', 'pageview');
+</script>
+
+
+    </head>
+    <body>
+        <div id="content">
+            <div class="navbar navbar-static-top">
+                <div class="navbar-inner">
+                    <div class="container-fluid">
+                        <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                        </a>
+                        <a class="brand" href="https://kernelgo.org/"><span class=site-name>kernelgo</span></a>
+                        <div class="nav-collapse collapse">
+                            <ul class="nav pull-right top-menu">
+                                <li >
+                                    <a href=
+                                       https://kernelgo.org
+                                    >Home</a>
+                                </li>
+                                <li ><a href="https://kernelgo.org/pages/about.html">About</a></li>
+                                <li ><a href="https://kernelgo.org/categories.html">Categories</a></li>
+                                <li ><a href="https://kernelgo.org/tags.html">Tags</a></li>
+                                <li ><a href="https://kernelgo.org/archives.html">Archives</a></li>
+                                <li><form class="navbar-search" action="https://kernelgo.org/search.html" onsubmit="return validateForm(this.elements['q'].value);"> <input type="text" class="search-query" placeholder="Search" name="q" id="tipue_search_input"></form></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="container-fluid">
+                <div class="row-fluid">
+                    <div class="span1"></div>
+                    <div class="span10">
+<article itemscope>
+<div class="row-fluid">
+    <header class="page-header span10 offset2">
+        <h1>
+            <a href="https://kernelgo.org/amd-x2avic.html">
+                AMD x2avic details
+            </a>
+        </h1>
+    </header>
+</div>
+
+<div class="row-fluid">
+        <div class="span8 offset2 article-content">
+            
+            <h1>AMD x2AVIC 详解</h1>
+<p>本文面向虚拟化与内核开发者，旨在系统性地总结 AMD AVIC/x2AVIC 的硬件原理及其在 KVM 中的支持方式，并提供实践指导。</p>
+<h2>1. 什么是 AVIC 与 x2AVIC？</h2>
+<h3><strong>1.1 AVIC：高级虚拟中断控制器</strong></h3>
+<p><strong>AVIC (Advanced Virtual Interrupt Controller)</strong> 是 AMD 为其虚拟化技术 <strong>AMD-V (SVM)</strong> 提供的一项硬件加速扩展，专门用于优化虚拟机（VM）的中断处理。</p>
+<p>在传统的虚拟化环境中，APIC（高级可编程中断控制器）的访问和中断投递通常需要 VMM（虚拟机监视器，如 KVM）的介入。无论是 vCPU 之间的核间中断（IPI），还是来自物理设备的中断，都需要触发 <strong>VM-Exit</strong>，由 VMM 模拟 APIC 行为，然后再通过 <strong>VM-Entry</strong> 返回到 Guest。频繁的 VM-Exit 是虚拟化环境中的主要性能开销之一。</p>
+<p>AVIC 的核心目标就是减少这种开销。它通过引入 <strong>vAPIC backing page</strong> 的概念，将虚拟机的本地 APIC (vLAPIC) 寄存器状态直接暴露给硬件。这样，硬件就可以在不退出到 VMM 的情况下，直接处理大部分 APIC 相关的操作：</p>
+<ul>
+<li><strong>加速 APIC 寄存器访问</strong>：Guest 对 vLAPIC 寄存器的读写可以直接在硬件中完成，无需 VMM 介入。</li>
+<li><strong>加速中断投递</strong>：当目标 vCPU 正在物理核心上运行时，硬件可以直接将 IPI 或设备中断投递到该 vCPU，避免了 VMM 的中断注入流程。</li>
+</ul>
+<blockquote>
+<p><strong>参考资料</strong>: AMD 的 AVIC 设计理念在早期的 Xen 社区分享中有详细阐述。<a href="https://docs.huihoo.com/xen/summit/2012/aug27/5b-introduction-of-amd-advanced-virtual-interrupt-controller.pdf">Introduction of AMD Advanced Virtual Interrupt Controller (Xen Summit 2012)</a></p>
+</blockquote>
+<h3><strong>1.2 x2AVIC：支持超大规模 vCPU 的 AVIC</strong></h3>
+<p>传统的 APIC 架构（xAPIC）使用 8 位 ID，最多只能支持 255 个 CPU 核心。随着多核处理器的发展，这一限制在大型服务器和虚拟机上日益凸显。为了解决这个问题，<strong>x2APIC</strong> 架构应运而生，它将 APIC ID 扩展到 32 位，并改用 <strong>MSR (Model-Specific Register)</strong> 接口进行访问。</p>
+<p><strong>x2AVIC</strong> 正是 AVIC 技术在 <strong>x2APIC</strong> 模式下的自然演进。它使得 AVIC 的硬件加速能力可以应用于拥有 <strong>超过 255 个 vCPU</strong> 的大规模虚拟机。当 Guest 运行在 x2APIC 模式下时，x2AVIC 硬件能够：</p>
+<ul>
+<li><strong>直接处理 x2APIC MSR 访问</strong>：硬件能够识别 Guest 对 x2APIC 相关 MSR 的读写操作，并模拟其行为，同样无需 VM-Exit。</li>
+<li><strong>支持 32 位 APIC ID</strong>：中断投递和 vCPU 目标识别都能正确处理扩展后的 32 位 APIC ID。</li>
+</ul>
+<p>简而言之，<strong>AVIC 是对传统 xAPIC 的虚拟化加速，而 x2AVIC 则是将其扩展到支持现代 x2APIC 架构，是构建高性能、大规模虚拟化平台的关键技术</strong>。</p>
+<blockquote>
+<p><strong>参考资料</strong>: 关于 KVM 引入 x2AVIC 支持的内核邮件列表讨论，详细说明了其实现动机和方式。<a href="https://lwn.net/Articles/887196/">Introducing AMD x2APIC Virtualization (x2AVIC) support (LWN.net, 2022)</a></p>
+</blockquote>
+<h2>2. AMD 硬件实现原理</h2>
+<p>AVIC 的实现深度整合在 CPU 和 IOMMU 硬件中，其核心围绕着一套新的数据结构和控制机制。</p>
+<h3><strong>2.1 硬件能力识别与启用</strong></h3>
+<ul>
+<li><strong>CPUID 识别</strong>：</li>
+<li><strong><code>CPUID Fn8000_000A_EDX[AVIC, bit 13]</code></strong>: 表明 CPU 是否支持 AVIC。</li>
+<li><strong><code>CPUID Fn8000_000A_EDX[x2AVIC, bit 18]</code></strong>: 表明 CPU 是否支持 x2AVIC。</li>
+<li><strong>VMCB 控制</strong>：AVIC 的启用由 <strong>VMCB (Virtual Machine Control Block)</strong> 的一个控制位域来管理。在 <strong>VMCB 偏移量 60h</strong> 的 <code>int_ctl</code> 字段中：</li>
+<li><strong><code>bit 31 (AVIC enable)</code></strong>: 置 1 时，为该 vCPU 启用 AVIC 功能。</li>
+<li><strong><code>bit 30 (x2APIC mode)</code></strong>: 当 <code>bit 31</code> 置 1 时，此位决定 AVIC 的工作模式。置 1 表示工作在 <strong>x2AVIC</strong> 模式，置 0 表示工作在传统的 <strong>AVIC (xAPIC)</strong> 模式。</li>
+</ul>
+<h3><strong>2.2 关键数据结构</strong></h3>
+<p>为了让硬件能够独立完成中断管理，AVIC 定义了几个关键的内存数据结构，由 VMM（KVM）负责初始化和维护：</p>
+<ol>
+<li><strong>vAPIC Backing Page (每 vCPU 一页)</strong>：</li>
+<li>这是一个 4KB 大小的物理内存页，作为 vCPU 的 <strong>虚拟 APIC 寄存器</strong> 的硬件映像。Guest 对 APIC 寄存器的修改会反映在此页上，硬件也通过此页来更新中断状态（如 IRR, ISR）。</li>
+<li>VMCB 中的 <strong><code>avic_backing_page</code></strong> 字段指向这个页的物理地址。</li>
+<li><strong>Physical APIC ID Table (每 VM 一张)</strong>：</li>
+<li>这张表建立了 <strong>物理 APIC ID</strong> 到 vCPU 的映射。它的索引是物理 CPU ID，条目中包含了对应 vCPU 是否正在运行（<strong><code>IS_RUNNING</code></strong> 标志位）、vAPIC Backing Page 的物理地址等关键信息。</li>
+<li>当一个中断或 IPI 投递到某个物理 CPU 时，硬件通过此表查询目标 vCPU 的状态。</li>
+<li>VMCB 中的 <strong><code>avic_physical_id</code></strong> 字段指向这张表的物理地址。</li>
+<li><strong>Logical APIC ID Table (每 VM 一张)</strong>：</li>
+<li>这张表用于 <strong>逻辑模式</strong> 的中断投递，它将逻辑目标地址（如一个集群或广播）解析为一组具体的 vCPU。</li>
+<li>VMCB 中的 <strong><code>avic_logical_id</code></strong> 字段指向这张表的物理地址。在 x2AVIC 模式下，由于 APIC ID 扩展，这张表不再被硬件使用。</li>
+<li><strong>AVIC Doorbell MSR</strong>:</li>
+<li>这是一个特殊的 MSR。当 VMM 需要通知一个正在运行的 vCPU 重新评估其中断状态时（例如，VMM 软件注入了一个中断），它只需向这个 MSR 写入目标 vCPU 的物理 APIC ID 即可。硬件会确保该 vCPU 感知到中断状态的变化，而无需触发 VM-Exit。</li>
+</ol>
+<h3><strong>2.3 AVIC 中断处理流程</strong></h3>
+<p>下图简要描述了在启用 AVIC 后，一个 IPI 或设备中断如何被硬件直接处理：</p>
+<p>当一个中断发生时：</p>
+<ol>
+<li>硬件（CPU 或 IOMMU）确定目标 vCPU。</li>
+<li>硬件访问 <strong>vAPIC Backing Page</strong>，更新其中的中断请求寄存器（IRR）。</li>
+<li>如果目标 vCPU 正在物理核心上运行（通过 Physical APIC ID Table 的 <strong><code>IS_RUNNING</code></strong> 标志判断），硬件会通过类似 <strong>Doorbell</strong> 的机制直接通知 vCPU，vCPU 会在 Guest 模式下响应中断。</li>
+<li>只有当目标 vCPU <strong>没有在运行</strong> 时，硬件无法直接投递，此时才会触发 <strong>VM-Exit</strong> (类型为 <strong><code>AVIC_INCOMPLETE_IPI</code></strong>)，通知 KVM 需要调度该 vCPU 来处理挂起的中断。</li>
+</ol>
+<blockquote>
+<p><strong>参考资料</strong>: KVM 内核补丁系列详细讨论了这些数据结构的初始化和管理逻辑。<a href="https://www.mail-archive.com/linux-kernel@vger.kernel.org/msg1116900.html">KVM: x86: Detect and Initialize AVIC support (mail-archive, 2016)</a></p>
+</blockquote>
+<h2>3. KVM 如何支持 x2AVIC？</h2>
+<p>KVM 对 AVIC 和 x2AVIC 的支持是逐步演进的，涉及到内核模块参数、QEMU 配置以及与 IOMMU 的协同工作。</p>
+<h3><strong>3.1 内核配置与启用</strong></h3>
+<ul>
+<li><strong>内核模块参数</strong>：AVIC 和 x2AVIC 的总开关是 <strong><code>kvm_amd</code></strong> 模块的 <strong><code>avic</code></strong> 参数。</li>
+<li><code># 启用 AVIC/x2AVIC options kvm_amd avic=1</code></li>
+<li>可以通过创建 <strong><code>/etc/modprobe.d/kvm.conf</code></strong> 文件来持久化配置，或使用 <strong><code>modprobe</code></strong> 命令临时加载。当 <strong><code>kvm_amd.avic=1</code></strong> 时，KVM 会根据硬件能力自动启用 AVIC 或 x2AVIC。</li>
+<li><strong>数据结构管理</strong>：当一个虚拟机启动时，KVM 会为其分配并初始化上一节提到的 <strong>vAPIC backing page</strong>、<strong>Physical APIC ID table</strong> 和 <strong>Logical APIC ID table</strong>。</li>
+<li><strong><code>svm_create_vcpu</code></strong>: 在创建 vCPU 时，会调用 <strong><code>avic_init_backing_page</code></strong> 初始化 vAPIC backing page，并将其地址填入 Physical APIC ID table。</li>
+<li><strong><code>avic_vm_init</code></strong>: 在初始化 VM 时，分配两张核心的 ID 表。</li>
+<li><strong><code>avic_init_vmcb</code></strong>: 将这些数据结构的物理地址填入每个 vCPU 的 VMCB 中。</li>
+<li><strong>vCPU 运行状态同步</strong>：KVM 需要准确地维护 <strong>Physical APIC ID table</strong> 中的 <strong><code>IS_RUNNING</code></strong> 标志位，因为这是硬件判断是否需要 VM-Exit 的关键。</li>
+<li>当一个 vCPU 被调度到物理 CPU 上运行时（<strong><code>vcpu_load</code></strong>），KVM 会设置其对应的 <code>IS_RUNNING</code> 位为 1。</li>
+<li>当 vCPU 被换下时（<strong><code>vcpu_put</code></strong>），KVM 会清除该位。</li>
+<li><strong>动态模式切换</strong>：KVM 能够处理 Guest 在运行时从 xAPIC 切换到 x2APIC 模式的情况。当检测到模式切换时，KVM 会相应地更新 VMCB 中的 <strong><code>bit 30 (x2APIC mode)</code></strong>，并调整对 x2APIC MSR 的拦截策略，确保 x2AVIC 硬件能够接管。</li>
+</ul>
+<h3><strong>3.2 QEMU/Libvirt 实践配置</strong></h3>
+<p>要在 QEMU/KVM 环境中充分利用 x2AVIC，尤其是在 vCPU 数量超过 255 的场景下，需要满足几个关键配置：</p>
+<ul>
+<li><strong><code>-cpu host,x2apic=on</code></strong>:</li>
+<li>向 Guest 暴露 <strong>x2APIC</strong> 特性，这是启用 x2AVIC 的前提。</li>
+<li><strong><code>-machine kernel-irqchip=split</code></strong>:</li>
+<li>这是推荐的中断控制器模式。它将 vLAPIC 的模拟保留在内核（KVM）中，而将 IOAPIC 等其他部分交给用户态的 QEMU 处理。这种模式是启用 AVIC 的必要条件之一，因为它能更好地与 KVM 的 APICv 实现协同。</li>
+<li>使用 <code>split</code> 模式还可以配合 <strong><code>kvm-msi-ext-dest-id</code></strong> 这个半虚拟化特性，让超过 255 个 vCPU 的大虚拟机在没有完整 vIOMMU 的情况下也能正确路由 MSI 中断。</li>
+<li><strong>vIOMMU (可选但推荐)</strong>:</li>
+<li>对于需要设备直通（passthrough）的大型虚拟机，配置一个支持 x2APIC 的虚拟 IOMMU (如 <strong><code>-device intel-iommu,intremap=on,eim=on</code></strong>) 是更稳健的方案，它可以为 Guest 提供中断重映射能力。</li>
+</ul>
+<blockquote>
+<p><strong>参考资料</strong>: Oracle 的一篇博客文章详细介绍了在 KVM/QEMU 中启用和验证 x2AVIC 的完整步骤。<a href="https://blogs.oracle.com/linux/amd-avic">How to enable AMD AVIC and speed up your VMs (Oracle Linux Blog, 2024)</a></p>
+</blockquote>
+<h2>4. GA Log 机制原理</h2>
+<p>当 AVIC 与 IOMMU 结合使用时，可以实现对设备中断的端到端硬件加速。这个特性在 AMD IOMMU 规范中被称为 <strong>Guest Virtual APIC (GA) Mode</strong>。</p>
+<p>然而，这里存在一个与 vCPU 运行状态相关的挑战：如果一个设备中断的目标 vCPU 此刻<strong>没有</strong>在任何物理核心上运行，IOMMU 无法像 AVIC 处理 IPI 那样直接投递中断。为了解决这个问题，AMD IOMMU 引入了 <strong>GA Log (Guest APIC Log)</strong> 机制。</p>
+<h3><strong>4.1 GA Log 工作流程</strong></h3>
+<ol>
+<li><strong>中断到达 IOMMU</strong>：一个直通设备发出中断。</li>
+<li><strong>查询 IRTE</strong>：IOMMU 查找其中断重映射表（Interrupt Remapping Table Entry, <strong>IRTE</strong>）。在 GA 模式下，IRTE 是 128 位宽，包含了 <strong><code>ga_root_ptr</code></strong> (指向 vAPIC backing page) 和 <strong><code>ga_tag</code></strong> 等信息。</li>
+<li><strong>检查 vCPU 状态</strong>：IOMMU 硬件通过查询 Physical APIC ID Table（与 CPU AVIC 共享）来判断目标 vCPU 的 <strong><code>IS_RUNNING</code></strong> 状态。</li>
+<li><strong>vCPU 正在运行</strong>：如果 vCPU 正在运行，IOMMU 直接将中断信息写入 vAPIC backing page，流程与 CPU AVIC 类似，中断被快速投递。</li>
+<li><strong>vCPU 未在运行</strong>：如果 vCPU 未运行，直接投递会失败。此时，IOMMU 不会丢弃中断，而是：a.  将该中断的相关信息（如 <code>ga_tag</code>）记录在一个专门的内存区域——<strong>GA Log</strong> 中。b.  触发一个特殊的物理中断——<strong>GALOG 中断</strong>，通知宿主机（KVM）。</li>
+<li><strong>KVM 接管</strong>：a.  KVM 的 <strong>GALOG 中断处理函数</strong> (<code>avic_ga_log_notifier</code>) 被调用。b.  KVM 读取 GA Log，了解是哪个 vCPU 有待处理的设备中断。c.  KVM 调度器将该 vCPU 唤醒，并安排其在某个物理核心上运行。d.  一旦 vCPU 开始运行，KVM 再通过常规方式（或 AVIC doorbell）将挂起的设备中断注入给它。</li>
+</ol>
+<p>通过 GA Log 机制，AMD IOMMU 确保了即使在目标 vCPU 被调度走的情况下，设备中断也不会丢失，而是在 vCPU 恢复运行时能够被及时处理，实现了可靠的延迟投递。</p>
+<blockquote>
+<p><strong>参考资料</strong>: KVM 社区关于 IOMMU AVIC 支持的补丁集，包含了 GALOG 中断处理的实现细节。<a href="https://lwn.net/Articles/695286/">iommu/AMD: Introduce IOMMU AVIC support (LWN.net, 2016)</a></p>
+</blockquote>
+<h2>5. Physical APIC ID Table 条目格式</h2>
+<p>在 AMD x2AVIC 中，<strong>Physical APIC ID Table</strong> 是一个由硬件直接访问的内存表，用于将 Guest vCPU 的 APIC ID 映射到 Host 物理 CPU 信息。</p>
+<h3>5.1 条目结构</h3>
+<p>每个条目长度为 <strong>64 位（8 字节）</strong>，具体字段定义如下：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">位范围 (Bits)</th>
+<th style="text-align: left;">字段名称</th>
+<th style="text-align: left;">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>63</strong></td>
+<td style="text-align: left;"><strong>Valid (V)</strong></td>
+<td style="text-align: left;">条目是否有效。<code>1</code>=有效，<code>0</code>=无效。</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>62</strong></td>
+<td style="text-align: left;"><strong>IsRunning</strong></td>
+<td style="text-align: left;">vCPU 是否当前在该物理 CPU 上运行。<code>1</code>=运行中，<code>0</code>=未运行。</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>61</strong></td>
+<td style="text-align: left;"><strong>GA_Log_Intr</strong></td>
+<td style="text-align: left;">合成标志。用于设备 Posted IRQ 的 GA Log 中断通知。</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>51:12</strong></td>
+<td style="text-align: left;"><strong>Backing Page Pointer</strong></td>
+<td style="text-align: left;">指向该 vCPU 的 <strong>Virtual APIC Backing Page</strong> 的物理地址。</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>11:0</strong></td>
+<td style="text-align: left;"><strong>Host Physical APIC ID</strong></td>
+<td style="text-align: left;">该 vCPU 当前调度到的物理 CPU 的 APIC ID。</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>📌 <strong>x2AVIC 扩展特性</strong>：
+传统 AVIC 仅支持 8 位 Host Physical APIC ID（最大 255），而 <strong>x2AVIC 将此字段扩展到 12 位</strong>，支持最大 <strong>4095</strong> 的物理 APIC ID，以适应大规模多核系统。</p>
+</blockquote>
+<h3>5.2 Linux 内核宏定义</h3>
+<p>以下宏定义来自 Linux 内核源码 (<code>arch/x86/include/asm/svm.h</code>)：</p>
+<div class="highlight"><pre><span></span><code><span class="cp">#define AVIC_PHYSICAL_ID_ENTRY_HOST_PHYSICAL_ID_MASK  GENMASK_ULL(11, 0)   </span><span class="c1">// bits 11:0</span>
+<span class="cp">#define AVIC_PHYSICAL_ID_ENTRY_BACKING_PAGE_MASK      GENMASK_ULL(51, 12)  </span><span class="c1">// bits 51:12</span>
+<span class="cp">#define AVIC_PHYSICAL_ID_ENTRY_IS_RUNNING_MASK        (1ULL &lt;&lt; 62)         </span><span class="c1">// bit 62</span>
+<span class="cp">#define AVIC_PHYSICAL_ID_ENTRY_VALID_MASK             (1ULL &lt;&lt; 63)         </span><span class="c1">// bit 63</span>
+<span class="cp">#define AVIC_PHYSICAL_ID_ENTRY_GA_LOG_INTR            BIT_ULL(61)          </span><span class="c1">// bit 61 (synthetic)</span>
+</code></pre></div>
+
+<h3>5.3. vCPU 调度时的更新策略</h3>
+<p><strong>核心结论</strong>：当 vCPU 发生调度（即切换了绑定的物理 pCPU）时，Physical APIC ID Table 中对应的条目必须同步更新，以确保硬件中断路由的正确性。</p>
+<h4>5.3.1 需要更新的字段</h4>
+<ol>
+<li><strong>Host Physical APIC ID (bits 11:0)</strong></li>
+<li><strong>操作</strong>：更新为新的物理 CPU 的 APIC ID。</li>
+<li><strong>原因</strong>：硬件需要通过此字段知道向哪个物理 CPU 发送 Doorbell 中断。</li>
+<li><strong>IsRunning (bit 62)</strong></li>
+<li><strong>操作</strong>：<ul>
+<li>vCPU 被调度到 pCPU 运行时：设为 <code>1</code>。</li>
+<li>vCPU 被调度出/阻塞时：设为 <code>0</code>。</li>
+</ul>
+</li>
+<li><strong>原因</strong>：告知硬件该 vCPU 当前是否可接收中断注入。</li>
+</ol>
+<h4>5.3.2 更新场景汇总表</h4>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">场景</th>
+<th style="text-align: center;">是否更新 Host Physical APIC ID</th>
+<th style="text-align: center;">是否更新 IsRunning</th>
+<th style="text-align: left;">备注</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>vCPU 调度到新 pCPU</strong> (非阻塞)</td>
+<td style="text-align: center;">✅ <strong>是</strong></td>
+<td style="text-align: center;">✅ <strong>设为 1</strong></td>
+<td style="text-align: left;">迁移发生，需更新物理 ID</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>vCPU 被抢占/调度出</strong></td>
+<td style="text-align: center;">❌ 否</td>
+<td style="text-align: center;">✅ <strong>设为 0</strong></td>
+<td style="text-align: left;">通常保留旧物理 ID，避免 Doorbell 丢失</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>vCPU 进入阻塞状态</strong> (如 HLT)</td>
+<td style="text-align: center;">❌ 否</td>
+<td style="text-align: center;">✅ <strong>设为 0</strong></td>
+<td style="text-align: left;">可能同时设置 GA_Log_Intr</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>vCPU 从阻塞唤醒</strong></td>
+<td style="text-align: center;">✅ <strong>是</strong> (若迁移)</td>
+<td style="text-align: center;">✅ <strong>设为 1</strong></td>
+<td style="text-align: left;">恢复运行状态</td>
+</tr>
+</tbody>
+</table>
+<p>⚠️ <strong>重要细节</strong>： 当 <code>enable_ipiv=0</code>（IPI 虚拟化禁用）时，KVM 会刻意在写入物理表前清除 <code>IsRunning</code> 位，防止硬件看到 <code>IsRunning=1</code> 但实际 vCPU 未运行的不一致状态。</p>
+<h3>5.4. Linux KVM 实现逻辑</h3>
+<p>在 Linux KVM 内核模块中，更新逻辑主要位于 <code>avic_vcpu_load</code> 和 <code>avic_vcpu_put</code> 函数中。</p>
+<h4>5.4.1 vCPU 加载 (Load)</h4>
+<p>当 vCPU 被调度到物理 CPU 上运行时：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">avic_vcpu_load</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">cpu</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// 1. 获取目标物理 CPU 的 APIC ID</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">h_physical_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">kvm_cpu_get_apicid</span><span class="p">(</span><span class="n">cpu</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// 2. 读取当前条目</span>
+<span class="w">    </span><span class="n">u64</span><span class="w"> </span><span class="n">entry</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">READ_ONCE</span><span class="p">(</span><span class="n">kvm_svm</span><span class="o">-&gt;</span><span class="n">avic_physical_id_table</span><span class="p">[</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">vcpu_id</span><span class="p">]);</span>
+
+<span class="w">    </span><span class="c1">// 3. 更新 Host Physical APIC ID</span>
+<span class="w">    </span><span class="n">entry</span><span class="w"> </span><span class="o">&amp;=</span><span class="w"> </span><span class="o">~</span><span class="n">AVIC_PHYSICAL_ID_ENTRY_HOST_PHYSICAL_ID_MASK</span><span class="p">;</span>
+<span class="w">    </span><span class="n">entry</span><span class="w"> </span><span class="o">|=</span><span class="w"> </span><span class="n">h_physical_id</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1">// 4. 设置 IsRunning = 1</span>
+<span class="w">    </span><span class="n">entry</span><span class="w"> </span><span class="o">|=</span><span class="w"> </span><span class="n">AVIC_PHYSICAL_ID_ENTRY_IS_RUNNING_MASK</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1">// 5. 写回物理表 (若 IPI 虚拟化启用)</span>
+<span class="w">    </span><span class="n">WRITE_ONCE</span><span class="p">(</span><span class="n">kvm_svm</span><span class="o">-&gt;</span><span class="n">avic_physical_id_table</span><span class="p">[</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">vcpu_id</span><span class="p">],</span><span class="w"> </span><span class="n">entry</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<h4>5.4.2 vCPU 卸载 (Put)</h4>
+<p>当 vCPU 离开物理 CPU 时 执行avic_vcpu_put：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">avic_vcpu_put</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// 1. 读取当前条目</span>
+<span class="w">    </span><span class="n">u64</span><span class="w"> </span><span class="n">entry</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">READ_ONCE</span><span class="p">(</span><span class="n">kvm_svm</span><span class="o">-&gt;</span><span class="n">avic_physical_id_table</span><span class="p">[</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">vcpu_id</span><span class="p">]);</span>
+
+<span class="w">    </span><span class="c1">// 2. 清除 IsRunning 标志 (设为 0)</span>
+<span class="w">    </span><span class="n">entry</span><span class="w"> </span><span class="o">&amp;=</span><span class="w"> </span><span class="o">~</span><span class="n">AVIC_PHYSICAL_ID_ENTRY_IS_RUNNING_MASK</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1">// 3. Host Physical APIC ID 通常保留上次值</span>
+<span class="w">    </span><span class="c1">// 目的：避免 doorbell 发送到无效 CPU 导致中断丢失</span>
+
+<span class="w">    </span><span class="c1">// 4. 写回物理表</span>
+<span class="w">    </span><span class="n">WRITE_ONCE</span><span class="p">(</span><span class="n">kvm_svm</span><span class="o">-&gt;</span><span class="n">avic_physical_id_table</span><span class="p">[</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">vcpu_id</span><span class="p">],</span><span class="w"> </span><span class="n">entry</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<h3>5.5. 机制原理与作用</h3>
+<p>维护 Physical APIC ID Table 的正确性对于虚拟化性能至关重要：</p>
+<ol>
+<li><strong>硬件中断路由</strong></li>
+<li>当 Guest 发送 IPI (Inter-Processor Interrupt) 时，AVIC 硬件直接查表。</li>
+<li>根据目标 vCPU ID 找到对应的 <strong>Host Physical APIC ID</strong>。</li>
+<li>通过 <strong>Doorbell 机制</strong> 通知目标物理 CPU。</li>
+<li><strong>避免 VM-Exit</strong></li>
+<li>若表项正确且 <code>IsRunning=1</code>，IPI 可直接由硬件注入目标 vCPU。</li>
+<li><strong>无需陷入 Hypervisor</strong>，显著降低中断延迟。</li>
+<li><strong>迁移一致性</strong></li>
+<li>vCPU 迁移后若不及时更新表项，Doorbell 可能发送到错误的物理 CPU。</li>
+<li>后果：中断丢失、延迟增加或需要软件介入补救。</li>
+</ol>
+<h2>6. 参考资料</h2>
+<ul>
+<li><strong>AMD 官方文档</strong>: AMD64 Architecture Programmer's Manual Vol.2, Section 15.2 "Advanced Virtual Interrupt Controller (AVIC)"</li>
+<li><strong>Linux 内核源码</strong>:</li>
+<li><code>arch/x86/kvm/svm/avic.c</code></li>
+<li><code>arch/x86/include/asm/svm.h</code></li>
+<li><strong>技术文章</strong>: LWN - <em>Introducing AMD x2APIC Virtualization (x2AVIC) support</em></li>
+<li><strong>硬件参考</strong>: AMD Processor Programming Reference (PPR) - SVM and AVIC Chapters</li>
+</ul>
+
+
+             
+ 
+                <p id="post-share-links">
+    Share on:
+      <a href="https://twitter.com/intent/tweet?text=AMD%20x2avic%20details&url=https%3A//kernelgo.org/amd-x2avic.html&hashtags=virtualization" target="_blank" rel="nofollow noopener noreferrer" title="Share on Twitter">Twitter</a>
+ ❄       <a href="https://www.facebook.com/sharer/sharer.php?u=https%3A//kernelgo.org/amd-x2avic.html" target="_blank" rel="nofollow noopener noreferrer" title="Share on Facebook">Facebook</a>
+ ❄       <a href="mailto:?subject=AMD%20x2avic%20details&amp;body=https%3A//kernelgo.org/amd-x2avic.html" target="_blank" rel="nofollow noopener noreferrer" title="Share via Email">Email</a>
+
+            
+            
+
+
+
+
+
+
+
+<section>
+    <h6 style="display:none;">Comments</h6>
+    <p id="comment-message"> </p>
+
+    <div class="accordion" id="accordion2">
+        <div class="accordion-group">
+            <div class="accordion-heading">
+                <a class="accordion-toggle disqus-comment-count comment-count collapsed"
+                   data-toggle="collapse"
+                   data-parent="#accordion2"
+                   data-disqus-identifier="https://kernelgo.org/amd-x2avic.html"
+                   href="https://kernelgo.org/amd-x2avic.html#comment_thread"
+                   id="comment-accordion-toggle">
+                    Comments
+                </a>
+            </div>
+            <div id="comment_thread" class="accordion-body collapse">
+                <div class="accordion-inner">
+                    <div class="comments">
+                        <div id="disqus_thread"></div>
+                        <script>
+    var disqus_shortname = 'kernelgo';
+    (function () {
+        var s = document.createElement('script'); s.async = true;
+        s.type = 'text/javascript';
+        s.src = '//' + disqus_shortname + '.disqus.com/count.js';
+        (document.getElementsByTagName('HEAD')[0] || document.getElementsByTagName('BODY')[0]).appendChild(s);
+    }());
+
+    var disqus_identifier = 'https://kernelgo.org/amd-x2avic.html';
+    var disqus_url = 'https://kernelgo.org/amd-x2avic.html';
+
+    (function() {
+        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    })();
+</script>
+
+<noscript>Please enable JavaScript to view the <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+
+
+
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+            <hr/>
+<section>
+    <h2>Related Posts</h2>
+<ul class="related-posts-list">
+<li><a href="https://kernelgo.org/x86-nmi.html" title="Virt NMI Emulation">Virt NMI Emulation</a></li>
+<li><a href="https://kernelgo.org/reading2019.html" title="Article Archive 2019 Reading Plan">Article Archive 2019 Reading Plan</a></li>
+<li><a href="https://kernelgo.org/microVM.html" title="Lightweight Micro Virtual Machines">Lightweight Micro Virtual Machines</a></li>
+<li><a href="https://kernelgo.org/virtio-overview.html" title="Virtio Spec Overview">Virtio Spec Overview</a></li>
+<li><a href="https://kernelgo.org/reading2020.html" title="Article Archive 2020 Reading Plan">Article Archive 2020 Reading Plan</a></li>
+</ul>
+<hr />
+</section>
+            <aside>
+            <nav>
+            <ul class="articles-timeline">
+                <li class="previous-article">« <a href="https://kernelgo.org/x86_apic.html" title="Previous: Discuss On X86 APIC Virtualization">Discuss On X86 APIC Virtualization</a></li>
+            </ul>
+            </nav>
+            </aside>
+        </div>
+        <section id="article-sidebar" class="span2">
+            <h4>Published</h4>
+            <time itemprop="dateCreated" datetime="2026-02-18T23:00:00+08:00">Wed 18 February 2026</time>
+
+            <h4>Category</h4>
+            <a class="category-link" href="https://kernelgo.org/categories.html#virtualization-ref">virtualization</a>
+            <h4>Tags</h4>
+            <ul class="list-of-tags tags-in-article">
+                <li><a href="https://kernelgo.org/tags.html#virtualization-ref">virtualization
+                    <span class="superscript">16</span>
+</a></li>
+            </ul>
+<h4>Contact</h4>
+<div id="sidebar-social-link">
+    <a href="https://github.com/fangying" title="" target="_blank" rel="nofollow noopener noreferrer">
+        <svg xmlns="http://www.w3.org/2000/svg" aria-label="GitHub" role="img" viewBox="0 0 512 512"><rect width="512" height="512" rx="15%" fill="#1B1817"/><path fill="#fff" d="M335 499c14 0 12 17 12 17H165s-2-17 12-17c13 0 16-6 16-12l-1-50c-71 16-86-28-86-28-12-30-28-37-28-37-24-16 1-16 1-16 26 2 40 26 40 26 22 39 59 28 74 22 2-17 9-28 16-35-57-6-116-28-116-126 0-28 10-51 26-69-3-6-11-32 3-67 0 0 21-7 70 26 42-12 86-12 128 0 49-33 70-26 70-26 14 35 6 61 3 67 16 18 26 41 26 69 0 98-60 120-117 126 10 8 18 24 18 48l-1 70c0 6 3 12 16 12z"/></svg>
+    </a>
+</div>
+            
+
+
+
+
+
+            
+
+
+
+
+
+        </section>
+</div>
+</article>
+<!-- Root element of PhotoSwipe. Must have class pswp. -->
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    <!-- Background of PhotoSwipe.
+         It's a separate element as animating opacity is faster than rgba(). -->
+    <div class="pswp__bg"></div>
+
+    <!-- Slides wrapper with overflow:hidden. -->
+    <div class="pswp__scroll-wrap">
+
+        <!-- Container that holds slides.
+            PhotoSwipe keeps only 3 of them in the DOM to save memory.
+            Don't modify these 3 pswp__item elements, data is added later on. -->
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        <!-- Default (PhotoSwipeUI_Default) interface on top of sliding area. Can be changed. -->
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                <!--  Controls are self-explanatory. Order can be changed. -->
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                <!-- Preloader demo https://codepen.io/dimsemenov/pen/yyBWoR -->
+                <!-- element will get class pswp__preloader--active when preloader is running -->
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                      <div class="pswp__preloader__cut">
+                        <div class="pswp__preloader__donut"></div>
+                      </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>                    </div>
+                    <div class="span1"></div>
+                </div>
+            </div>
+        </div>
+<footer>
+    <div>
+        <span xmlns:dct="http://purl.org/dc/terms/" property="dct:title"> kernelgo"</span> by <a xmlns:cc="http://creativecommons.org/ns#" href="https://kernelgo.org" property="cc:attributionName" rel="cc:attributionURL">Yori Fang</a> is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/3.0/deed.en_US">Creative Commons Attribution-ShareAlike 3.0 Unported License</a>.
+    </div>
+
+
+
+
+    <div id="fpowered">
+        Powered by: <a href="http://getpelican.com/" title="Pelican Home Page" target="_blank" rel="nofollow noopener noreferrer">Pelican</a>
+        Theme: <a href="https://elegant.oncrashreboot.com/" title="Theme Elegant Home Page" target="_blank" rel="nofollow noopener noreferrer">Elegant</a>
+    </div>
+</footer>            <script src="//code.jquery.com/jquery.min.js"></script>
+        <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/js/bootstrap.min.js"></script>
+        <script src="https://kernelgo.org/theme/js/elegant.prod.9e9d5ce754.js"></script>
+        <script>
+            function validateForm(query)
+            {
+                return (query.length > 0);
+            }
+        </script>
+
+    <script>
+    (function () {
+        if (window.location.hash.match(/^#comment-\d+$/)) {
+            $('#comment_thread').collapse('show');
+        }
+    })();
+    window.onhashchange=function(){
+        if (window.location.hash.match(/^#comment-\d+$/))
+            window.location.reload(true);
+    }
+    $('#comment_thread').on('shown', function () {
+        var link = document.getElementById('comment-accordion-toggle');
+        var old_innerHTML = link.innerHTML;
+        $(link).fadeOut(200, function() {
+            $(this).text('Click here to hide comments').fadeIn(200);
+        });
+        $('#comment_thread').on('hidden', function () {
+            $(link).fadeOut(200, function() {
+                $(this).text(old_innerHTML).fadeIn(200);
+            });
+        })
+    })
+</script>
+
+    </body>
+    <!-- Theme: Elegant built for Pelican
+        License : MIT -->
+</html>
