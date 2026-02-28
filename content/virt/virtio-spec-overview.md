@@ -1,4 +1,4 @@
-Title:  Virtio协议概述
+Title:  Virtio Spec Overview
 Date: 2019-9-13 23:00
 Modified: 2019-9-13 23:00
 Tags: virtualization,virtio,virtio-net,virtio-scsi,virtio-blk,virtqueue
@@ -46,7 +46,7 @@ virtio协议标准最早由IBM提出，virtio作为一套标准协议现在有�
 bit24-bit37预给队列和feature协商机制，bit38以上保留给未来其他用途。
 例如：对于virtio-net设备而言，feature bit0表示网卡设备支持checksum校验。
 `VIRTIO_F_VERSION_1`这个feature bit用来表示设备是否支持virtio 1.0 spec标准。
-
+ 
  在virtio协议中，所有的设备都使用virtqueue来进行数据的传输。
  **每个设备可以有0个或者多个virtqueue，每个virtqueue占用2个或者更多个4K的物理页**。
  virtqueue有`Split Virtqueues`和`Packed Virtqueues`两种模式，
@@ -54,17 +54,17 @@ bit24-bit37预给队列和feature协商机制，bit38以上保留给未来其他
  每个部分都是前端驱动或者后端单向可写的（不能两端同时写）。
  每个virtqueue都有一个16bit的queue size参数，表示队列的总长度。
  每个virtqueue由3个部分组成：
-
+ 
 ```
 	+-------------------+--------------------------------+-----------------------+
 	| Descriptor Table  |   Available Ring  (padding)    |       Used Ring       |
 	+-------------------+--------------------------------+-----------------------+
 ```
-
+ 
  * Descriptor Table：存放IO传输请求信息；
  * Available Ring：记录了Descriptor Table表中的I/O请求下发信息，前端Driver可写后端只读；
  * Used Ring：记录Descriptor Table表中已被提交到硬件的信息，前端Driver只读后端可写。
-
+ 
 整个virtio协议中设备IO请求的工作机制可以简单地概括为：
 
 1.  前端驱动将IO请求放到`Descriptor Table`中，然后将索引更新到`Available Ring`中，最后kick后端去取数据；
@@ -89,10 +89,10 @@ virtio-spec 4.2 [Virtio Over MMIO](https://docs.oasis-open.org/virtio/virtio/v1.
 virtio legacy（virtio 0.95）协议规定，对应的配置数据结构（virtio common configuration structure）
 应该存放在设备的BAR0里面，我们称之为`virtio legay interface`，其结构如下：
 
-```
-                       virtio legacy ==> Mapped into PCI BAR0
-	+------------------------------------------------------------------+
-	|                    Host Feature Bits[0:31]                       |
+``` 
+                       virtio legacy ==> Mapped into PCI BAR0 
+	+------------------------------------------------------------------+ 
+	|                    Host Feature Bits[0:31]                       | 
 	+------------------------------------------------------------------+
 	|                    Guest Feature Bits[0:31]                      |
 	+------------------------------------------------------------------+
@@ -108,29 +108,29 @@ virtio legacy（virtio 0.95）协议规定，对应的配置数据结构（virti
 
 对于新的`virtio modern`，协议将配置结构划分为5种类型：
 ```
-/* Common configuration */
-#define VIRTIO_PCI_CAP_COMMON_CFG        1
-/* Notifications */
+/* Common configuration */ 
+#define VIRTIO_PCI_CAP_COMMON_CFG        1 
+/* Notifications */ 
 #define VIRTIO_PCI_CAP_NOTIFY_CFG        2
-/* ISR Status */
-#define VIRTIO_PCI_CAP_ISR_CFG           3
-/* Device specific configuration */
-#define VIRTIO_PCI_CAP_DEVICE_CFG        4
-/* PCI configuration access */
-#define VIRTIO_PCI_CAP_PCI_CFG           5
+/* ISR Status */ 
+#define VIRTIO_PCI_CAP_ISR_CFG           3 
+/* Device specific configuration */ 
+#define VIRTIO_PCI_CAP_DEVICE_CFG        4 
+/* PCI configuration access */ 
+#define VIRTIO_PCI_CAP_PCI_CFG           5 
 ```
 以上的每种配置结构是直接映射到virtio设备的BAR空间内，那么如何指定每种配置结构的位置呢？
 答案是通过`PCI Capability list`方式去指定，这和物理PCI设备是一样的，体现了virtio-pci的协议兼容性。
 ```
-struct virtio_pci_cap {
-        u8 cap_vndr;    /* Generic PCI field: PCI_CAP_ID_VNDR */
-        u8 cap_next;    /* Generic PCI field: next ptr. */
-        u8 cap_len;     /* Generic PCI field: capability length */
-        u8 cfg_type;    /* Identifies the structure. */
-        u8 bar;         /* Where to find it. */
-        u8 padding[3];  /* Pad to full dword. */
-        le32 offset;    /* Offset within bar. */
-        le32 length;    /* Length of the structure, in bytes. */
+struct virtio_pci_cap { 
+        u8 cap_vndr;    /* Generic PCI field: PCI_CAP_ID_VNDR */ 
+        u8 cap_next;    /* Generic PCI field: next ptr. */ 
+        u8 cap_len;     /* Generic PCI field: capability length */ 
+        u8 cfg_type;    /* Identifies the structure. */ 
+        u8 bar;         /* Where to find it. */ 
+        u8 padding[3];  /* Pad to full dword. */ 
+        le32 offset;    /* Offset within bar. */ 
+        le32 length;    /* Length of the structure, in bytes. */ 
 };
 ```
 只是略微不同的是，virtio-pci的Capability有一个统一的结构，
@@ -246,26 +246,26 @@ Used Ring结构稍微不一样，flags的值如果为`VIRTIO_F_EVENT_IDX`并且�
  * at the end of the avail ring. Host should ignore the avail->flags field. */
 /* The Host publishes the avail index for which it expects a kick
  * at the end of the used ring. Guest should ignore the used->flags field. */
-
-struct virtq_used {
-#define VIRTQ_USED_F_NO_NOTIFY  1
-        le16 flags;
-        le16 idx;
-        struct virtq_used_elem ring[ /* Queue Size */];
-        le16 avail_event; /* Only if VIRTIO_F_EVENT_IDX */
-};
-
-/* le32 is used here for ids for padding reasons. */
-struct virtq_used_elem {
-        /* Index of start of used descriptor chain. */
-        le32 id;
-        /* Total length of the descriptor chain which was used (written to) */
-        le32 len;
+ 
+struct virtq_used { 
+#define VIRTQ_USED_F_NO_NOTIFY  1 
+        le16 flags; 
+        le16 idx; 
+        struct virtq_used_elem ring[ /* Queue Size */]; 
+        le16 avail_event; /* Only if VIRTIO_F_EVENT_IDX */ 
+}; 
+ 
+/* le32 is used here for ids for padding reasons. */ 
+struct virtq_used_elem { 
+        /* Index of start of used descriptor chain. */ 
+        le32 id; 
+        /* Total length of the descriptor chain which was used (written to) */ 
+        le32 len; 
 };
 ```
 
 原理就到这里，后面会以virtio网卡为例进行详细流程说明。
-
+    
 ## 2. 前后端通信机制（irqfd 与 ioeventfd）
 
 共享内存方式解决了传统设备IO过程中内存拷贝带来的性能损耗问题，除此之外前端驱动和后端驱动的通信问题也是有可以改进的地方。
@@ -304,15 +304,15 @@ Virtio前后端通信概括起来只有两个方向，即GuestOS通知QEMU和QEM
 ```c
 前端驱动通知后端：
 内核流程mark一下，PCI设备驱动流程这个后面可以学习一下，先扫描PCI bus发现是virtio设备再扫描virtio-bus。
-worker_thread --> process_one_work --> pciehp_power_thread --> pciehp_enable_slot -->
-pciehp_configure_device --> pci_bus_add_devices --> pci_bus_add_device --> device_attach -->
-__device_attach --> bus_for_each_drv --> __device_attach_driver --> driver_probe_device -->
-pci_device_probe --> local_pci_probe --> virtio_pci_probe --> register_virtio_device -->
-device_register --> device_add --> bus_probe_device --> device_initial_probe
+worker_thread --> process_one_work --> pciehp_power_thread --> pciehp_enable_slot --> 
+pciehp_configure_device --> pci_bus_add_devices --> pci_bus_add_device --> device_attach --> 
+__device_attach --> bus_for_each_drv --> __device_attach_driver --> driver_probe_device --> 
+pci_device_probe --> local_pci_probe --> virtio_pci_probe --> register_virtio_device --> 
+device_register --> device_add --> bus_probe_device --> device_initial_probe 
 --> __device_attach --> bus_for_each_drv --> __device_attach_driver -->
 driver_probe_device --> virtio_dev_probe --> virtnet_probe (网卡设备驱动加载的入口)
 
-static int virtnet_probe(struct virtio_device *vdev)
+static int virtnet_probe(struct virtio_device *vdev) 
 {
     ......
     virtio_device_ready(vdev);
@@ -402,7 +402,7 @@ virtnet_probe
             --> vp_request_msix_vectors // 主要的MSIx中断申请逻辑都在这个函数里面
               --> pci_alloc_irq_vectors_affinity // 申请MSIx中断描述符(__pci_enable_msix_range)
                 --> request_irq  // 注册中断处理函数
-
+               
 	       // virtio-net网卡至少申请了3个MSIx中断：
                 // 一个是configuration change中断（配置空间发生变化后，QEMU通知前端）
                 // 发送队列1个MSIx中断，接收队列1MSIx中断
@@ -416,13 +416,13 @@ virtio_pci_config_write
       --> virtio_net_vhost_status
         --> vhost_net_start
           --> virtio_pci_set_guest_notifiers
-            --> kvm_virtio_pci_vector_use
+            --> kvm_virtio_pci_vector_use 
               |--> kvm_irqchip_add_msi_route //更新中断路由表
               |--> kvm_virtio_pci_irqfd_use  //使能MSI中断
                  --> kvm_irqchip_add_irqfd_notifier_gsi
                    --> kvm_irqchip_assign_irqfd
-
-# 申请MSIx中断的时候，会为MSIx分配一个gsi，并为这个gsi绑定一个irqfd，然后调用ioctl KVM_IRQFD注册到内核中。
+                  
+# 申请MSIx中断的时候，会为MSIx分配一个gsi，并为这个gsi绑定一个irqfd，然后调用ioctl KVM_IRQFD注册到内核中。               
 static int kvm_irqchip_assign_irqfd(KVMState *s, int fd, int rfd, int virq,
                                     bool assign)
 {
@@ -552,9 +552,9 @@ QEM模拟PCI设备对GuestOS进行呈现，设备驱动加载的时候尝试去�
 ```c
 # 先在PCI总线上调用probe设备，调用了virtio_pci_probe，然后再virtio-bus上调用virtio_dev_probe
 # virtio_dev_probe最后调用到virtnet_probe
-pci_device_probe --> local_pci_probe --> virtio_pci_probe --> register_virtio_device -->
-device_register --> device_add --> bus_probe_device --> device_initial_probe
---> __device_attach --> bus_for_each_drv --> __device_attach_driver --> driver_probe_device -->
+pci_device_probe --> local_pci_probe --> virtio_pci_probe --> register_virtio_device --> 
+device_register --> device_add --> bus_probe_device --> device_initial_probe 
+--> __device_attach --> bus_for_each_drv --> __device_attach_driver --> driver_probe_device --> 
 virtio_dev_probe --> virtnet_probe
 
 # 在virtio_pci_probe里先尝试以virtio modern方式读取设备配置数据结构，如果失败则尝试virio legacy方式。
@@ -581,7 +581,7 @@ int virtio_pci_modern_probe(struct virtio_pci_device *vp_dev)
         notify = virtio_pci_find_capability(pci_dev, VIRTIO_PCI_CAP_NOTIFY_CFG,
                                             IORESOURCE_IO | IORESOURCE_MEM,
                                             &vp_dev->modern_bars);
-
+                                            
         /* Device capability is only mandatory for devices that have
         * device-specific configuration.
         */
@@ -594,12 +594,12 @@ int virtio_pci_modern_probe(struct virtio_pci_device *vp_dev)
                                         sizeof(struct virtio_pci_common_cfg), 4,
                                         0, sizeof(struct virtio_pci_common_cfg),
                                         NULL);
-        // 将配virtio置结构所在的BAR空间MAP到内核地址空间里
+        // 将配virtio置结构所在的BAR空间MAP到内核地址空间里                                
         vp_dev->common = map_capability(pci_dev, common,
                                         sizeof(struct virtio_pci_common_cfg), 4,
                                         0, sizeof(struct virtio_pci_common_cfg),
                                         NULL);
-        ......
+        ......                              
 }
 
 # 接着来到virtio_dev_probe里面看下：
@@ -610,10 +610,10 @@ static int virtio_dev_probe(struct device *_d)
 
         /* Figure out what features the device supports. */
         device_features = dev->config->get_features(dev);   // 查询后端支持哪些feature bits
-
+        
         // feature set协商，取交集
         err = virtio_finalize_features(dev); 
-
+        
         // 调用特定virtio设备的驱动程序probe，例如: virtnet_probe, virtblk_probe
         err = drv->probe(dev); 
 }
@@ -627,20 +627,20 @@ static int virtnet_probe(struct virtio_device *vdev)
        // check后端是否支持多队列，并按情况创建队列
        /* Allocate ourselves a network device with room for our info */
         dev = alloc_etherdev_mq(sizeof(struct virtnet_info), max_queue_pairs);
-
+        
         // 定义一个网络设备并配置一些属性，例如MAC地址
         dev->ethtool_ops = &virtnet_ethtool_ops;
 	       SET_NETDEV_DEV(dev, &vdev->dev);
-
+ 
         // 初始化virtqueue
         err = init_vqs(vi);
-
+        
         // 注册一个网络设备
         err = register_netdev(dev);
-
+        
         // 写状态位DRIVER_OK，告诉后端，前端已经ready
         virtio_device_ready(vdev);
-
+        
         // 将网卡up起来
         netif_carrier_on(dev);
 }
@@ -659,15 +659,20 @@ static int vp_find_vqs_msix(struct virtio_device *vdev, unsigned nvqs,
 		const bool *ctx,
 		struct irq_affinity *desc)
 {
-        /* 为configuration change申请MSIx中断 */
-	err = vp_request_msix_vectors(vdev, nvectors, per_vq_vectors,
+
+
+        // 为每个vq分配一个MSIx中断号， per_vq_vectors = true
+        // 同时为configuration change申请单独一个MSIx中断，一并设置了cfg的中断处理函数
+	    err = vp_request_msix_vectors(vdev, nvectors, per_vq_vectors,
 			      per_vq_vectors ? desc : NULL);
+
         for (i = 0; i < nvqs; ++i) {
-		 // 创建队列 --> vring_create_virtqueue --> vring_create_virtqueue_split --> vring_alloc_queue
-	         vqs[i] = vp_setup_vq(vdev, queue_idx++, callbacks[i], names[i],
+                // 创建队列 --> vring_create_virtqueue --> vring_create_virtqueue_split --> vring_alloc_queue
+                vqs[i] = vp_setup_vq(vdev, queue_idx++, callbacks[i], names[i],
                                 ctx ? ctx[i] : false,
                                 msix_vec);
-		// 每个队列申请一个MSIx中断
+
+		        // 每个队列设置对应的MSIx中断处理函数
                 err = request_irq(pci_irq_vector(vp_dev->pci_dev, msix_vec),
                                   vring_interrupt, 0,
                                   vp_dev->msix_names[msix_vec],
@@ -749,7 +754,7 @@ OK，这个小节就到这里。Are you clear ?
 ### 3.2 virtio-net网卡收发在virtqueue上的实现
 
 这里以virtio-net为例（非vhost-net模式）来分析一下网卡收发报文在virtio协议上的具体实现。
-virtio-net模式下网卡收发包的流程为：
+virtio-net模式下网卡收发包的流程为： 
 
 * 收包：Hardware => Host Kernel => Qemu => Guest
 * 发包：Guest => Host Kernel => Qemu => Host Kernel => Hardware
@@ -785,7 +790,7 @@ start_xmit
 	// 将skb放到virtqueue队列中
  	-> xmit_skb -> sg_init_table,virtqueue_add_outbuf -> virtqueue_add
 	// kick通知qemu后端去取
-	virtqueue_kick_prepare && virtqueue_notify
+	virtqueue_kick_prepare && virtqueue_notify 
 	// kick次数加1
 	sq->stats.kicks++
 ```
@@ -804,7 +809,7 @@ virtio_queue_host_notifier_read -> virtio_queue_notify_vq
 	        -> virtqueue_pop
 		-> qemu_sendv_packet_async // 报文放到发送队列上，写tap设备的fd去发包
 		    -> tap_receive_iov -> tap_write_packet
-
+		    
 // 最后调用 tap_write_packet 把数据包发给tap设备投递出去
 ```
 
