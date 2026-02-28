@@ -1,4 +1,4 @@
-Title: AMD x2avic details
+Title: AMD X2AVIC 理解
 Date: 2026-2-18 23:00
 Modified: 2026-2-18 23:00
 Tags: virtualization
