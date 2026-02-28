@@ -4,7 +4,7 @@
         <meta charset="utf-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="stylesheet" href="https://blog.kernel.love/theme/css/style.min.css?fc5adb95">
+<link rel="stylesheet" href="https://blog.kernel.love/theme/css/style.min.css?2fcac227">
 
         <link rel="dns-prefetch" href="//fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin>
@@ -16,26 +16,27 @@
         <meta property="og:type" content="article" />
         <meta name="twitter:card" content="summary">
 
-<meta name="keywords" content="virtualization, virtualization, " />
+<meta name="keywords" content="virtualization, virt, " />
 
-<meta property="og:title" content="VT-d DMA Remapping "/>
+<meta property="og:title" content="VT-d DMA Remapping原理 "/>
 <meta property="og:url" content="https://blog.kernel.love/dma-remapping.html" />
 <meta property="og:description" content="VT-d DMA Remapping" />
-<meta property="og:site_name" content="kernelgo" />
+<meta property="og:site_name" content="blog.kernel.love" />
 <meta property="og:article:author" content="Yori Fang" />
 <meta property="og:article:published_time" content="2017-10-01T13:00:00+08:00" />
 <meta property="og:article:modified_time" content="2017-10-01T13:00:00+08:00" />
-<meta name="twitter:title" content="VT-d DMA Remapping ">
+<meta name="twitter:title" content="VT-d DMA Remapping原理 ">
 <meta name="twitter:description" content="VT-d DMA Remapping">
 
-        <title>VT-d DMA Remapping  · kernelgo
+        <title>VT-d DMA Remapping原理  · blog.kernel.love
 </title>
+
 <script>
     (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
      })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
-    ga('create', 'UA-107392039-1', 'auto');
+    ga('create', 'UA-107392039-2', 'auto');
     ga('send', 'pageview');
 </script>
 
@@ -51,7 +52,7 @@
                             <span class="icon-bar"></span>
                             <span class="icon-bar"></span>
                         </a>
-                        <a class="brand" href="https://blog.kernel.love/"><span class=site-name>kernelgo</span></a>
+                        <a class="brand" href="https://blog.kernel.love/"><span class=site-name>blog.kernel.love</span></a>
                         <div class="nav-collapse collapse">
                             <ul class="nav pull-right top-menu">
                                 <li >
@@ -78,7 +79,7 @@
     <header class="page-header span10 offset2">
         <h1>
             <a href="https://blog.kernel.love/dma-remapping.html">
-                VT-d DMA Remapping
+                VT-d DMA Remapping原理
             </a>
         </h1>
     </header>
@@ -139,9 +140,9 @@ IOMMU硬件会截获直通设备发出的请求，然后根据其Request ID查�
  
                 <p id="post-share-links">
     Share on:
-      <a href="https://twitter.com/intent/tweet?text=VT-d%20DMA%20Remapping&url=https%3A//blog.kernel.love/dma-remapping.html&hashtags=virtualization" target="_blank" rel="nofollow noopener noreferrer" title="Share on Twitter">Twitter</a>
+      <a href="https://twitter.com/intent/tweet?text=VT-d%20DMA%20Remapping%E5%8E%9F%E7%90%86&url=https%3A//blog.kernel.love/dma-remapping.html&hashtags=virtualization" target="_blank" rel="nofollow noopener noreferrer" title="Share on Twitter">Twitter</a>
  ❄       <a href="https://www.facebook.com/sharer/sharer.php?u=https%3A//blog.kernel.love/dma-remapping.html" target="_blank" rel="nofollow noopener noreferrer" title="Share on Facebook">Facebook</a>
- ❄       <a href="mailto:?subject=VT-d%20DMA%20Remapping&amp;body=https%3A//blog.kernel.love/dma-remapping.html" target="_blank" rel="nofollow noopener noreferrer" title="Share via Email">Email</a>
+ ❄       <a href="mailto:?subject=VT-d%20DMA%20Remapping%E5%8E%9F%E7%90%86&amp;body=https%3A//blog.kernel.love/dma-remapping.html" target="_blank" rel="nofollow noopener noreferrer" title="Share via Email">Email</a>
 
             
             
@@ -151,67 +152,15 @@ IOMMU硬件会截获直通设备发出的请求，然后根据其Request ID查�
 
 
 
-
-<section>
-    <h6 style="display:none;">Comments</h6>
-    <p id="comment-message"> </p>
-
-    <div class="accordion" id="accordion2">
-        <div class="accordion-group">
-            <div class="accordion-heading">
-                <a class="accordion-toggle disqus-comment-count comment-count collapsed"
-                   data-toggle="collapse"
-                   data-parent="#accordion2"
-                   data-disqus-identifier="https://blog.kernel.love/dma-remapping.html"
-                   href="https://blog.kernel.love/dma-remapping.html#comment_thread"
-                   id="comment-accordion-toggle">
-                    Comments
-                </a>
-            </div>
-            <div id="comment_thread" class="accordion-body collapse">
-                <div class="accordion-inner">
-                    <div class="comments">
-                        <div id="disqus_thread"></div>
-                        <script>
-    var disqus_shortname = 'kernelgo';
-    (function () {
-        var s = document.createElement('script'); s.async = true;
-        s.type = 'text/javascript';
-        s.src = '//' + disqus_shortname + '.disqus.com/count.js';
-        (document.getElementsByTagName('HEAD')[0] || document.getElementsByTagName('BODY')[0]).appendChild(s);
-    }());
-
-    var disqus_identifier = 'https://blog.kernel.love/dma-remapping.html';
-    var disqus_url = 'https://blog.kernel.love/dma-remapping.html';
-
-    (function() {
-        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
-        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
-        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
-    })();
-</script>
-
-<noscript>Please enable JavaScript to view the <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
-
-
-
-
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</section>
 
             <hr/>
 <section>
     <h2>Related Posts</h2>
 <ul class="related-posts-list">
-<li><a href="https://blog.kernel.love/reading2019.html" title="Article Archive 2019 Reading Plan">Article Archive 2019 Reading Plan</a></li>
-<li><a href="https://blog.kernel.love/microVM.html" title="Lightweight Micro Virtual Machines">Lightweight Micro Virtual Machines</a></li>
+<li><a href="https://blog.kernel.love/vtd-posted-interrupt-code-analysis.html" title="VT-d Interrupt Posting代码分析">VT-d Interrupt Posting代码分析</a></li>
+<li><a href="https://blog.kernel.love/x86-nmi.html" title="Virt NMI Emulation">Virt NMI Emulation</a></li>
+<li><a href="https://blog.kernel.love/microVM.html" title="轻量级虚拟化技术">轻量级虚拟化技术</a></li>
 <li><a href="https://blog.kernel.love/virtio-overview.html" title="Virtio Spec Overview">Virtio Spec Overview</a></li>
-<li><a href="https://blog.kernel.love/reading2020.html" title="Article Archive 2020 Reading Plan">Article Archive 2020 Reading Plan</a></li>
 <li><a href="https://blog.kernel.love/amd-x2avic.html" title="AMD x2avic details">AMD x2avic details</a></li>
 </ul>
 <hr />
@@ -219,8 +168,8 @@ IOMMU硬件会截获直通设备发出的请求，然后根据其Request ID查�
             <aside>
             <nav>
             <ul class="articles-timeline">
-                <li class="previous-article">« <a href="https://blog.kernel.love/posted-interrupt.html" title="Previous: VT-d Posted Interrupt">VT-d Posted Interrupt</a></li>
-                <li class="next-article"><a href="https://blog.kernel.love/vfio-introduction.html" title="Next: VFIO Introduction">VFIO Introduction</a> »</li>
+                <li class="previous-article">« <a href="https://blog.kernel.love/posted-interrupt.html" title="Previous: VT-d Posted Interrupt原理">VT-d Posted Interrupt原理</a></li>
+                <li class="next-article"><a href="https://blog.kernel.love/vfio-introduction.html" title="Next: VFIO设备直通框架介绍">VFIO设备直通框架介绍</a> »</li>
             </ul>
             </nav>
             </aside>
@@ -230,11 +179,11 @@ IOMMU硬件会截获直通设备发出的请求，然后根据其Request ID查�
             <time itemprop="dateCreated" datetime="2017-10-01T13:00:00+08:00">Sun 01 October 2017</time>
 
             <h4>Category</h4>
-            <a class="category-link" href="https://blog.kernel.love/categories.html#virtualization-ref">virtualization</a>
+            <a class="category-link" href="https://blog.kernel.love/categories.html#virt-ref">virt</a>
             <h4>Tags</h4>
             <ul class="list-of-tags tags-in-article">
                 <li><a href="https://blog.kernel.love/tags.html#virtualization-ref">virtualization
-                    <span class="superscript">16</span>
+                    <span class="superscript">13</span>
 </a></li>
             </ul>
 <h4>Contact</h4>
@@ -330,7 +279,7 @@ IOMMU硬件会截获直通设备发出的请求，然后根据其Request ID查�
         </div>
 <footer>
     <div>
-        <span xmlns:dct="http://purl.org/dc/terms/" property="dct:title"> kernelgo"</span> by <a xmlns:cc="http://creativecommons.org/ns#" href="https://kernelgo.org" property="cc:attributionName" rel="cc:attributionURL">Yori Fang</a> is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/3.0/deed.en_US">Creative Commons Attribution-ShareAlike 3.0 Unported License</a>.
+        <span xmlns:dct="http://purl.org/dc/terms/" property="dct:title"> blog.kernel.love"</span> by <a xmlns:cc="http://creativecommons.org/ns#" href="https://blog.kernel.love" property="cc:attributionName" rel="cc:attributionURL">Yori Fang</a> is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/3.0/deed.en_US">Creative Commons Attribution-ShareAlike 3.0 Unported License</a>.
     </div>
 
 

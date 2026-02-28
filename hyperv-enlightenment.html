@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://blog.kernel.love/theme/css/style.min.css?2fcac227">
+
+        <link rel="dns-prefetch" href="//fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin>
+
+        <meta name="author" content="YoriFang" />
+
+        <meta name="description" content="本文不是为了分析HyperV，而是来分析一下当前KVM中对hyperv的一些增强的支持， 这些HyperV Enlightenment能够对KVM场景下Windows虚拟机的性能提升有帮助。 在大多数场景下通过软件模拟的硬件性能会比较差，为此KVM实现了自己的半虚拟化接口。 Linux虚拟机通常能够在半虚拟化下工作的很好，因 …
+" />
+        <meta property="og:type" content="article" />
+        <meta name="twitter:card" content="summary">
+
+<meta name="keywords" content="hyperv, virt, " />
+
+<meta property="og:title" content="KVM中的HperV增强 "/>
+<meta property="og:url" content="https://blog.kernel.love/hyperv-enlightenment.html" />
+<meta property="og:description" content="本文不是为了分析HyperV，而是来分析一下当前KVM中对hyperv的一些增强的支持， 这些HyperV Enlightenment能够对KVM场景下Windows虚拟机的性能提升有帮助。 在大多数场景下通过软件模拟的硬件性能会比较差，为此KVM实现了自己的半虚拟化接口。 Linux虚拟机通常能够在半虚拟化下工作的很好，因 …" />
+<meta property="og:site_name" content="blog.kernel.love" />
+<meta property="og:article:author" content="YoriFang" />
+<meta property="og:article:published_time" content="2022-11-11T20:20:00+08:00" />
+<meta name="twitter:title" content="KVM中的HperV增强 ">
+<meta name="twitter:description" content="本文不是为了分析HyperV，而是来分析一下当前KVM中对hyperv的一些增强的支持， 这些HyperV Enlightenment能够对KVM场景下Windows虚拟机的性能提升有帮助。 在大多数场景下通过软件模拟的硬件性能会比较差，为此KVM实现了自己的半虚拟化接口。 Linux虚拟机通常能够在半虚拟化下工作的很好，因 …">
+
+        <title>KVM中的HperV增强  · blog.kernel.love
+</title>
+
+<script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+     (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+     m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+     })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+    ga('create', 'UA-107392039-2', 'auto');
+    ga('send', 'pageview');
+</script>
+
+
+    </head>
+    <body>
+        <div id="content">
+            <div class="navbar navbar-static-top">
+                <div class="navbar-inner">
+                    <div class="container-fluid">
+                        <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                        </a>
+                        <a class="brand" href="https://blog.kernel.love/"><span class=site-name>blog.kernel.love</span></a>
+                        <div class="nav-collapse collapse">
+                            <ul class="nav pull-right top-menu">
+                                <li >
+                                    <a href=
+                                       https://blog.kernel.love
+                                    >Home</a>
+                                </li>
+                                <li ><a href="https://blog.kernel.love/pages/about.html">About</a></li>
+                                <li ><a href="https://blog.kernel.love/categories.html">Categories</a></li>
+                                <li ><a href="https://blog.kernel.love/tags.html">Tags</a></li>
+                                <li ><a href="https://blog.kernel.love/archives.html">Archives</a></li>
+                                <li><form class="navbar-search" action="https://blog.kernel.love/search.html" onsubmit="return validateForm(this.elements['q'].value);"> <input type="text" class="search-query" placeholder="Search" name="q" id="tipue_search_input"></form></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="container-fluid">
+                <div class="row-fluid">
+                    <div class="span1"></div>
+                    <div class="span10">
+<article itemscope>
+<div class="row-fluid">
+    <header class="page-header span10 offset2">
+        <h1>
+            <a href="https://blog.kernel.love/hyperv-enlightenment.html">
+                KVM中的HperV增强
+            </a>
+        </h1>
+    </header>
+</div>
+
+<div class="row-fluid">
+        <div class="span8 offset2 article-content">
+            
+            <p><img alt="hyperv-logo" src="https://www.pikpng.com/pngl/m/361-3613517_microsoft-hyper-v-logo-microsoft-hyper-v-logo.png"></p>
+<p>本文不是为了分析HyperV，而是来分析一下当前KVM中对hyperv的一些增强的支持，</p>
+<p>这些HyperV Enlightenment能够对KVM场景下Windows虚拟机的性能提升有帮助。
+在大多数场景下通过软件模拟的硬件性能会比较差，为此KVM实现了自己的半虚拟化接口。
+Linux虚拟机通常能够在半虚拟化下工作的很好，因为内核本身会同步支持半虚拟化。
+但通常来说为一些闭源的操作系统来实现这些就比较困难了，例如Microsoft Windows。
+为此KVM在x86上为Windows Guest实现了HyperV启迪（HyperV Enlightenment），
+这些特性会让Windows和HyperV的Guest认为他们运行在HyperV兼容的Hypervisor上，
+这样Guest就会自动开启一些半虚拟化的性能优化。</p>
+<p>翻译原文：<a href="https://www.qemu.org/docs/master/system/i386/hyperv.html">hyper-v enlightenment</a></p>
+<h3>设置HyperV启迪</h3>
+<p>默认情况下Qemu/KVM不会开启任何的HyperV启迪，qemu支持将单个的启迪特性通过cpu flags配置传入来尝试使能，例如：</p>
+<div class="highlight"><pre><span></span><code>qemu-system-x86_64 --enable-kvm --cpu host,hv_relaxed,hv_vpindex,hv_time, ...
+</code></pre></div>
+
+<p>libvirt的HyperV特性对应的XML配置为：</p>
+<div class="highlight"><pre><span></span><code><span class="nt">&lt;features&gt;</span>
+<span class="w">  </span><span class="nt">&lt;acpi/&gt;</span>
+<span class="w">  </span><span class="nt">&lt;apic/&gt;</span>
+<span class="w">  </span><span class="nt">&lt;pae/&gt;</span>
+<span class="w">  </span><span class="nt">&lt;hyperv&gt;</span>
+<span class="w">    </span><span class="nt">&lt;relaxed</span><span class="w"> </span><span class="na">state=</span><span class="s">&#39;on&#39;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;vapic</span><span class="w"> </span><span class="na">state=</span><span class="s">&#39;on&#39;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;spinlocks</span><span class="w"> </span><span class="na">state=</span><span class="s">&#39;on&#39;</span><span class="w"> </span><span class="na">retries=</span><span class="s">&#39;8191&#39;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;vpindex</span><span class="w"> </span><span class="na">state=</span><span class="s">&#39;on&#39;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;synic</span><span class="w"> </span><span class="na">state=</span><span class="s">&#39;on&#39;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;stimer</span><span class="w"> </span><span class="na">state=</span><span class="s">&#39;on&#39;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;reset</span><span class="w"> </span><span class="na">state=</span><span class="s">&#39;on&#39;</span><span class="nt">/&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/hyperv&gt;</span>
+<span class="nt">&lt;/features&gt;</span>
+<span class="nt">&lt;clock</span><span class="w"> </span><span class="na">offset=</span><span class="s">&#39;localtime&#39;</span><span class="nt">&gt;</span>
+<span class="w">  </span><span class="nt">&lt;timer</span><span class="w"> </span><span class="na">name=</span><span class="s">&#39;rtc&#39;</span><span class="w"> </span><span class="na">tickpolicy=</span><span class="s">&#39;catchup&#39;</span><span class="nt">/&gt;</span>
+<span class="w">  </span><span class="nt">&lt;timer</span><span class="w"> </span><span class="na">name=</span><span class="s">&#39;pit&#39;</span><span class="w"> </span><span class="na">tickpolicy=</span><span class="s">&#39;delay&#39;</span><span class="nt">/&gt;</span>
+<span class="w">  </span><span class="nt">&lt;timer</span><span class="w"> </span><span class="na">name=</span><span class="s">&#39;hpet&#39;</span><span class="w"> </span><span class="na">present=</span><span class="s">&#39;no&#39;</span><span class="nt">/&gt;</span>
+<span class="w">  </span><span class="nt">&lt;timer</span><span class="w"> </span><span class="na">name=</span><span class="s">&#39;hypervclock&#39;</span><span class="w"> </span><span class="na">present=</span><span class="s">&#39;yes&#39;</span><span class="nt">/&gt;</span>
+<span class="nt">&lt;/clock&gt;</span>
+</code></pre></div>
+
+<p>有时候特性之间可能会有依赖关系，qemu需要检测配置的合法性。
+Qemu通过模拟CPUID 0x40000000..0x4000000A来对Guest呈现HyerV标志，
+KVM将这些CPUID存放在0x40000100..0x40000101分枝上。</p>
+<h3>HyperV启迪特性</h3>
+<h4>hv-relaxed</h4>
+<p>这个特性的作用是告诉Guest OS去关闭watchdog超时，某些Windows版本依旧会有watchdog超时及时它看到了hypervisor呈现的这个CPU flag。</p>
+<h4>hv-vapic</h4>
+<p>用来提供半虚拟化的VP Assit Page MSR来让Guest的APIC更加高效。并且这个启迪特性允许半虚拟化（Exitless）的EOI处理。
+（有点类似于让Windows也支持上APICv）</p>
+<h4>hv-spinlocks</h4>
+<p>半虚拟化的spinlocks。这个参数表示当发生了多少次spinlock争抢之后将这个信息告诉给hypervisor。
+如果配置为0xffffffff则表示永远不通知hyervisor。</p>
+<h4>hv-vpindex</h4>
+<p>为Guest提供HV_X64_MSR_VP_INDEX (0x40000002) MSR来呈现Virtual processor index信息。
+这个启迪需要和hv-synic，hv-timer还有其他需要让Guest知道自己的Virtual processor index的特性一起使用。
+例如：当Guest要做HyperCall的时候就需要将VP Index作为参数传入。</p>
+<h4>hv-runtime</h4>
+<p>为Guest提供HV_X64_MSR_VP_RUNTIME (0x40000010) MSR，这个MSR以100ns为单位保存了virtual processor的运行时间。
+它能够帮助Guest操作系统计算steal time（也就是vcpu被其他任务抢占的时间）。</p>
+<h4>hv-crash</h4>
+<p>为Guest提供HV_X64_MSR_CRASH_P0..HV_X64_MSR_CRASH_P5 (0x40000100..0x40000105) and HV_X64_MSR_CRASH_CTL (0x40000105) MSR两个MSR。
+当Guest发生Crash的时候会去写这两个MSR，HV_X64_MSR_CRASH_P0..HV_X64_MSR_CRASH_P5 MSRs包含了额外的crash信息。
+这些信息能狗通过QAPI打印到qemu的日志中。注意：与under geuine HyperV不同的是，write to HV_X64_MSR_CRASH_CTL会导致Guest关机。
+这样会有效阻止Windows产生crash dump。</p>
+<h4>hv-time</h4>
+<p>为Guest使能两个专属的HyperV时钟源，基于MSR的HyperV时钟源（HV_X64_MSR_TIME_REF_COUNT, 0x40000020）和
+可引用的TSC页（通HV_X64_MSR_REFERENCE_TSC, 0x40000021这个MSR来使能）。
+每个时钟源都是per-guest的，Reference TSC page时钟源允许exit-less方式来读取time stamp。
+使用这个启动特性可以显著地提升所有跟timestamp有关的操作。</p>
+<h4>hv-synic</h4>
+<p>为Guest使能合成的中断控制器（对LAPIC的扩展）。当这个特性被使能之后，能够为Guest提供额外的SynIC Msg和Events。
+这是实现VMBus设备（qemu中暂时还不提供）的前提条件。并且，这个特性是实现HyperV synthetic timers所必须的。
+通过HV_X64_MSR_SCONTROL..HV_X64_MSR_EOM (0x40000080..0x40000084) and HV_X64_MSR_SINT0..HV_X64_MSR_SINT15 (0x40000090..0x4000009F)
+这两个定时器可以来控制SynIC。</p>
+<p>依赖于：<strong>hv-vpindex</strong></p>
+<h4>hv-stimer</h4>
+<p>使能HyperV合成定时器。对每个vCPU而言可以通过HV_X64_MSR_STIMER0_CONFIG..HV_X64_MSR_STIMER3_COUNT (0x400000B0..0x400000B7) MSR
+来控制4个定时器。这些定时器可以工作在single-shot或者periodic模式。
+必须知道的是，当这个启迪特性没有使能的时候，某些特定的Windows版本会转而使用HPET（甚至是RTC当HPET不可用的时候），
+这会导致显著的CPU开销，即使vCPU在处于IDLE状态的时候。</p>
+<p>依赖于： <strong>hv-vpindex, hv-synic, hv-time</strong></p>
+<h4>hv-tlbflush</h4>
+<p>为Guest使能半虚拟化的TLB shutdown机制。在x86架构上，远程vCPU的TLB Flush过程要求发送IPI并等待其他CPU执行完TLB Flush。
+在虚拟化场景下当IPI到达的时候，一些vCPU可能恰好没有被调度执行或者没有在请求Flush（又或者TLB Flush会被延迟到vCPU被调度进来执行）。
+hv-tlbflush启迪实现了hypervisr层面对TLB Flush的优化。</p>
+<p>依赖于：<strong>hv-vpindex</strong></p>
+<h4>hv-ipi</h4>
+<p>使能半虚拟化的IPI发送机制。HvCallSendSyntheticClusterIpi hypercall会支持同时发送给大于64个vCPU的场景，
+如果使用APIC来完成需要超过1次的访问，并且会退出到hypervisor中。</p>
+<p>依赖于：<strong>hv-vpindex</strong></p>
+<h4>hv-vendor-id=xxx</h4>
+<p>这个可以将HyperV的CPUID 0x40000000.EBX-EDX 标志改为定义的内容。这个参数不能超过12个子符。
+根据spec约定，Guest不应当直接使用这个信息。
+注意：hypervisor-vendor-id不是一个启迪特性，因此当没有其他启迪特性配置的时候它是不生效的。</p>
+<h4>hv-reset</h4>
+<p>为Guest提供HV_X64_MSR_RESET (0x40000003) MSR并且允许Guest写这个寄存器来触发重启，
+即使这个特性使能了，这也不是一个推荐的Windows重启方式，所以它可能是用不到的。</p>
+<h4>hv-frequency</h4>
+<p>为Guest提供HV_X64_MSR_TSC_FREQUENCY (0x40000022) and HV_X64_MSR_APIC_FREQUENCY (0x40000023)两个MSR
+来允许Guest获取它的TSC/APIC频率。</p>
+<h4>hv-reenlightenment</h4>
+<p>这特性适用于Nested嵌套虚拟化场景，目标是在KVM Guest上运行HyperV。
+当特性使能之后会提供HV_X64_MSR_REENLIGHTENMENT_CONTROL (0x40000106), HV_X64_MSR_TSC_EMULATION_CONTROL (0x40000107)and HV_X64_MSR_TSC_EMULATION_STATUS (0x40000108) MSR这3个MSR并且允许Guest在TSC频率发生改变的时候收到通知，
+并保持使用老的频率直到hyervisor可以切换到新的频率为止。
+因此，和<strong>hv-frequencies</strong>特性一起使用的时候允许KVM上的运行的HyperV可以使用稳定的时钟源。</p>
+<p>注意，KVM并没有全量支持re-enlightenment notifications，并且并不模拟TSC Access当虚拟机迁移之后。
+因此‘tsc-frequency=’这个CPU配置项也必须要指定来保证热迁移成功。
+目的端端CPU要么和源端保持一样的CPU频率或者支持TSC Scaling这个CPU特性。</p>
+<h4>hv-evmcs</h4>
+<p>这也为Nested嵌套虚拟化场景准备的，目标是在KVM上运行HyperV。
+当被使能之后，它为Guest提供Version 1版本的 Enlightened VMCS。
+这个特性在L0（KVM）和L1（HyperV）Hyervisor之间实现了半虚拟化这样可以帮助L2跑的更快。这个特性只在Intel平台上有用。</p>
+<p>依赖于： <strong>hv-vapic</strong></p>
+<h4>hv-stimer-direct</h4>
+<p>HyperV spec中允许两种模式的synthetic timer。
+”classic“模式：超时Event被作为SynIC message来投递，
+“direct”模式：Event被作为正常的interrupt来投递。
+我们知道，在HyperV嵌套虚拟化场景下只能在direct模式下使用synthetic timers，
+因此，<strong>hv-stimer-direct</strong>必须要使能。</p>
+<p>依赖于：<strong>hv-vpindex, hv-synic, hv-time, hv-stimer</strong></p>
+<h4>hv-avic (hv-apicv)</h4>
+<p>这个特性告诉Guest使用HyperV SynIC和基于硬件辅助虚拟化的APICv/AVIC。
+通常HyperV SynIC会禁止这些硬件Feature并且建议Guest使用半虚拟化的AutoEOI feature。
+注意：在旧的硬件（without APICv/AVIC support）上使能这个feature会对Guest性能有副作用。</p>
+<h4>hv-no-noarch-coresharing = on/off/auto</h4>
+<p>这个特性告诉Guest虚拟机的处理器不会share同一个物理core除非有被上报为相邻的SMT threads。
+Windows和HyperV Guest需要知道这个信息来合适的消除SMT相关的CPU vulnerabilities。</p>
+<p>当这个选择被设置为Auto时，Qemu只有在KVM报告non-architectural coresharing的时候才会使能它。
+这意味着，超线程是不支持的或者完全被host禁用掉了。同时这个设置也会阻止往SMT配置不同的目的端做热迁移。
+当这个选项设置为on，Qemu都会使能这个feature而不管host的配置如何。
+为了保证Guest的安全性，只有在需要呈现正确的vCPU拓扑和vCPU绑定关系的时候才会用到。</p>
+<h4>hv-version-id-build, hv-version-id-major, hv-version-id-minor, hv-version-id-spack, hv-version-id-sbranch, hv-version-id-snumber</h4>
+<p>这些配置会改变HyperV版本标的CPUID 0x40000002.EAX-EDX信息，默认值是WS2016。
+*   <strong>hv-version-id-build</strong> 设置‘Build Number’（32bits）
+*   <strong>hv-version-id-major</strong> 设置‘Major Version’（16bits）
+*   <strong>hv-version-id-minor</strong> 设置'Minor Version'（16bits）
+*   <strong>hv-version-id-spack</strong> 设置‘Service Pack’ (32bits)
+*   <strong>hv-version-id-sbranch</strong> 设置'Service Branch'（8bits）
+*   <strong>hv-version-id-snumber</strong> 设置‘Service Number’ (24bits)</p>
+<p>注意：<strong>hv-version-id-x</strong>不是启迪特性，因此在没有其他启迪特性配置的时候不会使能这个HyperV标志。</p>
+<h4>hv-syndbg</h4>
+<p>使能HyperV synthetic调试接口，这是一个由Windows Kernel Debugger用来发送数据包的通道，而不是通过串口/网络发送。
+当被使能之后，这个启迪特性能提供额外的通信辅助给Guest：SynDbg消息。
+这个新的通信通道被Windows kernel Debugger用来发送数据包而不是通过seiral/network，
+相对其他通道而言有显著的性能提升。
+这个启迪特性需要一个VMBus设备（-device vmbus-bridge,irq=15)。</p>
+<p>依赖于：<strong>hv-relaxed, hv_time, hv-vapic, hv-vpindex, hv-synic, hv-runtime, hv-stimer</strong></p>
+<h4>hv-emsr-bitmap</h4>
+<p>这个启迪特性适用于Nested场景，目标是运行在KVM上的HyperV Guest。
+当该特性被使能后，它允许L0（KVM）和L1（HyperV）的hypervisor来合作以避免在发生vmexit的时候更新L2的MSR Bitmap。
+而且这个特性在VMX（Intel）和SVM（AMD）上都支持，在VMX的实现上需要<strong>hv-evmcs</strong>特性被使能。</p>
+<h4>hv-xmm-input</h4>
+<p>HyperV spec允许我们通过XMM寄存器（XMM Fast Hypercall Input）来为某些hypercall传递参数。
+当使用这个特性的时候，能够加速hypercall的处理流程因为KVM可以避免读Guest的内存。</p>
+<h4>hv-tlbflush-ext</h4>
+<p>允许扩展传递给HyperV TLB flush hypercalls（HvFlushVirtualAddressList/HvFlushVirtualAddressListEx）的GVA范围。</p>
+<p>依赖于：<strong>hv-tlbflush</strong></p>
+<h4>hv-tlbflush-direct</h4>
+<p>这个启迪特性适用于Nested嵌套虚拟化场景，目标是在KVM上运行的HyperV Guest。
+当该特性被使能之后，允许L0（KVM）直接处理L2 Guest的TLB flush hypercalls而不需要发生VM-Exit到L1 hypervisor。
+而且这个特性在VMX（Intel）和SVM（AMD）上都适用，VMX上的实现需要<strong>hv-evmcs</strong>特性被guest使能。</p>
+<p>依赖于：<strong>hv-vapic</strong></p>
+<h3>补充的features</h3>
+<h4>hv-passthrough</h4>
+<p>在某些场景下（例如，开发过程中）需要使用Qemu来‘pass-through’模式，然后给Windows Guest所有KVM支持的启迪特性。
+这个pass-through模式可以由配置‘hv-passthrough’ CPU flag。
+注意：<strong>hv-passthrough</strong>选项仅仅使能了Qemu支持的启迪特性，并且将hv-spinlocks和hv-vendor-id从KVM拷贝到QEMU。
+<strong>hv-passthrough</strong>会覆盖其他的hyperv配置项。</p>
+<h4>hv-enforce-cpuid</h4>
+<p>当HyperV的CPUID接口暴漏的是，KVM默认会允许Guest使用当前KVM所有可以支持的HyperV启迪特性，
+而不管是否有些特性是不是没有被CPUID声明为Guest可见。
+<strong>hv-enforce-cpuid</strong>特性改变了只允许Guest使用暴漏的HyperV启迪特性的默认行为。</p>
+<h3>有用的参考链接</h3>
+<p>Hyper-V顶级功能spec和其他信息：</p>
+<ul>
+<li>https://github.com/MicrosoftDocs/Virtualization-Documentation</li>
+<li>https://docs.microsoft.com/en-us/virtualization/hyper-v-on-windows/tlfs/tlfs</li>
+</ul>
+
+
+             
+ 
+                <p id="post-share-links">
+    Share on:
+      <a href="https://twitter.com/intent/tweet?text=KVM%E4%B8%AD%E7%9A%84HperV%E5%A2%9E%E5%BC%BA&url=https%3A//blog.kernel.love/hyperv-enlightenment.html&hashtags=hyperv" target="_blank" rel="nofollow noopener noreferrer" title="Share on Twitter">Twitter</a>
+ ❄       <a href="https://www.facebook.com/sharer/sharer.php?u=https%3A//blog.kernel.love/hyperv-enlightenment.html" target="_blank" rel="nofollow noopener noreferrer" title="Share on Facebook">Facebook</a>
+ ❄       <a href="mailto:?subject=KVM%E4%B8%AD%E7%9A%84HperV%E5%A2%9E%E5%BC%BA&amp;body=https%3A//blog.kernel.love/hyperv-enlightenment.html" target="_blank" rel="nofollow noopener noreferrer" title="Share via Email">Email</a>
+
+            
+            
+
+
+
+
+
+
+
+            <hr/>
+            <aside>
+            <nav>
+            <ul class="articles-timeline">
+                <li class="previous-article">« <a href="https://blog.kernel.love/nvim-as-ide.html" title="Previous: 打造开箱即用的Neovim IDE">打造开箱即用的Neovim IDE</a></li>
+                <li class="next-article"><a href="https://blog.kernel.love/para-virt-remote-tlb-flush.html" title="Next: 半虚拟化Remote TLB Flush">半虚拟化Remote TLB Flush</a> »</li>
+            </ul>
+            </nav>
+            </aside>
+        </div>
+        <section id="article-sidebar" class="span2">
+            <h4>Published</h4>
+            <time itemprop="dateCreated" datetime="2022-11-11T20:20:00+08:00">Fri 11 November 2022</time>
+            <h4>Category</h4>
+            <a class="category-link" href="https://blog.kernel.love/categories.html#virt-ref">virt</a>
+            <h4>Tags</h4>
+            <ul class="list-of-tags tags-in-article">
+                <li><a href="https://blog.kernel.love/tags.html#hyperv-ref">hyperv
+                    <span class="superscript">1</span>
+</a></li>
+            </ul>
+<h4>Contact</h4>
+<div id="sidebar-social-link">
+    <a href="https://github.com/fangying" title="" target="_blank" rel="nofollow noopener noreferrer">
+        <svg xmlns="http://www.w3.org/2000/svg" aria-label="GitHub" role="img" viewBox="0 0 512 512"><rect width="512" height="512" rx="15%" fill="#1B1817"/><path fill="#fff" d="M335 499c14 0 12 17 12 17H165s-2-17 12-17c13 0 16-6 16-12l-1-50c-71 16-86-28-86-28-12-30-28-37-28-37-24-16 1-16 1-16 26 2 40 26 40 26 22 39 59 28 74 22 2-17 9-28 16-35-57-6-116-28-116-126 0-28 10-51 26-69-3-6-11-32 3-67 0 0 21-7 70 26 42-12 86-12 128 0 49-33 70-26 70-26 14 35 6 61 3 67 16 18 26 41 26 69 0 98-60 120-117 126 10 8 18 24 18 48l-1 70c0 6 3 12 16 12z"/></svg>
+    </a>
+</div>
+            
+
+
+
+
+
+            
+
+
+
+
+
+        </section>
+</div>
+</article>
+<!-- Root element of PhotoSwipe. Must have class pswp. -->
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    <!-- Background of PhotoSwipe.
+         It's a separate element as animating opacity is faster than rgba(). -->
+    <div class="pswp__bg"></div>
+
+    <!-- Slides wrapper with overflow:hidden. -->
+    <div class="pswp__scroll-wrap">
+
+        <!-- Container that holds slides.
+            PhotoSwipe keeps only 3 of them in the DOM to save memory.
+            Don't modify these 3 pswp__item elements, data is added later on. -->
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        <!-- Default (PhotoSwipeUI_Default) interface on top of sliding area. Can be changed. -->
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                <!--  Controls are self-explanatory. Order can be changed. -->
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                <!-- Preloader demo https://codepen.io/dimsemenov/pen/yyBWoR -->
+                <!-- element will get class pswp__preloader--active when preloader is running -->
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                      <div class="pswp__preloader__cut">
+                        <div class="pswp__preloader__donut"></div>
+                      </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>                    </div>
+                    <div class="span1"></div>
+                </div>
+            </div>
+        </div>
+<footer>
+    <div>
+        <span xmlns:dct="http://purl.org/dc/terms/" property="dct:title"> blog.kernel.love"</span> by <a xmlns:cc="http://creativecommons.org/ns#" href="https://blog.kernel.love" property="cc:attributionName" rel="cc:attributionURL">Yori Fang</a> is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/3.0/deed.en_US">Creative Commons Attribution-ShareAlike 3.0 Unported License</a>.
+    </div>
+
+
+
+
+    <div id="fpowered">
+        Powered by: <a href="http://getpelican.com/" title="Pelican Home Page" target="_blank" rel="nofollow noopener noreferrer">Pelican</a>
+        Theme: <a href="https://elegant.oncrashreboot.com/" title="Theme Elegant Home Page" target="_blank" rel="nofollow noopener noreferrer">Elegant</a>
+    </div>
+</footer>            <script src="//code.jquery.com/jquery.min.js"></script>
+        <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/js/bootstrap.min.js"></script>
+        <script src="https://blog.kernel.love/theme/js/elegant.prod.9e9d5ce754.js"></script>
+        <script>
+            function validateForm(query)
+            {
+                return (query.length > 0);
+            }
+        </script>
+
+    <script>
+    (function () {
+        if (window.location.hash.match(/^#comment-\d+$/)) {
+            $('#comment_thread').collapse('show');
+        }
+    })();
+    window.onhashchange=function(){
+        if (window.location.hash.match(/^#comment-\d+$/))
+            window.location.reload(true);
+    }
+    $('#comment_thread').on('shown', function () {
+        var link = document.getElementById('comment-accordion-toggle');
+        var old_innerHTML = link.innerHTML;
+        $(link).fadeOut(200, function() {
+            $(this).text('Click here to hide comments').fadeIn(200);
+        });
+        $('#comment_thread').on('hidden', function () {
+            $(link).fadeOut(200, function() {
+                $(this).text(old_innerHTML).fadeIn(200);
+            });
+        })
+    })
+</script>
+
+    </body>
+    <!-- Theme: Elegant built for Pelican
+        License : MIT -->
+</html>

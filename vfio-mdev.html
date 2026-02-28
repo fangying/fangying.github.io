@@ -4,7 +4,7 @@
         <meta charset="utf-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="stylesheet" href="https://blog.kernel.love/theme/css/style.min.css?fc5adb95">
+<link rel="stylesheet" href="https://blog.kernel.love/theme/css/style.min.css?2fcac227">
 
         <link rel="dns-prefetch" href="//fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin>
@@ -16,25 +16,26 @@
         <meta property="og:type" content="article" />
         <meta name="twitter:card" content="summary">
 
-<meta name="keywords" content="vfio mdev, virtualization, " />
+<meta name="keywords" content="vfio mdev, virt, " />
 
-<meta property="og:title" content="VFIO Mediated Devices Introduction "/>
+<meta property="og:title" content="VFIO mdev框架 "/>
 <meta property="og:url" content="https://blog.kernel.love/vfio-mdev.html" />
 <meta property="og:description" content="VFIO mdev Framework" />
-<meta property="og:site_name" content="kernelgo" />
+<meta property="og:site_name" content="blog.kernel.love" />
 <meta property="og:article:author" content="Yori Fang" />
 <meta property="og:article:published_time" content="2019-10-31T23:00:00+08:00" />
-<meta name="twitter:title" content="VFIO Mediated Devices Introduction ">
+<meta name="twitter:title" content="VFIO mdev框架 ">
 <meta name="twitter:description" content="VFIO mdev Framework">
 
-        <title>VFIO Mediated Devices Introduction  · kernelgo
+        <title>VFIO mdev框架  · blog.kernel.love
 </title>
+
 <script>
     (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
      })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
-    ga('create', 'UA-107392039-1', 'auto');
+    ga('create', 'UA-107392039-2', 'auto');
     ga('send', 'pageview');
 </script>
 
@@ -50,7 +51,7 @@
                             <span class="icon-bar"></span>
                             <span class="icon-bar"></span>
                         </a>
-                        <a class="brand" href="https://blog.kernel.love/"><span class=site-name>kernelgo</span></a>
+                        <a class="brand" href="https://blog.kernel.love/"><span class=site-name>blog.kernel.love</span></a>
                         <div class="nav-collapse collapse">
                             <ul class="nav pull-right top-menu">
                                 <li >
@@ -77,7 +78,7 @@
     <header class="page-header span10 offset2">
         <h1>
             <a href="https://blog.kernel.love/vfio-mdev.html">
-                VFIO Mediated Devices Introduction
+                VFIO mdev框架
             </a>
         </h1>
     </header>
@@ -268,9 +269,9 @@ Nvidia就是利用这个mdev框架去设计了Nvidia vGPU设备驱动，将自�
  
                 <p id="post-share-links">
     Share on:
-      <a href="https://twitter.com/intent/tweet?text=VFIO%20Mediated%20Devices%20Introduction&url=https%3A//blog.kernel.love/vfio-mdev.html&hashtags=vfio-mdev" target="_blank" rel="nofollow noopener noreferrer" title="Share on Twitter">Twitter</a>
+      <a href="https://twitter.com/intent/tweet?text=VFIO%20mdev%E6%A1%86%E6%9E%B6&url=https%3A//blog.kernel.love/vfio-mdev.html&hashtags=vfio-mdev" target="_blank" rel="nofollow noopener noreferrer" title="Share on Twitter">Twitter</a>
  ❄       <a href="https://www.facebook.com/sharer/sharer.php?u=https%3A//blog.kernel.love/vfio-mdev.html" target="_blank" rel="nofollow noopener noreferrer" title="Share on Facebook">Facebook</a>
- ❄       <a href="mailto:?subject=VFIO%20Mediated%20Devices%20Introduction&amp;body=https%3A//blog.kernel.love/vfio-mdev.html" target="_blank" rel="nofollow noopener noreferrer" title="Share via Email">Email</a>
+ ❄       <a href="mailto:?subject=VFIO%20mdev%E6%A1%86%E6%9E%B6&amp;body=https%3A//blog.kernel.love/vfio-mdev.html" target="_blank" rel="nofollow noopener noreferrer" title="Share via Email">Email</a>
 
             
             
@@ -280,65 +281,13 @@ Nvidia就是利用这个mdev框架去设计了Nvidia vGPU设备驱动，将自�
 
 
 
-
-<section>
-    <h6 style="display:none;">Comments</h6>
-    <p id="comment-message"> </p>
-
-    <div class="accordion" id="accordion2">
-        <div class="accordion-group">
-            <div class="accordion-heading">
-                <a class="accordion-toggle disqus-comment-count comment-count collapsed"
-                   data-toggle="collapse"
-                   data-parent="#accordion2"
-                   data-disqus-identifier="https://blog.kernel.love/vfio-mdev.html"
-                   href="https://blog.kernel.love/vfio-mdev.html#comment_thread"
-                   id="comment-accordion-toggle">
-                    Comments
-                </a>
-            </div>
-            <div id="comment_thread" class="accordion-body collapse">
-                <div class="accordion-inner">
-                    <div class="comments">
-                        <div id="disqus_thread"></div>
-                        <script>
-    var disqus_shortname = 'kernelgo';
-    (function () {
-        var s = document.createElement('script'); s.async = true;
-        s.type = 'text/javascript';
-        s.src = '//' + disqus_shortname + '.disqus.com/count.js';
-        (document.getElementsByTagName('HEAD')[0] || document.getElementsByTagName('BODY')[0]).appendChild(s);
-    }());
-
-    var disqus_identifier = 'https://blog.kernel.love/vfio-mdev.html';
-    var disqus_url = 'https://blog.kernel.love/vfio-mdev.html';
-
-    (function() {
-        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
-        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
-        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
-    })();
-</script>
-
-<noscript>Please enable JavaScript to view the <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
-
-
-
-
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</section>
 
             <hr/>
             <aside>
             <nav>
             <ul class="articles-timeline">
                 <li class="previous-article">« <a href="https://blog.kernel.love/virtio-overview.html" title="Previous: Virtio Spec Overview">Virtio Spec Overview</a></li>
-                <li class="next-article"><a href="https://blog.kernel.love/live-migration-with-passthroughed-device.html" title="Next: Live Migration with Passthroughed Device (Draft)">Live Migration with Passthroughed Device (Draft)</a> »</li>
+                <li class="next-article"><a href="https://blog.kernel.love/qemu-aio-internal.html" title="Next: 一个导致Qemu主线程挂起的aio系统bug">一个导致Qemu主线程挂起的aio系统bug</a> »</li>
             </ul>
             </nav>
             </aside>
@@ -347,7 +296,7 @@ Nvidia就是利用这个mdev框架去设计了Nvidia vGPU设备驱动，将自�
             <h4>Published</h4>
             <time itemprop="dateCreated" datetime="2019-10-31T23:00:00+08:00">Thu 31 October 2019</time>
             <h4>Category</h4>
-            <a class="category-link" href="https://blog.kernel.love/categories.html#virtualization-ref">virtualization</a>
+            <a class="category-link" href="https://blog.kernel.love/categories.html#virt-ref">virt</a>
             <h4>Tags</h4>
             <ul class="list-of-tags tags-in-article">
                 <li><a href="https://blog.kernel.love/tags.html#vfio-mdev-ref">vfio mdev
@@ -447,7 +396,7 @@ Nvidia就是利用这个mdev框架去设计了Nvidia vGPU设备驱动，将自�
         </div>
 <footer>
     <div>
-        <span xmlns:dct="http://purl.org/dc/terms/" property="dct:title"> kernelgo"</span> by <a xmlns:cc="http://creativecommons.org/ns#" href="https://kernelgo.org" property="cc:attributionName" rel="cc:attributionURL">Yori Fang</a> is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/3.0/deed.en_US">Creative Commons Attribution-ShareAlike 3.0 Unported License</a>.
+        <span xmlns:dct="http://purl.org/dc/terms/" property="dct:title"> blog.kernel.love"</span> by <a xmlns:cc="http://creativecommons.org/ns#" href="https://blog.kernel.love" property="cc:attributionName" rel="cc:attributionURL">Yori Fang</a> is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/3.0/deed.en_US">Creative Commons Attribution-ShareAlike 3.0 Unported License</a>.
     </div>
 
 

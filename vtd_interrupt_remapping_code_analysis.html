@@ -4,7 +4,7 @@
         <meta charset="utf-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="stylesheet" href="https://blog.kernel.love/theme/css/style.min.css?fc5adb95">
+<link rel="stylesheet" href="https://blog.kernel.love/theme/css/style.min.css?2fcac227">
 
         <link rel="dns-prefetch" href="//fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin>
@@ -16,26 +16,27 @@
         <meta property="og:type" content="article" />
         <meta name="twitter:card" content="summary">
 
-<meta name="keywords" content="virtualization, virtualization, " />
+<meta name="keywords" content="virtualization, virt, " />
 
-<meta property="og:title" content="VT-d Interrupt Remapping Code Analysis "/>
+<meta property="og:title" content="VT-d Interrupt Remapping代码分析 "/>
 <meta property="og:url" content="https://blog.kernel.love/vtd_interrupt_remapping_code_analysis.html" />
 <meta property="og:description" content="vtd interrupt remapping" />
-<meta property="og:site_name" content="kernelgo" />
+<meta property="og:site_name" content="blog.kernel.love" />
 <meta property="og:article:author" content="Yori Fang" />
 <meta property="og:article:published_time" content="2019-01-24T22:00:00+08:00" />
 <meta property="og:article:modified_time" content="2019-08-24T23:00:00+08:00" />
-<meta name="twitter:title" content="VT-d Interrupt Remapping Code Analysis ">
+<meta name="twitter:title" content="VT-d Interrupt Remapping代码分析 ">
 <meta name="twitter:description" content="vtd interrupt remapping">
 
-        <title>VT-d Interrupt Remapping Code Analysis  · kernelgo
+        <title>VT-d Interrupt Remapping代码分析  · blog.kernel.love
 </title>
+
 <script>
     (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
      })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
-    ga('create', 'UA-107392039-1', 'auto');
+    ga('create', 'UA-107392039-2', 'auto');
     ga('send', 'pageview');
 </script>
 
@@ -51,7 +52,7 @@
                             <span class="icon-bar"></span>
                             <span class="icon-bar"></span>
                         </a>
-                        <a class="brand" href="https://blog.kernel.love/"><span class=site-name>kernelgo</span></a>
+                        <a class="brand" href="https://blog.kernel.love/"><span class=site-name>blog.kernel.love</span></a>
                         <div class="nav-collapse collapse">
                             <ul class="nav pull-right top-menu">
                                 <li >
@@ -78,7 +79,7 @@
     <header class="page-header span10 offset2">
         <h1>
             <a href="https://blog.kernel.love/vtd_interrupt_remapping_code_analysis.html">
-                VT-d Interrupt Remapping Code Analysis
+                VT-d Interrupt Remapping代码分析
             </a>
         </h1>
     </header>
@@ -178,7 +179,7 @@ Guest OS设备驱动尝试写配置空间来Enable设备中断，这时候会访
 <span class="w">    </span><span class="n">vfio_disable_interrupts</span><span class="p">(</span><span class="n">vdev</span><span class="p">);</span><span class="w">  </span><span class="err">#</span><span class="n">先disable设备中断</span>
 
 <span class="w">    </span><span class="n">vdev</span><span class="o">-&gt;</span><span class="n">nr_vectors</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">msi_nr_vectors_allocated</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vdev</span><span class="o">-&gt;</span><span class="n">pdev</span><span class="p">);</span><span class="w">    </span><span class="err">#</span><span class="n">从设备配置空间读取设备Enable的MSI中断数目</span>
-<span class="w">    </span><span class="n">vdev</span><span class="o">-&gt;</span><span class="n">msi_vectors</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">g_new0</span><span class="p">(</span><span class="n">VFIOMSIVector</span><span class="p">,</span><span class="w"> </span><span class="n">vdev</span><span class="o">-&gt;</span><span class="n">nr_vectors</span><span class="p">);</span><span class="w"> </span>
+<span class="w">    </span><span class="n">vdev</span><span class="o">-&gt;</span><span class="n">msi_vectors</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">g_new0</span><span class="p">(</span><span class="n">VFIOMSIVector</span><span class="p">,</span><span class="w"> </span><span class="n">vdev</span><span class="o">-&gt;</span><span class="n">nr_vectors</span><span class="p">);</span>
 
 <span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">vdev</span><span class="o">-&gt;</span><span class="n">nr_vectors</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
 <span class="w">        </span><span class="n">VFIOMSIVector</span><span class="w"> </span><span class="o">*</span><span class="n">vector</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&amp;</span><span class="n">vdev</span><span class="o">-&gt;</span><span class="n">msi_vectors</span><span class="p">[</span><span class="n">i</span><span class="p">];</span>
@@ -193,7 +194,7 @@ Guest OS设备驱动尝试写配置空间来Enable设备中断，这时候会访
 <span class="w">        </span><span class="n">qemu_set_fd_handler</span><span class="p">(</span><span class="n">event_notifier_get_fd</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vector</span><span class="o">-&gt;</span><span class="n">interrupt</span><span class="p">),</span><span class="w">　</span><span class="c1">// 绑定irqfd的处理函数</span>
 <span class="w">                            </span><span class="n">vfio_msi_interrupt</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">,</span><span class="w"> </span><span class="n">vector</span><span class="p">);</span>
 <span class="w">        </span><span class="c1">// 将中断信息刷新到kvm irq routing table里，其实就是建立起gsi和irqfd的映射关系</span>
-<span class="w">        </span><span class="n">vfio_add_kvm_msi_virq</span><span class="p">(</span><span class="n">vdev</span><span class="p">,</span><span class="w"> </span><span class="n">vector</span><span class="p">,</span><span class="w"> </span><span class="n">i</span><span class="p">,</span><span class="w"> </span><span class="nb">false</span><span class="p">);</span><span class="w">　</span>
+<span class="w">        </span><span class="n">vfio_add_kvm_msi_virq</span><span class="p">(</span><span class="n">vdev</span><span class="p">,</span><span class="w"> </span><span class="n">vector</span><span class="p">,</span><span class="w"> </span><span class="n">i</span><span class="p">,</span><span class="w"> </span><span class="nb">false</span><span class="p">);</span>
 <span class="w">    </span><span class="p">}</span>
 <span class="w">    </span><span class="cm">/* Set interrupt type prior to possible interrupts */</span>
 <span class="w">    </span><span class="n">vdev</span><span class="o">-&gt;</span><span class="n">interrupt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">VFIO_INT_MSI</span><span class="p">;</span>
@@ -319,7 +320,7 @@ irqfd_wakeup -&gt; EPOLLIN -&gt; schedule_work(&amp;irqfd-&gt;inject) -&gt; irqf
 <p>或者参考一下下面的原理图：</p>
 <p><img alt="vt-d interrupt remapping" src="../images/vtd-interrupt-remapping-explain.svg"></p>
 <p>总结一下中断重映射Enable和处理流程：</p>
-<div class="highlight"><pre><span></span><code><span class="n">QEMU向虚拟机呈现设备的PCI配置空间信息</span><span class="w"> </span>
+<div class="highlight"><pre><span></span><code><span class="n">QEMU向虚拟机呈现设备的PCI配置空间信息</span>
 <span class="w">    </span><span class="o">-&gt;</span><span class="w"> </span><span class="err">设备驱动加载，读写</span><span class="n">PCI配置空间Enable</span><span class="w"> </span><span class="n">MSI</span>
 <span class="w">    </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">VM</span><span class="w"> </span><span class="n">Exit到QEMU中处理vfio_pci_write_config</span>
 <span class="w">    </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">QEMU调用vfio_msi_enable使能直通设备MSI中断</span>
@@ -330,13 +331,12 @@ irqfd_wakeup -&gt; EPOLLIN -&gt; schedule_work(&amp;irqfd-&gt;inject) -&gt; irqf
 <span class="w">        </span><span class="n">vfio_enable_vectors设置VFIO的MSI中断触发方式</span><span class="err">，</span><span class="n">VFIO_DEVICE_SET_IRQS</span>
 <span class="w">            </span><span class="n">vfio_pci_set_irqs_ioctl</span><span class="w"> </span><span class="err">内核</span><span class="n">drivers</span><span class="o">/</span><span class="n">vfio</span><span class="o">/</span><span class="n">pci</span><span class="o">/</span><span class="n">vfio_pci</span><span class="o">.</span><span class="n">c</span>
 <span class="w">            </span><span class="n">vfio_pci_set_msi_trigger分配Host</span><span class="w"> </span><span class="n">irq并分配对应的IRTE和刷新中断重映射表</span><span class="err">，</span>
-<span class="w">            </span><span class="n">vfio_msi_set_vector_signal注册Host</span><span class="w"> </span><span class="n">irq的中断处理函数vfio_msihandler</span><span class="w"> </span>
+<span class="w">            </span><span class="n">vfio_msi_set_vector_signal注册Host</span><span class="w"> </span><span class="n">irq的中断处理函数vfio_msihandler</span>
 <span class="w">        </span><span class="n">irq_bypass_register_producer</span><span class="w"> </span><span class="err">将</span><span class="n">fd注册到kvm</span>
-<span class="w">    </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">vfio_msihandler写了irqfd这样就触发了EPOLLIN事件</span><span class="w"> </span>
+<span class="w">    </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">vfio_msihandler写了irqfd这样就触发了EPOLLIN事件</span>
 <span class="w">    </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">irqfd接受到EPOLLIN事件</span><span class="err">，调用</span><span class="n">irqfd_wakeup</span>
 <span class="w">    </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">kvm_arch_set_irq_inatomic</span><span class="w"> </span><span class="err">尝试直接注入中断，如果被</span><span class="n">BLOCK了</span><span class="err">（</span><span class="n">vCPU没有退出</span><span class="err">？）就调用</span><span class="w"> </span><span class="n">schedule_work</span><span class="p">(</span><span class="o">&amp;</span><span class="n">irqfd</span><span class="o">-&gt;</span><span class="n">inject</span><span class="p">)</span><span class="err">，让</span><span class="n">kworker延后处理</span>
-<span class="w">    </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">irqfd_inject向虚拟机注入中断</span><span class="w"> </span>
-<span class="w">    </span><span class="o">-&gt;</span><span class="w"> </span><span class="err">虚拟机退出的时候写对应</span><span class="n">VCPU的vAPIC</span><span class="w"> </span><span class="n">Page</span><span class="w"> </span><span class="n">IRR字段注入中断到Guest内部</span><span class="err">。</span>
+<span class="w">    </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">irqfd_inject向虚拟机注入中断</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="err">虚拟机退出的时候写对应</span><span class="n">VCPU的vAPIC</span><span class="w"> </span><span class="n">Page</span><span class="w"> </span><span class="n">IRR字段注入中断到Guest内部</span><span class="err">。</span>
 </code></pre></div>
 
 <p>Done!</p>
@@ -346,9 +346,9 @@ irqfd_wakeup -&gt; EPOLLIN -&gt; schedule_work(&amp;irqfd-&gt;inject) -&gt; irqf
  
                 <p id="post-share-links">
     Share on:
-      <a href="https://twitter.com/intent/tweet?text=VT-d%20Interrupt%20Remapping%20Code%20Analysis&url=https%3A//blog.kernel.love/vtd_interrupt_remapping_code_analysis.html&hashtags=virtualization" target="_blank" rel="nofollow noopener noreferrer" title="Share on Twitter">Twitter</a>
+      <a href="https://twitter.com/intent/tweet?text=VT-d%20Interrupt%20Remapping%E4%BB%A3%E7%A0%81%E5%88%86%E6%9E%90&url=https%3A//blog.kernel.love/vtd_interrupt_remapping_code_analysis.html&hashtags=virtualization" target="_blank" rel="nofollow noopener noreferrer" title="Share on Twitter">Twitter</a>
  ❄       <a href="https://www.facebook.com/sharer/sharer.php?u=https%3A//blog.kernel.love/vtd_interrupt_remapping_code_analysis.html" target="_blank" rel="nofollow noopener noreferrer" title="Share on Facebook">Facebook</a>
- ❄       <a href="mailto:?subject=VT-d%20Interrupt%20Remapping%20Code%20Analysis&amp;body=https%3A//blog.kernel.love/vtd_interrupt_remapping_code_analysis.html" target="_blank" rel="nofollow noopener noreferrer" title="Share via Email">Email</a>
+ ❄       <a href="mailto:?subject=VT-d%20Interrupt%20Remapping%E4%BB%A3%E7%A0%81%E5%88%86%E6%9E%90&amp;body=https%3A//blog.kernel.love/vtd_interrupt_remapping_code_analysis.html" target="_blank" rel="nofollow noopener noreferrer" title="Share via Email">Email</a>
 
             
             
@@ -358,67 +358,15 @@ irqfd_wakeup -&gt; EPOLLIN -&gt; schedule_work(&amp;irqfd-&gt;inject) -&gt; irqf
 
 
 
-
-<section>
-    <h6 style="display:none;">Comments</h6>
-    <p id="comment-message"> </p>
-
-    <div class="accordion" id="accordion2">
-        <div class="accordion-group">
-            <div class="accordion-heading">
-                <a class="accordion-toggle disqus-comment-count comment-count collapsed"
-                   data-toggle="collapse"
-                   data-parent="#accordion2"
-                   data-disqus-identifier="https://blog.kernel.love/vtd_interrupt_remapping_code_analysis.html"
-                   href="https://blog.kernel.love/vtd_interrupt_remapping_code_analysis.html#comment_thread"
-                   id="comment-accordion-toggle">
-                    Comments
-                </a>
-            </div>
-            <div id="comment_thread" class="accordion-body collapse">
-                <div class="accordion-inner">
-                    <div class="comments">
-                        <div id="disqus_thread"></div>
-                        <script>
-    var disqus_shortname = 'kernelgo';
-    (function () {
-        var s = document.createElement('script'); s.async = true;
-        s.type = 'text/javascript';
-        s.src = '//' + disqus_shortname + '.disqus.com/count.js';
-        (document.getElementsByTagName('HEAD')[0] || document.getElementsByTagName('BODY')[0]).appendChild(s);
-    }());
-
-    var disqus_identifier = 'https://blog.kernel.love/vtd_interrupt_remapping_code_analysis.html';
-    var disqus_url = 'https://blog.kernel.love/vtd_interrupt_remapping_code_analysis.html';
-
-    (function() {
-        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
-        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
-        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
-    })();
-</script>
-
-<noscript>Please enable JavaScript to view the <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
-
-
-
-
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</section>
 
             <hr/>
 <section>
     <h2>Related Posts</h2>
 <ul class="related-posts-list">
-<li><a href="https://blog.kernel.love/reading2019.html" title="Article Archive 2019 Reading Plan">Article Archive 2019 Reading Plan</a></li>
-<li><a href="https://blog.kernel.love/microVM.html" title="Lightweight Micro Virtual Machines">Lightweight Micro Virtual Machines</a></li>
+<li><a href="https://blog.kernel.love/vtd-posted-interrupt-code-analysis.html" title="VT-d Interrupt Posting代码分析">VT-d Interrupt Posting代码分析</a></li>
+<li><a href="https://blog.kernel.love/x86-nmi.html" title="Virt NMI Emulation">Virt NMI Emulation</a></li>
+<li><a href="https://blog.kernel.love/microVM.html" title="轻量级虚拟化技术">轻量级虚拟化技术</a></li>
 <li><a href="https://blog.kernel.love/virtio-overview.html" title="Virtio Spec Overview">Virtio Spec Overview</a></li>
-<li><a href="https://blog.kernel.love/reading2020.html" title="Article Archive 2020 Reading Plan">Article Archive 2020 Reading Plan</a></li>
 <li><a href="https://blog.kernel.love/amd-x2avic.html" title="AMD x2avic details">AMD x2avic details</a></li>
 </ul>
 <hr />
@@ -426,8 +374,8 @@ irqfd_wakeup -&gt; EPOLLIN -&gt; schedule_work(&amp;irqfd-&gt;inject) -&gt; irqf
             <aside>
             <nav>
             <ul class="articles-timeline">
-                <li class="previous-article">« <a href="https://blog.kernel.love/kernel-debug-using-qemu.html" title="Previous: Debug Linux Kernel Using QEMU and GDB">Debug Linux Kernel Using QEMU and GDB</a></li>
-                <li class="next-article"><a href="https://blog.kernel.love/vtd-posted-interrupt-code-analysis.html" title="Next: VT-d Interrupt Posting Code Analysis">VT-d Interrupt Posting Code Analysis</a> »</li>
+                <li class="previous-article">« <a href="https://blog.kernel.love/kernel-debug-using-qemu.html" title="Previous: 使用gdb和qemu来调试linux内核">使用gdb和qemu来调试linux内核</a></li>
+                <li class="next-article"><a href="https://blog.kernel.love/vtd-posted-interrupt-code-analysis.html" title="Next: VT-d Interrupt Posting代码分析">VT-d Interrupt Posting代码分析</a> »</li>
             </ul>
             </nav>
             </aside>
@@ -436,14 +384,14 @@ irqfd_wakeup -&gt; EPOLLIN -&gt; schedule_work(&amp;irqfd-&gt;inject) -&gt; irqf
             <h4>Published</h4>
             <time itemprop="dateCreated" datetime="2019-01-24T22:00:00+08:00">Thu 24 January 2019</time>
 <h4>Last Updated</h4>
-<time datetime="2019-08-24T23:00:00+08:00">Aug 24, 2019</time>
+<time datetime="2019-08-24T23:00:00+08:00">Sat 24 August 2019</time>
 
             <h4>Category</h4>
-            <a class="category-link" href="https://blog.kernel.love/categories.html#virtualization-ref">virtualization</a>
+            <a class="category-link" href="https://blog.kernel.love/categories.html#virt-ref">virt</a>
             <h4>Tags</h4>
             <ul class="list-of-tags tags-in-article">
                 <li><a href="https://blog.kernel.love/tags.html#virtualization-ref">virtualization
-                    <span class="superscript">16</span>
+                    <span class="superscript">13</span>
 </a></li>
             </ul>
 <h4>Contact</h4>
@@ -539,7 +487,7 @@ irqfd_wakeup -&gt; EPOLLIN -&gt; schedule_work(&amp;irqfd-&gt;inject) -&gt; irqf
         </div>
 <footer>
     <div>
-        <span xmlns:dct="http://purl.org/dc/terms/" property="dct:title"> kernelgo"</span> by <a xmlns:cc="http://creativecommons.org/ns#" href="https://kernelgo.org" property="cc:attributionName" rel="cc:attributionURL">Yori Fang</a> is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/3.0/deed.en_US">Creative Commons Attribution-ShareAlike 3.0 Unported License</a>.
+        <span xmlns:dct="http://purl.org/dc/terms/" property="dct:title"> blog.kernel.love"</span> by <a xmlns:cc="http://creativecommons.org/ns#" href="https://blog.kernel.love" property="cc:attributionName" rel="cc:attributionURL">Yori Fang</a> is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/3.0/deed.en_US">Creative Commons Attribution-ShareAlike 3.0 Unported License</a>.
     </div>
 
 
