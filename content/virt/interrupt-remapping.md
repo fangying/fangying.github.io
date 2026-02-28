@@ -1,4 +1,4 @@
-Title: VT-d Interrupt Remapping原理
+Title: VT-d Interrupt Remapping
 Date: 2017-9-22 23:00
 Modified: 2017-9-22 23:00
 Tags: virtualization
@@ -94,6 +94,6 @@ Interrupt Remapping格式的中断重映射表项的格式为（下篇会介绍I
 *   Present域(P)：0b表示此IRTE还没有被分配到任何的中断源，索引到此IRTE的Remapping中断将被blocked掉，1b表示此IRTE是有效的，已经被分配到某个设备。
 *   Destination Mode域(DM)：0b表示Destination ID域为Physical APIC-ID，1b表示Destination ID域是Logical APIC-ID。
 *   IRTE Mode域(IM)：0b表示此中断请求是一个Remapped Interrupt中断请求，1b表示此中断请求是一个Posted Interrupt中断请求。
-*   Vector域(V)：共8个Byte表示了此Remapped Interrupt中断请求的vector号(Remapped Interrupt)。
+*   Vector域(V)：共8个Byte表示了此Remapped Interrupt中断请求的vector号(Remapped Interrupt)，Vector号在Interrupt Remapping的时候是host vector在Interrupt Posting的时候是Guest vector。
 *   Destination ID域(DST)：表示此中断请求的目标CPU，根据当前Host中断方式不同具有不同的格式。xAPIC Mode (Cluster)为bit[40:47]， xAPIC Mode (Flat)和xAPIC Mode (Physical)为bit[47:40]， x2APIC Mode (Cluster)和x2APIC Mode (Physical)为bit[31:0]。
 *   SID, SQ, SVT则联合起来表示了中断请求的设备PCI/PCI-e request-id信息。
