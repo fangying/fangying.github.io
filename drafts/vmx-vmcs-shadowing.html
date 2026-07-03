@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://blog.kernel.love/theme/css/style.min.css?2fcac227">
+
+        <link rel="dns-prefetch" href="//fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin>
+
+        <meta name="author" content="Yori Fang" />
+
+        <meta name="description" content="从 Intel VMX 架构语义出发，详解 VMCS Shadowing 的原理、VMREAD/VMWRITE 退出判定、KVM 中 VMCS01/VMCS12/Shadow VMCS/VMCS02 的一致性维护，以及 AMD SVM 中 VMCB Clean Bits 的对应机制。
+" />
+        <meta property="og:type" content="article" />
+        <meta name="twitter:card" content="summary">
+
+<meta name="keywords" content="virtualization, nested-virt, virt, " />
+
+<meta property="og:title" content="VMCS Shadowing 技术详解 "/>
+<meta property="og:url" content="https://blog.kernel.love/drafts/vmx-vmcs-shadowing.html" />
+<meta property="og:description" content="从 Intel VMX 架构语义出发，详解 VMCS Shadowing 的原理、VMREAD/VMWRITE 退出判定、KVM 中 VMCS01/VMCS12/Shadow VMCS/VMCS02 的一致性维护，以及 AMD SVM 中 VMCB Clean Bits 的对应机制。" />
+<meta property="og:site_name" content="blog.kernel.love" />
+<meta property="og:article:author" content="Yori Fang" />
+<meta property="og:article:published_time" content="2026-07-03T10:00:00+08:00" />
+<meta property="og:article:modified_time" content="2026-07-03T10:00:00+08:00" />
+<meta name="twitter:title" content="VMCS Shadowing 技术详解 ">
+<meta name="twitter:description" content="从 Intel VMX 架构语义出发，详解 VMCS Shadowing 的原理、VMREAD/VMWRITE 退出判定、KVM 中 VMCS01/VMCS12/Shadow VMCS/VMCS02 的一致性维护，以及 AMD SVM 中 VMCB Clean Bits 的对应机制。">
+
+        <title>VMCS Shadowing 技术详解  · blog.kernel.love
+</title>
+
+<script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+     (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+     m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+     })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+    ga('create', 'UA-107392039-2', 'auto');
+    ga('send', 'pageview');
+</script>
+
+
+    </head>
+    <body>
+        <div id="content">
+            <div class="navbar navbar-static-top">
+                <div class="navbar-inner">
+                    <div class="container-fluid">
+                        <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                        </a>
+                        <a class="brand" href="https://blog.kernel.love/"><span class=site-name>blog.kernel.love</span></a>
+                        <div class="nav-collapse collapse">
+                            <ul class="nav pull-right top-menu">
+                                <li >
+                                    <a href=
+                                       https://blog.kernel.love
+                                    >Home</a>
+                                </li>
+                                <li ><a href="https://blog.kernel.love/pages/about.html">About</a></li>
+                                <li ><a href="https://blog.kernel.love/categories.html">Categories</a></li>
+                                <li ><a href="https://blog.kernel.love/tags.html">Tags</a></li>
+                                <li ><a href="https://blog.kernel.love/archives.html">Archives</a></li>
+                                <li><form class="navbar-search" action="https://blog.kernel.love/search.html" onsubmit="return validateForm(this.elements['q'].value);"> <input type="text" class="search-query" placeholder="Search" name="q" id="tipue_search_input"></form></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="container-fluid">
+                <div class="row-fluid">
+                    <div class="span1"></div>
+                    <div class="span10">
+<article itemscope>
+<div class="row-fluid">
+    <header class="page-header span10 offset2">
+        <h1>
+            <a href="https://blog.kernel.love/drafts/vmx-vmcs-shadowing.html">
+                VMCS Shadowing 技术详解
+            </a>
+        </h1>
+    </header>
+</div>
+
+<div class="row-fluid">
+        <div class="span8 offset2 article-content">
+            
+            <h1>VMCS Shadowing 技术详解</h1>
+<p>本文从 Intel VMX 的架构语义出发，说明 VMCS Shadowing 为什么存在、硬件如何决定 <code>VMREAD</code>/<code>VMWRITE</code> 是否退出，以及 Linux KVM 如何在 <code>VMCS01</code>、<code>VMCS12</code>、Shadow VMCS 和 <code>VMCS02</code> 之间维护一致性。文末还会说明 AMD SVM 为什么没有完全对应的机制，以及 VMCB Clean Bits 真正优化的是什么。</p>
+<blockquote>
+<p>本文中的层级约定：</p>
+<ul>
+<li><strong>L0</strong>：运行在物理机上的 Hypervisor，例如宿主机 KVM。</li>
+<li><strong>L1</strong>：运行在 L0 虚拟机中的 Guest Hypervisor，例如虚拟机内的 KVM、Xen 或 Hyper-V。</li>
+<li><strong>L2</strong>：由 L1 创建的嵌套虚拟机。</li>
+</ul>
+</blockquote>
+<hr>
+<h2>1. VMCS Shadowing 要解决什么问题</h2>
+<h3>1.1 VMCS 不是一块可由软件随意解析的普通结构体</h3>
+<p>Intel VMX 使用 VMCS（Virtual-Machine Control Structure）保存和控制虚拟机的运行状态。每个 VMCS 都关联一块最多 4 KiB 的 <strong>VMCS region</strong>，但除开头的 revision identifier 和 VMX-abort indicator 外，其余布局属于实现相关信息，软件不能依赖其内存格式。</p>
+<p>软件必须使用下列 VMX 指令管理 VMCS：</p>
+<ul>
+<li><code>VMPTRLD</code>：设置当前 VMCS。</li>
+<li><code>VMPTRST</code>：读取当前 VMCS 指针。</li>
+<li><code>VMREAD</code>：读取当前 VMCS 的字段。</li>
+<li><code>VMWRITE</code>：写入当前 VMCS 的字段。</li>
+<li><code>VMCLEAR</code>：使 VMCS 变为 inactive，并将其 launch state 置为 clear。</li>
+<li><code>VMLAUNCH</code> / <code>VMRESUME</code>：使用当前的普通 VMCS 执行 VM Entry。</li>
+</ul>
+<p>将 VMCS 简单描述为“存储在片上内存中”并不准确。Intel SDM 的表述是：处理器为 VMCS 关联一块内存区域，并且可以把 active VMCS 的状态保存在内存中、处理器内部，或者两者同时保存。真正导致嵌套虚拟化问题的关键是：<strong>VMCS 的字段必须通过专用 VMX 指令访问，而不是它是否物理地位于片上。</strong></p>
+<h3>1.2 为什么 L1 的 VMREAD/VMWRITE 会退出到 L0</h3>
+<p>运行 L1 时，物理处理器处于 VMX non-root operation。默认情况下，L1 在 non-root operation 中执行 <code>VMREAD</code> 或 <code>VMWRITE</code> 会触发 VM Exit，由 L0 模拟该指令。</p>
+<p>没有 VMCS Shadowing 时，一次字段访问大致经历：</p>
+<div class="highlight"><pre><span></span><code>L1 执行 VMREAD/VMWRITE
+          │
+          ▼
+物理 VM Exit 到 L0
+          │
+          ▼
+L0 检查字段编码和访问权限，并读写 VMCS12 的软件表示
+          │
+          ▼
+L0 执行 VM Entry，返回 L1
+</code></pre></div>
+
+<p>L1 在准备 L2 的 VM Entry、处理 L2 的 VM Exit 或切换虚拟 CPU 时，通常需要访问多个 VMCS 字段。如果每次字段访问都产生一次 L1→L0 VM Exit，退出、模拟和重新进入的成本会快速累积。</p>
+<p>VMCS Shadowing 的目标是：<strong>让一部分来自 L1 的 VMREAD/VMWRITE 直接由硬件作用于一个 Shadow VMCS，不再逐条退出到 L0。</strong></p>
+<p>需要强调的是，它只优化这一类访问，并不会消除 <code>VMLAUNCH</code>、<code>VMRESUME</code>、<code>VMPTRLD</code>、<code>VMCLEAR</code> 等 VMX 指令产生的退出，也不会消除嵌套页表、虚拟中断和 I/O 虚拟化的成本。</p>
+<hr>
+<h2>2. 理清四种容易混淆的 VMCS</h2>
+<p>Linux KVM 的嵌套 VMX 实现通常使用以下命名：</p>
+<table>
+<thead>
+<tr>
+<th>名称</th>
+<th>性质</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>VMCS01</strong></td>
+<td>L0 创建的硬件 VMCS</td>
+<td>物理处理器用它运行 L1。L1 执行 <code>VMREAD</code>/<code>VMWRITE</code> 时，生效的是 VMCS01 中的 VMCS Shadowing 控制、bitmap 地址和 VMCS link pointer。</td>
+</tr>
+<tr>
+<td><strong>VMCS12</strong></td>
+<td>L0 对“L1 为 L2 创建的 VMCS”的软件表示</td>
+<td>表示 L1 希望用于运行 L2 的配置和状态。KVM 会缓存 L1 Guest Physical Memory 中的 VMCS region，并以 <code>struct vmcs12</code> 等内部数据结构处理它。</td>
+</tr>
+<tr>
+<td><strong>Shadow VMCS</strong></td>
+<td>L0 分配的硬件 Shadow VMCS</td>
+<td>VMCS01 的 VMCS link pointer 指向它。被 bitmap 放行的 L1 <code>VMREAD</code>/<code>VMWRITE</code> 直接访问它。它只是 VMCS12 部分字段的硬件镜像，不能用于 VM Entry。</td>
+</tr>
+<tr>
+<td><strong>VMCS02</strong></td>
+<td>L0 创建的硬件普通 VMCS</td>
+<td>物理处理器实际用它运行 L2。它由 L1 的 VMCS12 意图与 L0 自身的控制和限制合成。</td>
+</tr>
+</tbody>
+</table>
+<p>最重要的关系是：</p>
+<div class="highlight"><pre><span></span><code>运行 L1 时
+
+                  VMCS link pointer
+VMCS01  ------------------------------------&gt;  Shadow VMCS
+  │                                               │
+  │ 物理处理器用 VMCS01 运行 L1                  │ 被放行的 VMREAD/VMWRITE
+  │                                               │ 直接读写这里
+  ▼                                               ▼
+ L1                                        VMCS12 部分字段的镜像
+
+
+运行 L2 时
+
+VMCS12（L1 的意图） + L0 的限制与宿主状态
+                         │
+                         ▼
+                       VMCS02
+                         │
+                         ▼
+                  物理处理器运行 L2
+</code></pre></div>
+
+<p>因此，“Shadow VMCS 与 VMCS02 关联”是容易造成误解的说法。在 KVM 中，用于加速 L1 字段访问的 Shadow VMCS 链接在 <strong>VMCS01</strong> 上；VMCS02 是运行 L2 的另一个普通 VMCS。</p>
+<hr>
+<h2>3. Intel VMCS Shadowing 的架构机制</h2>
+<h3>3.1 支持能力和控制位</h3>
+<p>VMCS Shadowing 是 secondary processor-based VM-execution control 的 bit 14。</p>
+<p>软件应读取 <code>IA32_VMX_PROCBASED_CTLS2</code>，检查该控制位是否允许设置为 1。仅仅发现 <code>CPUID.VMX=1</code> 并不能证明处理器支持 VMCS Shadowing。</p>
+<p>经验上，这项能力从部分第四代 Intel Core vPro/Haswell 时代的处理器开始出现；但软件不应根据“第几代 Core”或产品系列名称作最终判断。<strong>VMX capability MSR 才是权威依据。</strong></p>
+<h3>3.2 Ordinary VMCS 与 Shadow VMCS</h3>
+<p>VMCS region 开头 4 字节的 bit 31 是 shadow-VMCS indicator：</p>
+<ul>
+<li><code>0</code>：ordinary VMCS，可以用于 VM Entry。</li>
+<li><code>1</code>：shadow VMCS，不能用于 VM Entry。</li>
+</ul>
+<p>Shadow VMCS 的用途不是直接运行虚拟机，而是允许 VMX non-root 中的软件通过 <code>VMREAD</code> 和 <code>VMWRITE</code> 访问它。</p>
+<h3>3.3 VMCS link pointer</h3>
+<p>当前普通 VMCS 中包含一个 64 位 <code>VMCS link pointer</code> 字段。</p>
+<p>当 VMCS Shadowing 控制为 1 时，成功的 VM Entry 会检查该指针指向的 VMCS region 是否：</p>
+<ul>
+<li>地址满足对齐和物理地址宽度要求；</li>
+<li>revision identifier 与当前处理器一致；</li>
+<li>shadow-VMCS indicator 为 1。</li>
+</ul>
+<p>进入 L1 后，如果某次 <code>VMREAD</code>/<code>VMWRITE</code> 没有被 bitmap 拦截，处理器访问的是 <strong>VMCS link pointer 指向的 Shadow VMCS</strong>，而不是当前普通 VMCS 本身。</p>
+<h3>3.4 VMREAD bitmap 与 VMWRITE bitmap</h3>
+<p>硬件为 VMCS Shadowing 定义了两个各 4 KiB 的 bitmap：</p>
+<ul>
+<li>VMREAD bitmap：控制 L1 对各字段的读取是否退出。</li>
+<li>VMWRITE bitmap：控制 L1 对各字段的写入是否退出。</li>
+</ul>
+<p>bitmap 使用 VMCS field encoding 的低 15 位作为索引。其语义是：</p>
+<ul>
+<li>对应 bit 为 <strong>0</strong>：允许硬件直接访问 Shadow VMCS，不产生 VM Exit。</li>
+<li>对应 bit 为 <strong>1</strong>：产生 VM Exit，由 L0 模拟。</li>
+</ul>
+<p>对于在 64 位模式下 field encoding 的 bit 63:15 不全为 0 的情况，<code>VMREAD</code>/<code>VMWRITE</code> 也会退出。</p>
+<p>可以把处理器的核心判断简化为：</p>
+<div class="highlight"><pre><span></span><code>L1 在 VMX non-root 中执行 VMREAD(field)
+    │
+    ├─ VMCS shadowing = 0 ────────────────&gt; VM Exit
+    │
+    ├─ field encoding 高位非法 ───────────&gt; VM Exit
+    │
+    ├─ VMREAD bitmap[field] = 1 ─────────&gt; VM Exit
+    │
+    └─ VMREAD bitmap[field] = 0
+             │
+             ▼
+       从 VMCS link pointer 指向的 Shadow VMCS 读取
+</code></pre></div>
+
+<p><code>VMWRITE</code> 的判断相同，只是使用 VMWRITE bitmap。</p>
+<p>bitmap 的价值不仅是性能，还包括正确性和隔离性。L0 可以只放行自己能够可靠同步的字段，而继续拦截需要校验、模拟或特殊处理的字段。</p>
+<hr>
+<h2>4. KVM 中的完整工作流程</h2>
+<h3>4.1 L1 执行 VMPTRLD：选择 VMCS12</h3>
+<p>L1 的 <code>VMPTRLD</code> 仍然会退出到 L0。KVM 模拟该指令，记录 L1 当前选择的 VMCS12，并在 VMCS01 中：</p>
+<ol>
+<li>设置 <code>SECONDARY_EXEC_SHADOW_VMCS</code>；</li>
+<li>将 <code>VMCS_LINK_POINTER</code> 指向 KVM 为该 vCPU 分配的硬件 Shadow VMCS；</li>
+<li>标记 VMCS12 的字段需要同步到 Shadow VMCS。</li>
+</ol>
+<p>在再次进入 L1 之前，KVM 将需要由 L1 直接读取或修改的字段从 VMCS12 复制到 Shadow VMCS。</p>
+<h3>4.2 L1 配置 L2：大部分常用字段可直接访问</h3>
+<p>L1 执行 <code>VMREAD</code>/<code>VMWRITE</code> 时：</p>
+<ul>
+<li>对 bitmap 为 0 的字段，处理器直接访问 Shadow VMCS；</li>
+<li>对 bitmap 为 1 的字段，处理器退出到 L0，KVM 完成合法性检查和模拟。</li>
+</ul>
+<p>KVM 并没有让 L1 直接修改 VMCS02。因此，L1 无法通过 Shadow VMCS 绕过 L0 的控制。Shadow VMCS 只是 L1 所见 VMCS12 的一个受控镜像。</p>
+<h3>4.3 L1 执行 VMLAUNCH/VMRESUME：进入 L2 前回收修改</h3>
+<p><code>VMLAUNCH</code> 和 <code>VMRESUME</code> 仍会退出到 L0。KVM 的主要处理过程是：</p>
+<ol>
+<li>把 Shadow VMCS 中允许 L1 直接写入的字段复制回 VMCS12；</li>
+<li>按 Intel VMX 规则检查 VMCS12 的控制字段和 Guest/Host 状态；</li>
+<li>将 VMCS12 的配置与 L0 自身的限制合成为 VMCS02；</li>
+<li>切换到 VMCS02；</li>
+<li>使用 VMCS02 执行真正的硬件 VM Entry，运行 L2。</li>
+</ol>
+<p>这也是 Shadow VMCS 不能直接用于 VM Entry 的原因：L0 必须保留验证、合并和强制执行宿主策略的机会。</p>
+<h3>4.4 L2 退出：决定是由 L0 处理还是转交 L1</h3>
+<p>L2 发生物理 VM Exit 后首先到达 L0，因为物理处理器运行 L2 时使用的是 VMCS02。</p>
+<p>L0 随后判断：</p>
+<ul>
+<li>如果退出属于 L0 自己需要处理的事件，L0 处理后可直接恢复 L2；</li>
+<li>如果按照 VMCS12 的设置应当把退出交给 L1，KVM 将 VMCS02 中的 Guest 状态和 VM-exit information 写入 VMCS12，恢复 L1 的 Host 状态，并准备返回 L1。</li>
+</ul>
+<p>在重新运行 L1 之前，KVM 再把 VMCS12 中需要被 L1 直接读取的字段同步到 Shadow VMCS。这样 L1 随后的 <code>VMREAD</code> 可以直接看到 <code>VM_EXIT_REASON</code>、<code>EXIT_QUALIFICATION</code>、Guest RIP 等最新信息。</p>
+<h3>4.5 状态的“权威副本”会随执行层级变化</h3>
+<p>理解同步流程的一个好方法，是明确某一时刻哪个副本最新：</p>
+<table>
+<thead>
+<tr>
+<th>执行阶段</th>
+<th>主要权威状态</th>
+<th>原因</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>L1 正在配置当前 VMCS12</td>
+<td>Shadow VMCS 中的可直接写字段</td>
+<td>L1 的无退出 <code>VMWRITE</code> 直接修改 Shadow VMCS。</td>
+</tr>
+<tr>
+<td>L1 执行 VMLAUNCH/VMRESUME 后</td>
+<td>VMCS12，随后是 VMCS02</td>
+<td>KVM 先把 Shadow VMCS 的可写字段收回 VMCS12，再据此构造 VMCS02。</td>
+</tr>
+<tr>
+<td>L2 正在运行</td>
+<td>VMCS02</td>
+<td>物理处理器使用 VMCS02 运行 L2，Guest 状态会随执行变化。</td>
+</tr>
+<tr>
+<td>准备把 L2 的退出交给 L1</td>
+<td>VMCS12</td>
+<td>KVM将 VMCS02 的退出状态整理到 VMCS12。</td>
+</tr>
+<tr>
+<td>即将重新进入 L1</td>
+<td>Shadow VMCS</td>
+<td>KVM把 L1 可直接读取的字段从 VMCS12 更新到 Shadow VMCS。</td>
+</tr>
+</tbody>
+</table>
+<p>所以不能把同步简单概括成“VMLAUNCH 前 VMCS12→Shadow，VM Exit 后 Shadow→VMCS12”。在典型 KVM 流程中，进入 L2 前最关键的方向是 <strong>Shadow VMCS→VMCS12→VMCS02</strong>；把 L2 退出交给 L1 时则是 <strong>VMCS02→VMCS12→Shadow VMCS</strong>。</p>
+<hr>
+<h2>5. KVM 为什么只 Shadow 一部分字段</h2>
+<p>上游 KVM 初始化 VMREAD/VMWRITE bitmap 时，先把所有 bit 设为 1，也就是默认全部拦截；随后只为明确支持的字段清零。</p>
+<p>典型的直接读写字段包括：</p>
+<ul>
+<li><code>CPU_BASED_VM_EXEC_CONTROL</code></li>
+<li><code>PIN_BASED_VM_EXEC_CONTROL</code></li>
+<li><code>EXCEPTION_BITMAP</code></li>
+<li><code>VM_ENTRY_INTR_INFO_FIELD</code></li>
+<li><code>GUEST_RIP</code></li>
+<li><code>GUEST_RSP</code></li>
+<li><code>GUEST_CR0</code>、<code>GUEST_CR3</code>、<code>GUEST_CR4</code></li>
+<li><code>GUEST_RFLAGS</code></li>
+<li><code>CR0_GUEST_HOST_MASK</code>、<code>CR4_GUEST_HOST_MASK</code></li>
+</ul>
+<p>典型的直接读取字段包括：</p>
+<ul>
+<li><code>VM_EXIT_REASON</code></li>
+<li><code>VM_EXIT_INTR_INFO</code></li>
+<li><code>EXIT_QUALIFICATION</code></li>
+<li><code>GUEST_LINEAR_ADDRESS</code></li>
+<li><code>GUEST_PHYSICAL_ADDRESS</code></li>
+</ul>
+<p>具体列表会随 Linux 内核版本和硬件能力变化。例如，只有硬件真正支持 PML 或 VMX preemption timer 时，KVM 才能安全地把相关字段加入 Shadow VMCS 放行集合。</p>
+<p>这种 allowlist 设计有三个作用：</p>
+<ol>
+<li><strong>正确性</strong>：对不支持或需要特殊语义的字段继续由 KVM 模拟；</li>
+<li><strong>安全性</strong>：L1 不能直接改变 L0 不愿放行的控制；</li>
+<li><strong>兼容性</strong>：KVM 可以在不同硬件实现上提供一致的嵌套 VMX 行为。</li>
+</ol>
+<p>因此，“启用 VMCS Shadowing 后所有 VMREAD/VMWRITE 都不退出”是错误的。准确说法是：<strong>bitmap 为 0 且编码有效的字段访问可以不退出。</strong></p>
+<hr>
+<h2>6. Intel CPU 与 Linux KVM 支持</h2>
+<h3>6.1 不要仅按 CPU 代际判断</h3>
+<p>“Haswell 或更新”可以作为经验判断，但不能替代能力检测。不同 SKU、固件设置、宿主机 Hypervisor 暴露策略和云平台 CPU model 都可能改变最终可用能力。</p>
+<p>权威判断顺序应是：</p>
+<ol>
+<li>处理器通过 VMX capability MSR 表明 secondary control bit 14 可设置为 1；</li>
+<li>宿主 Linux KVM 检测到该能力；</li>
+<li><code>kvm_intel</code> 没有通过模块参数禁用它。</li>
+</ol>
+<h3>6.2 KVM 模块参数</h3>
+<p>当前上游 KVM 的 <code>enable_shadow_vmcs</code> 默认值为 1；如果硬件不支持，KVM 会在初始化时自动关闭它。</p>
+<p>可以检查：</p>
+<div class="highlight"><pre><span></span><code>cat<span class="w"> </span>/sys/module/kvm_intel/parameters/nested
+cat<span class="w"> </span>/sys/module/kvm_intel/parameters/enable_shadow_vmcs
+</code></pre></div>
+
+<p>典型输出为：</p>
+<div class="highlight"><pre><span></span><code>Y
+Y
+</code></pre></div>
+
+<p>如需查看当前内核是否提供这些参数：</p>
+<div class="highlight"><pre><span></span><code>modinfo<span class="w"> </span>kvm_intel<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-E<span class="w"> </span><span class="s1">&#39;nested|enable_shadow_vmcs&#39;</span>
+</code></pre></div>
+
+<p>旧内核或发行版明确关闭默认值时，可以在 <code>/etc/modprobe.d/kvm_intel.conf</code> 中配置：</p>
+<div class="highlight"><pre><span></span><code>options kvm_intel nested=1 enable_shadow_vmcs=1
+</code></pre></div>
+
+<p>Linux 上游文档说明，x86 KVM 从 Linux 4.20 起默认启用 <code>nested</code>，但发行版可以覆盖默认值。修改模块参数后重新加载 <code>kvm_intel</code> 会影响正在运行的虚拟机，生产环境中应先安排停机或迁移。</p>
+<p>此外，L1 还必须看到 VMX 能力。QEMU 常用 <code>-cpu host</code>，libvirt 常用 host-passthrough；否则即使 L0 支持 Shadow VMCS，L1 也未必能够运行 L2。</p>
+<hr>
+<h2>7. AMD SVM：为什么没有同样的字段访问问题</h2>
+<h3>7.1 VMCB 的架构设计不同</h3>
+<p>AMD SVM 使用 VMCB（Virtual Machine Control Block）。VMCB 是一块 4 KiB、架构定义了字段布局的内存区域。Hypervisor 使用普通内存 load/store 读写 VMCB，并通过 <code>VMRUN</code> 的操作数提供 VMCB 的物理地址。</p>
+<p>因此，在嵌套 SVM 中，L1 修改 VMCB12 的字段通常只是普通内存访问，不需要执行与 <code>VMREAD</code>/<code>VMWRITE</code> 对应的专用字段访问指令，也不会因为“读取一个 VMCB 字段”而必然产生 L1→L0 的 <code>#VMEXIT</code>。</p>
+<p>这意味着 AMD 不需要一个与 Intel VMCS Shadowing 完全等价、专门用于消除逐字段指令退出的机制。</p>
+<p>但这不代表嵌套 SVM 没有控制块合并成本：</p>
+<div class="highlight"><pre><span></span><code>L1 普通内存读写 VMCB12
+          │
+          ▼
+L1 执行 VMRUN
+          │
+          ▼
+#VMEXIT 到 L0
+          │
+          ▼
+L0 校验 VMCB12，并构造/更新用于实际运行 L2 的 VMCB02
+          │
+          ▼
+L0 执行真正的 VMRUN
+</code></pre></div>
+
+<p>也就是说，AMD 避免的是 <strong>逐字段 VMREAD/VMWRITE 退出问题</strong>；L0 对嵌套 <code>VMRUN</code> 的拦截、VMCB12 校验、VMCB02 合并以及 L2 退出转发仍然存在。</p>
+<h3>7.2 VMCB Clean Bits 的真实含义</h3>
+<p>VMCB Clean Bits 与 VMCS Shadowing 不是等价机制。</p>
+<p>支持 VMCB state caching 的处理器可以在一次 <code>#VMEXIT</code> 与后续 <code>VMRUN</code> 之间缓存部分 Guest 状态。VMCB Clean 字段用于告诉处理器，哪些内存中的 VMCB 字段相对硬件缓存没有被 Hypervisor 修改：</p>
+<ul>
+<li>clean bit 为 <strong>1</strong>：处理器可以使用缓存值；这是一个 hint，处理器也可以选择重新从 VMCB 加载。</li>
+<li>clean bit 为 <strong>0</strong>：处理器必须从 VMCB 重新加载对应字段。</li>
+</ul>
+<p>当 Hypervisor 显式修改一组 VMCB 字段时，必须清零相应 clean bit。首次运行某个 Guest、把 Guest 迁移到另一个物理核心或移动 VMCB 的物理页时，必须按 AMD 手册要求清理相关状态，通常要把整个 VMCB Clean 字段置 0。</p>
+<p>当前 AMD 架构手册定义的主要分组包括：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Bit</th>
+<th>分组</th>
+<th>代表字段</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">0</td>
+<td><code>I</code></td>
+<td>intercept vectors、TSC offset、Pause Filter Count</td>
+</tr>
+<tr>
+<td style="text-align: right;">1</td>
+<td><code>IOPM</code></td>
+<td>IOPM base、MSRPM base</td>
+</tr>
+<tr>
+<td style="text-align: right;">2</td>
+<td><code>ASID</code></td>
+<td>ASID</td>
+</tr>
+<tr>
+<td style="text-align: right;">3</td>
+<td><code>TPR</code></td>
+<td>虚拟 TPR 和虚拟中断相关字段</td>
+</tr>
+<tr>
+<td style="text-align: right;">4</td>
+<td><code>NP</code></td>
+<td>Nested Paging 的 NCR3、Guest PAT</td>
+</tr>
+<tr>
+<td style="text-align: right;">5</td>
+<td><code>CRx</code></td>
+<td>CR0、CR3、CR4、EFER</td>
+</tr>
+<tr>
+<td style="text-align: right;">6</td>
+<td><code>DRx</code></td>
+<td>DR6、DR7</td>
+</tr>
+<tr>
+<td style="text-align: right;">7</td>
+<td><code>DT</code></td>
+<td>GDT/IDT base 与 limit</td>
+</tr>
+<tr>
+<td style="text-align: right;">8</td>
+<td><code>SEG</code></td>
+<td>段寄存器 selector/base/limit/attributes、CPL</td>
+</tr>
+<tr>
+<td style="text-align: right;">9</td>
+<td><code>CR2</code></td>
+<td>CR2</td>
+</tr>
+<tr>
+<td style="text-align: right;">10</td>
+<td><code>LBR</code></td>
+<td>DebugCtl 和 last-branch 相关状态</td>
+</tr>
+<tr>
+<td style="text-align: right;">11</td>
+<td><code>AVIC</code></td>
+<td>AVIC 相关指针</td>
+</tr>
+<tr>
+<td style="text-align: right;">12</td>
+<td><code>CET</code></td>
+<td>S_CET、SSP、ISST_ADDR</td>
+</tr>
+</tbody>
+</table>
+<p>VMCB Clean Bits 优化的是 <strong>处理器在 VMRUN 时是否需要从内存重新加载某组 Guest 状态</strong>。它不负责消除 L1 的字段访问退出，也不直接解决 VMCB12 与 VMCB02 的软件同步问题。</p>
+<hr>
+<h2>8. Intel 与 AMD 的准确对比</h2>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>Intel VMX</th>
+<th>AMD SVM</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>控制块</td>
+<td>VMCS region 有内存载体，但字段布局不透明</td>
+<td>VMCB 是布局公开的 4 KiB 内存结构</td>
+</tr>
+<tr>
+<td>字段访问</td>
+<td>使用 <code>VMREAD</code>/<code>VMWRITE</code></td>
+<td>使用普通内存 load/store</td>
+</tr>
+<tr>
+<td>嵌套环境中的逐字段退出</td>
+<td>默认会发生，除非 VMCS Shadowing 与 bitmap 允许直通</td>
+<td>架构上没有对应的专用字段访问指令，因此没有同样的问题</td>
+</tr>
+<tr>
+<td>实际运行 L2</td>
+<td>L0 由 VMCS12 合成 VMCS02</td>
+<td>L0 通常由 VMCB12 合成/更新 VMCB02</td>
+</tr>
+<tr>
+<td>相关硬件优化</td>
+<td>Shadow VMCS、VMREAD/VMWRITE bitmap</td>
+<td>VMCB state caching 与 Clean Bits</td>
+</tr>
+<tr>
+<td>Clean/Shadow 是否等价</td>
+<td>不适用</td>
+<td>不等价；它们优化不同路径</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>9. 性能收益应如何理解</h2>
+<h3>9.1 被减少的成本</h3>
+<p>VMCS Shadowing 主要减少：</p>
+<ul>
+<li>L1 <code>VMREAD</code>/<code>VMWRITE</code> 导致的物理 VM Exit 次数；</li>
+<li>L0 对这些指令进行解码、权限检查和软件模拟的次数；</li>
+<li>从 L0 重新进入 L1 的次数。</li>
+</ul>
+<p>它把多个逐字段退出，转换为在关键边界处对一组允许字段进行同步。对于频繁读写 VMCS 字段的 L1 Hypervisor，收益可能很明显。</p>
+<h3>9.2 没有被消除的成本</h3>
+<p>以下开销仍然存在：</p>
+<ul>
+<li>L1 的 <code>VMLAUNCH</code>、<code>VMRESUME</code>、<code>VMPTRLD</code>、<code>VMCLEAR</code> 等 VMX 指令退出；</li>
+<li>VMCS12 的合法性检查；</li>
+<li>VMCS12 与 VMCS02 的合并；</li>
+<li>L2 的物理 VM Exit 及其转发；</li>
+<li>nested EPT、TLB、虚拟中断、设备 I/O 和调度开销；</li>
+<li>Shadow VMCS 与 VMCS12 之间的批量字段同步；</li>
+<li><code>VMREAD</code>/<code>VMWRITE</code> 指令本身的执行成本。</li>
+</ul>
+<p>所以不应把性能模型写成固定的“N 次 VM Exit 变为 0 次 VM Exit加两次同步”，也不应给出一个与 workload、内核版本、L1 Hypervisor 和其他嵌套优化无关的统一性能比例。</p>
+<p>历史报告中常把 VMCS Shadowing 与 nested EPT、APIC virtualization 等特性一起测试。此类数据可以说明整套嵌套虚拟化优化的潜力，但不能把组合结果全部归因于 VMCS Shadowing。尤其是“L2 达到 L1 的约 80%”这类数字，必须同时给出测试平台、workload、基线和启用的全部特性，不能作为普遍结论。</p>
+<h3>9.3 建议的测量方法</h3>
+<p>评估 VMCS Shadowing 时，至少应保持以下条件一致：</p>
+<ol>
+<li>相同 CPU、BIOS、内核、QEMU 和 L1 Hypervisor；</li>
+<li>相同 L1/L2 vCPU 数量、内存和 CPU model；</li>
+<li>仅切换 <code>enable_shadow_vmcs</code>，其他特性保持不变；</li>
+<li>同时记录 workload 用时和 L0 的 KVM exit 统计；</li>
+<li>特别观察 VMREAD、VMWRITE 类退出是否明显减少；</li>
+<li>将 nested EPT、APICv、posted interrupt 等变量单独记录。</li>
+</ol>
+<hr>
+<h2>10. 常见混淆</h2>
+<table>
+<thead>
+<tr>
+<th>概念</th>
+<th>与 VMCS Shadowing 的区别</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Shadow Paging</strong></td>
+<td>用软件维护 Guest 页表到 Host 页表的映射，与 VMCS 字段访问无关。</td>
+</tr>
+<tr>
+<td><strong>Nested EPT</strong></td>
+<td>合成 L2 GPA 到 Host PA 的二级地址转换，与 Shadow VMCS 是两条独立的优化路径。</td>
+</tr>
+<tr>
+<td><strong>Hyper-V Enlightened VMCS（eVMCS）</strong></td>
+<td>一种 Hyper-V/KVM 间的半虚拟化 VMCS 接口，使用内存结构和 clean-field 协议；不是 Intel 硬件 Shadow VMCS。</td>
+</tr>
+<tr>
+<td><strong>VMCB Clean Bits</strong></td>
+<td>AMD 用来提示处理器能否复用缓存 Guest 状态的机制，不是 VMREAD/VMWRITE 的直通机制。</td>
+</tr>
+<tr>
+<td><strong>VMCS02</strong></td>
+<td>真正运行 L2 的普通 VMCS；Shadow VMCS 只是 VMCS12 部分字段的受控镜像。</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>11. 总结</h2>
+<ol>
+<li>Intel VMCS 有内存关联区域，但字段布局不透明，软件必须使用 VMX 指令访问；把它简单称为“片上内存结构”不准确。</li>
+<li>默认情况下，L1 在 VMX non-root 中执行 <code>VMREAD</code>/<code>VMWRITE</code> 会退出到 L0。</li>
+<li>L0 在 <strong>VMCS01</strong> 中启用 VMCS Shadowing，并通过 VMCS link pointer 指向硬件 Shadow VMCS。</li>
+<li>VMREAD/VMWRITE bitmap 的 <strong>0 bit 表示允许直接访问</strong>，<strong>1 bit 表示退出</strong>。</li>
+<li>Shadow VMCS 不能用于 VM Entry，也不会让 L1 直接修改 VMCS02。</li>
+<li>KVM 只 Shadow 明确支持的一部分字段，并在 L1/L2 切换边界维护 <code>Shadow VMCS ↔ VMCS12 ↔ VMCS02</code> 的一致性。</li>
+<li>AMD VMCB 可由普通内存访问，因此不存在同样的逐字段指令退出问题；但嵌套 <code>VMRUN</code>、VMCB12/VMCB02 合并等开销仍然存在。</li>
+<li>VMCB Clean Bits 优化 VMRUN 时的硬件状态重载，不是 VMCS Shadowing 的 AMD 等价物。</li>
+<li>VMCS Shadowing 的收益取决于 L1 的 VMCS 访问模式和整套嵌套虚拟化配置，不能用单一比例概括。</li>
+</ol>
+<hr>
+<h2>12. 参考资料</h2>
+<ol>
+<li><a href="https://cdrdv2.intel.com/v1/dl/getContent/671506">Intel® 64 and IA-32 Architectures Software Developer’s Manual, Volume 3C</a>，重点参见 VMCS region、secondary processor-based controls、VMCS types、VMREAD/VMWRITE 和 VM-entry checks。</li>
+<li><a href="https://www.kernel.org/doc/html/latest/virt/kvm/x86/nested-vmx.html">Linux Kernel Documentation: Nested VMX</a>。</li>
+<li><a href="https://www.kernel.org/doc/html/next/virt/kvm/x86/running-nested-guests.html">Linux Kernel Documentation: Running nested guests with KVM</a>。</li>
+<li><a href="https://github.com/torvalds/linux/blob/master/arch/x86/kvm/vmx/nested.c">Linux KVM <code>nested.c</code></a>。</li>
+<li><a href="https://github.com/torvalds/linux/blob/master/arch/x86/kvm/vmx/vmcs_shadow_fields.h">Linux KVM <code>vmcs_shadow_fields.h</code></a>。</li>
+<li><a href="https://docs.amd.com/v/u/en-US/24593_3.44_APM_Vol2">AMD64 Architecture Programmer’s Manual, Volume 2: System Programming</a>，重点参见 SVM、VMCB State Caching 和 VMCB Clean Bits。</li>
+<li><a href="https://www.linux-kvm.org/images/8/8c/Kvm-forum-2013-nested-ept.pdf">KVM Forum 2013: Nested EPT to Make Nested VMX Faster</a>，仅作为历史性能与实现背景资料。</li>
+</ol>
+<blockquote>
+<p>内容依据 2026 年 7 月可获得的 Intel、AMD 架构文档和 Linux 上游 KVM 实现复核。内核实现细节可能继续演进，分析特定版本时应以对应版本源码为准。</p>
+</blockquote>
+
+
+             
+ 
+            
+            
+            
+
+
+
+
+
+
+
+            <hr/>
+<section>
+    <h2>Related Posts</h2>
+<ul class="related-posts-list">
+<li><a href="https://blog.kernel.love/x86-nmi.html" title="Virt NMI Emulation">Virt NMI Emulation</a></li>
+<li><a href="https://blog.kernel.love/microVM.html" title="轻量级虚拟化技术">轻量级虚拟化技术</a></li>
+<li><a href="https://blog.kernel.love/virtio-overview.html" title="Virtio Spec Overview">Virtio Spec Overview</a></li>
+<li><a href="https://blog.kernel.love/amd-x2avic.html" title="AMD X2AVIC 理解">AMD X2AVIC 理解</a></li>
+<li><a href="https://blog.kernel.love/x86 nested virtualization.html" title="X86 Nested Virtualization">X86 Nested Virtualization</a></li>
+</ul>
+<hr />
+</section>
+        </div>
+        <section id="article-sidebar" class="span2">
+            <h4>Published</h4>
+            <time itemprop="dateCreated" datetime="2026-07-03T10:00:00+08:00">Fri 03 July 2026</time>
+
+            <h4>Category</h4>
+            <a class="category-link" href="https://blog.kernel.love/categories.html#virt-ref">virt</a>
+            <h4>Tags</h4>
+            <ul class="list-of-tags tags-in-article">
+                <li><a href="https://blog.kernel.love/tags.html#nested-virt-ref">nested-virt
+</a></li>
+                <li><a href="https://blog.kernel.love/tags.html#virtualization-ref">virtualization
+                    <span class="superscript">14</span>
+</a></li>
+            </ul>
+<h4>Contact</h4>
+<div id="sidebar-social-link">
+    <a href="https://github.com/fangying" title="" target="_blank" rel="nofollow noopener noreferrer">
+        <svg xmlns="http://www.w3.org/2000/svg" aria-label="GitHub" role="img" viewBox="0 0 512 512"><rect width="512" height="512" rx="15%" fill="#1B1817"/><path fill="#fff" d="M335 499c14 0 12 17 12 17H165s-2-17 12-17c13 0 16-6 16-12l-1-50c-71 16-86-28-86-28-12-30-28-37-28-37-24-16 1-16 1-16 26 2 40 26 40 26 22 39 59 28 74 22 2-17 9-28 16-35-57-6-116-28-116-126 0-28 10-51 26-69-3-6-11-32 3-67 0 0 21-7 70 26 42-12 86-12 128 0 49-33 70-26 70-26 14 35 6 61 3 67 16 18 26 41 26 69 0 98-60 120-117 126 10 8 18 24 18 48l-1 70c0 6 3 12 16 12z"/></svg>
+    </a>
+</div>
+            
+
+
+
+
+
+            
+
+
+
+
+
+        </section>
+</div>
+</article>
+<!-- Root element of PhotoSwipe. Must have class pswp. -->
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    <!-- Background of PhotoSwipe.
+         It's a separate element as animating opacity is faster than rgba(). -->
+    <div class="pswp__bg"></div>
+
+    <!-- Slides wrapper with overflow:hidden. -->
+    <div class="pswp__scroll-wrap">
+
+        <!-- Container that holds slides.
+            PhotoSwipe keeps only 3 of them in the DOM to save memory.
+            Don't modify these 3 pswp__item elements, data is added later on. -->
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        <!-- Default (PhotoSwipeUI_Default) interface on top of sliding area. Can be changed. -->
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                <!--  Controls are self-explanatory. Order can be changed. -->
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                <!-- Preloader demo https://codepen.io/dimsemenov/pen/yyBWoR -->
+                <!-- element will get class pswp__preloader--active when preloader is running -->
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                      <div class="pswp__preloader__cut">
+                        <div class="pswp__preloader__donut"></div>
+                      </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>                    </div>
+                    <div class="span1"></div>
+                </div>
+            </div>
+        </div>
+<footer>
+    <div>
+        <span xmlns:dct="http://purl.org/dc/terms/" property="dct:title"> blog.kernel.love"</span> by <a xmlns:cc="http://creativecommons.org/ns#" href="https://blog.kernel.love" property="cc:attributionName" rel="cc:attributionURL">Yori Fang</a> is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/3.0/deed.en_US">Creative Commons Attribution-ShareAlike 3.0 Unported License</a>.
+    </div>
+
+
+
+
+    <div id="fpowered">
+        Powered by: <a href="http://getpelican.com/" title="Pelican Home Page" target="_blank" rel="nofollow noopener noreferrer">Pelican</a>
+        Theme: <a href="https://elegant.oncrashreboot.com/" title="Theme Elegant Home Page" target="_blank" rel="nofollow noopener noreferrer">Elegant</a>
+    </div>
+</footer>            <script src="//code.jquery.com/jquery.min.js"></script>
+        <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/js/bootstrap.min.js"></script>
+        <script src="https://blog.kernel.love/theme/js/elegant.prod.9e9d5ce754.js"></script>
+        <script>
+            function validateForm(query)
+            {
+                return (query.length > 0);
+            }
+        </script>
+
+    <script>
+    (function () {
+        if (window.location.hash.match(/^#comment-\d+$/)) {
+            $('#comment_thread').collapse('show');
+        }
+    })();
+    window.onhashchange=function(){
+        if (window.location.hash.match(/^#comment-\d+$/))
+            window.location.reload(true);
+    }
+    $('#comment_thread').on('shown', function () {
+        var link = document.getElementById('comment-accordion-toggle');
+        var old_innerHTML = link.innerHTML;
+        $(link).fadeOut(200, function() {
+            $(this).text('Click here to hide comments').fadeIn(200);
+        });
+        $('#comment_thread').on('hidden', function () {
+            $(link).fadeOut(200, function() {
+                $(this).text(old_innerHTML).fadeIn(200);
+            });
+        })
+    })
+</script>
+
+    </body>
+    <!-- Theme: Elegant built for Pelican
+        License : MIT -->
+</html>
