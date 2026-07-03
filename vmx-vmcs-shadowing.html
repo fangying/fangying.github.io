@@ -19,7 +19,7 @@
 <meta name="keywords" content="virtualization, nested-virt, virt, " />
 
 <meta property="og:title" content="VMCS Shadowing 技术详解 "/>
-<meta property="og:url" content="https://blog.kernel.love/drafts/vmx-vmcs-shadowing.html" />
+<meta property="og:url" content="https://blog.kernel.love/vmx-vmcs-shadowing.html" />
 <meta property="og:description" content="从 Intel VMX 架构语义出发，详解 VMCS Shadowing 的原理、VMREAD/VMWRITE 退出判定、KVM 中 VMCS01/VMCS12/Shadow VMCS/VMCS02 的一致性维护，以及 AMD SVM 中 VMCB Clean Bits 的对应机制。" />
 <meta property="og:site_name" content="blog.kernel.love" />
 <meta property="og:article:author" content="Yori Fang" />
@@ -78,7 +78,7 @@
 <div class="row-fluid">
     <header class="page-header span10 offset2">
         <h1>
-            <a href="https://blog.kernel.love/drafts/vmx-vmcs-shadowing.html">
+            <a href="https://blog.kernel.love/vmx-vmcs-shadowing.html">
                 VMCS Shadowing 技术详解
             </a>
         </h1>
@@ -624,7 +624,12 @@ L0 执行真正的 VMRUN
 
              
  
-            
+                <p id="post-share-links">
+    Share on:
+      <a href="https://twitter.com/intent/tweet?text=VMCS%20Shadowing%20%E6%8A%80%E6%9C%AF%E8%AF%A6%E8%A7%A3&url=https%3A//blog.kernel.love/vmx-vmcs-shadowing.html&hashtags=virtualization,nested-virt" target="_blank" rel="nofollow noopener noreferrer" title="Share on Twitter">Twitter</a>
+ ❄       <a href="https://www.facebook.com/sharer/sharer.php?u=https%3A//blog.kernel.love/vmx-vmcs-shadowing.html" target="_blank" rel="nofollow noopener noreferrer" title="Share on Facebook">Facebook</a>
+ ❄       <a href="mailto:?subject=VMCS%20Shadowing%20%E6%8A%80%E6%9C%AF%E8%AF%A6%E8%A7%A3&amp;body=https%3A//blog.kernel.love/vmx-vmcs-shadowing.html" target="_blank" rel="nofollow noopener noreferrer" title="Share via Email">Email</a>
+
             
             
 
@@ -646,6 +651,13 @@ L0 执行真正的 VMRUN
 </ul>
 <hr />
 </section>
+            <aside>
+            <nav>
+            <ul class="articles-timeline">
+                <li class="previous-article">« <a href="https://blog.kernel.love/x86 nested virtualization.html" title="Previous: X86 Nested Virtualization">X86 Nested Virtualization</a></li>
+            </ul>
+            </nav>
+            </aside>
         </div>
         <section id="article-sidebar" class="span2">
             <h4>Published</h4>
@@ -656,9 +668,10 @@ L0 执行真正的 VMRUN
             <h4>Tags</h4>
             <ul class="list-of-tags tags-in-article">
                 <li><a href="https://blog.kernel.love/tags.html#nested-virt-ref">nested-virt
+                    <span class="superscript">1</span>
 </a></li>
                 <li><a href="https://blog.kernel.love/tags.html#virtualization-ref">virtualization
-                    <span class="superscript">14</span>
+                    <span class="superscript">15</span>
 </a></li>
             </ul>
 <h4>Contact</h4>
