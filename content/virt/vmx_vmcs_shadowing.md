@@ -3,7 +3,7 @@ Date: 2026-7-3 10:00
 Modified: 2026-7-3 10:00
 Tags: virtualization, nested-virt
 Slug: vmx-vmcs-shadowing
-Status: draft
+Status: published
 Authors: Yori Fang
 Summary: 从 Intel VMX 架构语义出发，详解 VMCS Shadowing 的原理、VMREAD/VMWRITE 退出判定、KVM 中 VMCS01/VMCS12/Shadow VMCS/VMCS02 的一致性维护，以及 AMD SVM 中 VMCB Clean Bits 的对应机制。
 
