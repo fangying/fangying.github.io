@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://blog.kernel.love/theme/css/style.min.css?2fcac227">
+
+        <link rel="dns-prefetch" href="//fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin>
+
+        <meta name="author" content="Yori Fang" />
+
+        <meta name="description" content="深入分析 Linux KVM 半虚拟化 Steal Time 机制的内核实现，覆盖 x86 与 ARM64 架构，涵盖宿主机/客户机数据流、调度器集成、vCPU 抢占检测与 PV TLB Flush 等核心主题。
+" />
+        <meta property="og:type" content="article" />
+        <meta name="twitter:card" content="summary">
+
+<meta name="keywords" content="virtualization, kvm, paravirtualization, virt, " />
+
+<meta property="og:title" content="KVM PV Steal Time 机制分析 "/>
+<meta property="og:url" content="https://blog.kernel.love/kvm-pv-steal-time.html" />
+<meta property="og:description" content="深入分析 Linux KVM 半虚拟化 Steal Time 机制的内核实现，覆盖 x86 与 ARM64 架构，涵盖宿主机/客户机数据流、调度器集成、vCPU 抢占检测与 PV TLB Flush 等核心主题。" />
+<meta property="og:site_name" content="blog.kernel.love" />
+<meta property="og:article:author" content="Yori Fang" />
+<meta property="og:article:published_time" content="2026-07-04T10:00:00+08:00" />
+<meta property="og:article:modified_time" content="2026-07-04T10:00:00+08:00" />
+<meta name="twitter:title" content="KVM PV Steal Time 机制分析 ">
+<meta name="twitter:description" content="深入分析 Linux KVM 半虚拟化 Steal Time 机制的内核实现，覆盖 x86 与 ARM64 架构，涵盖宿主机/客户机数据流、调度器集成、vCPU 抢占检测与 PV TLB Flush 等核心主题。">
+
+        <title>KVM PV Steal Time 机制分析  · blog.kernel.love
+</title>
+
+<script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+     (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+     m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+     })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+    ga('create', 'UA-107392039-2', 'auto');
+    ga('send', 'pageview');
+</script>
+
+
+    </head>
+    <body>
+        <div id="content">
+            <div class="navbar navbar-static-top">
+                <div class="navbar-inner">
+                    <div class="container-fluid">
+                        <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                        </a>
+                        <a class="brand" href="https://blog.kernel.love/"><span class=site-name>blog.kernel.love</span></a>
+                        <div class="nav-collapse collapse">
+                            <ul class="nav pull-right top-menu">
+                                <li >
+                                    <a href=
+                                       https://blog.kernel.love
+                                    >Home</a>
+                                </li>
+                                <li ><a href="https://blog.kernel.love/pages/about.html">About</a></li>
+                                <li ><a href="https://blog.kernel.love/categories.html">Categories</a></li>
+                                <li ><a href="https://blog.kernel.love/tags.html">Tags</a></li>
+                                <li ><a href="https://blog.kernel.love/archives.html">Archives</a></li>
+                                <li><form class="navbar-search" action="https://blog.kernel.love/search.html" onsubmit="return validateForm(this.elements['q'].value);"> <input type="text" class="search-query" placeholder="Search" name="q" id="tipue_search_input"></form></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="container-fluid">
+                <div class="row-fluid">
+                    <div class="span1"></div>
+                    <div class="span10">
+<article itemscope>
+<div class="row-fluid">
+    <header class="page-header span10 offset2">
+        <h1>
+            <a href="https://blog.kernel.love/kvm-pv-steal-time.html">
+                KVM PV Steal Time 机制分析
+            </a>
+        </h1>
+    </header>
+</div>
+
+<div class="row-fluid">
+        <div class="span8 offset2 article-content">
+            
+            <h1>KVM PV Steal Time 机制分析</h1>
+<p>本文深入分析 Linux KVM 半虚拟化（Paravirtualized）Steal Time 机制的内核实现，覆盖 x86 与 ARM64 架构，涵盖宿主机/客户机数据流、调度器集成、vCPU 抢占检测与 PV TLB Flush 等核心主题。</p>
+<h1>1. 概述</h1>
+<p>在虚拟化环境中，客户机（Guest）的 vCPU 可能被宿主机（Host）调度器抢占，导致 vCPU 虽然在客户机视角处于运行态，但实际上在宿主机层面被挂起等待 CPU。这段"被偷走的时间"称为 <strong>Steal Time</strong>。</p>
+<p>KVM 通过<strong>半虚拟化（Paravirtualization）</strong>机制，让宿主机主动将 steal time 信息通过共享内存传递给客户机，使客户机内核能够感知到真实的时间损耗，从而做出更准确的调度和计费决策。</p>
+<p><strong>核心价值</strong>：客户机内核能准确区分"真正运行的时间"和"被宿主机抢占的时间"，避免将 steal time 误计入用户进程 CPU 时间，提升调度公平性与监控准确性。</p>
+<h1>2. 核心数据结构</h1>
+<h2>2.1 struct kvm_steal_time</h2>
+<p>宿主机与客户机之间的共享内存布局，定义在 Linux 内核 UAPI 头文件中：</p>
+<div class="highlight"><pre><span></span><code><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_steal_time</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">__u64</span><span class="w"> </span><span class="n">steal</span><span class="p">;</span><span class="w">       </span><span class="cm">/* 累计 steal time，单位：纳秒 */</span>
+<span class="w">    </span><span class="n">__u32</span><span class="w"> </span><span class="n">version</span><span class="p">;</span><span class="w">     </span><span class="cm">/* 序列计数器（奇数 = 更新中） */</span>
+<span class="w">    </span><span class="n">__u32</span><span class="w"> </span><span class="n">flags</span><span class="p">;</span><span class="w">       </span><span class="cm">/* 当前始终为零 */</span>
+<span class="w">    </span><span class="n">__u8</span><span class="w">  </span><span class="n">preempted</span><span class="p">;</span><span class="w">   </span><span class="cm">/* 非零表示 vCPU 已被抢占 */</span>
+<span class="w">    </span><span class="n">__u8</span><span class="w">  </span><span class="n">u8_pad</span><span class="p">[</span><span class="mi">3</span><span class="p">];</span>
+<span class="w">    </span><span class="n">__u32</span><span class="w"> </span><span class="n">pad</span><span class="p">[</span><span class="mi">11</span><span class="p">];</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>steal</code></td>
+<td>u64</td>
+<td>累计被偷走的纳秒数。仅统计 vCPU 有任务但被宿主机调度走的时间，不含 idle 时间</td>
+</tr>
+<tr>
+<td><code>version</code></td>
+<td>u32</td>
+<td>Seqlock 序列号。奇数表示写入进行中，偶数表示数据一致可读</td>
+</tr>
+<tr>
+<td><code>preempted</code></td>
+<td>u8</td>
+<td>vCPU 抢占状态标志。非零 = 已抢占，零 = 正在运行</td>
+</tr>
+<tr>
+<td><code>flags</code></td>
+<td>u32</td>
+<td>保留字段，当前始终为零</td>
+</tr>
+</tbody>
+</table>
+<h2>2.2 MSR 接口</h2>
+<p>x86 架构通过 MSR（Model Specific Register）进行交互：</p>
+<table>
+<thead>
+<tr>
+<th>MSR</th>
+<th>地址</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>MSR_KVM_STEAL_TIME</code></td>
+<td><code>0x4b564d03</code></td>
+<td>客户机写入共享内存物理地址 + 使能位</td>
+</tr>
+<tr>
+<td><code>MSR_KVM_STEAL_TIME</code> bit 0</td>
+<td>—</td>
+<td>使能位（KVM_MSR_ENABLED）。置 1 开启 steal time 上报</td>
+</tr>
+</tbody>
+</table>
+<p>共享内存必须 <strong>64 字节对齐</strong>，以确保缓存行对齐，避免 false sharing。</p>
+<h1>3. 宿主机侧实现</h1>
+<h2>3.1 数据来源：sched_info.run_delay</h2>
+<p>宿主机内核调度器在每个任务的 <code>sched_info</code> 结构中维护运行队列等待时间：</p>
+<div class="highlight"><pre><span></span><code><span class="k">struct</span><span class="w"> </span><span class="nc">sched_info</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">pcount</span><span class="p">;</span><span class="w">           </span><span class="cm">/* 在此 CPU 上运行的次数 */</span>
+<span class="w">    </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">run_delay</span><span class="p">;</span><span class="w">   </span><span class="cm">/* 在运行队列上等待的时间（纳秒） */</span>
+<span class="w">    </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">last_arrival</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">last_queued</span><span class="p">;</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<p><code>run_delay</code> 在 <code>sched_info_arrive()</code>（入队时记录到达时间）和 <code>sched_info_dequeued()</code>（出队时累加等待差值）中更新，精确记录了 vCPU 线程在宿主机运行队列上等待调度的总时间。</p>
+<h2>3.2 record_steal_time() — 核心写入函数</h2>
+<p>该函数在 <code>kvm_arch_vcpu_load()</code> 中被调用，即每次 vCPU 即将被加载到物理 CPU 上运行前执行：</p>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">record_steal_time</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_steal_time</span><span class="w"> </span><span class="o">*</span><span class="n">st</span><span class="p">;</span>
+
+<span class="w">    </span><span class="cm">/* 建立 shared memory 映射（涉及 KVM_GUEST_USES_PGDPTR 等） */</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">st</span><span class="p">.</span><span class="n">msr_val</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">KVM_MSR_ENABLED</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="cm">/* ...映射 st 指向 guest 物理地址... */</span>
+
+<span class="w">        </span><span class="cm">/* 首次写入：若 version 为奇数，先 +1 变偶数 */</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">st</span><span class="o">-&gt;</span><span class="n">version</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span>
+<span class="w">            </span><span class="n">st</span><span class="o">-&gt;</span><span class="n">version</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+
+<span class="w">        </span><span class="cm">/* 开始写入：version 变奇数，读者需等待 */</span>
+<span class="w">        </span><span class="n">st</span><span class="o">-&gt;</span><span class="n">version</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<span class="w">        </span><span class="n">smp_wmb</span><span class="p">();</span><span class="w">  </span><span class="cm">/* 写屏障：确保 version 先于 steal 更新 */</span>
+
+<span class="w">        </span><span class="cm">/* 累加增量 steal time */</span>
+<span class="w">        </span><span class="n">st</span><span class="o">-&gt;</span><span class="n">steal</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">current</span><span class="o">-&gt;</span><span class="n">sched_info</span><span class="p">.</span><span class="n">run_delay</span>
+<span class="w">                   </span><span class="o">-</span><span class="w"> </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">st</span><span class="p">.</span><span class="n">last_steal</span><span class="p">;</span>
+<span class="w">        </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">st</span><span class="p">.</span><span class="n">last_steal</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">current</span><span class="o">-&gt;</span><span class="n">sched_info</span><span class="p">.</span><span class="n">run_delay</span><span class="p">;</span>
+
+<span class="w">        </span><span class="n">smp_wmb</span><span class="p">();</span><span class="w">  </span><span class="cm">/* 写屏障：确保 steal 先于 version 更新 */</span>
+<span class="w">        </span><span class="cm">/* 写入完成：version 再变偶数 */</span>
+<span class="w">        </span><span class="n">st</span><span class="o">-&gt;</span><span class="n">version</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><strong>Seqlock 写入流程</strong>：version 奇→写数据→version 偶。读者通过检查 version 奇偶和前后一致性来保证读到完整数据。</p>
+<h2>3.3 调用时机</h2>
+<table>
+<thead>
+<tr>
+<th>调用点</th>
+<th>函数</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>vCPU 加载</td>
+<td><code>kvm_arch_vcpu_load()</code></td>
+<td>每次 vCPU 线程被调度到物理 CPU 时调用</td>
+</tr>
+<tr>
+<td>vCPU 放卸</td>
+<td><code>kvm_arch_vcpu_put()</code></td>
+<td>记录 last_steal 快照，供下次 load 时计算增量</td>
+</tr>
+</tbody>
+</table>
+<h1>4. 客户机侧实现（x86）</h1>
+<h2>4.1 初始化与注册</h2>
+<p>客户机内核启动时，在 <code>kvm_guest_init()</code> 中检测并注册 steal time：</p>
+<div class="highlight"><pre><span></span><code><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_para_has_feature</span><span class="p">(</span><span class="n">KVM_FEATURE_STEAL_TIME</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">has_steal_clock</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<span class="w">    </span><span class="n">static_call_update</span><span class="p">(</span><span class="n">pv_steal_clock</span><span class="p">,</span><span class="w"> </span><span class="n">kvm_steal_clock</span><span class="p">);</span>
+<span class="cp">#ifdef CONFIG_PARAVIRT_SPINLOCKS</span>
+<span class="w">    </span><span class="n">pv_ops</span><span class="p">.</span><span class="n">lock</span><span class="p">.</span><span class="n">vcpu_is_preempted</span><span class="w"> </span><span class="o">=</span>
+<span class="w">        </span><span class="n">PV_CALLEE_SAVE</span><span class="p">(</span><span class="n">__kvm_vcpu_is_preempted</span><span class="p">);</span>
+<span class="cp">#endif</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>注册后，内核调度器通过 <code>paravirt_steal_clock</code> 静态调用（static call）获取 steal time，无需知晓底层 hypervisor 细节。</p>
+<h2>4.2 kvm_register_steal_time() — 每核注册</h2>
+<p>每个 CPU 在上线时向宿主机注册共享内存地址：</p>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">kvm_register_steal_time</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">cpu</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">smp_processor_id</span><span class="p">();</span>
+<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_steal_time</span><span class="w"> </span><span class="o">*</span><span class="n">st</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&amp;</span><span class="n">per_cpu</span><span class="p">(</span><span class="n">steal_time</span><span class="p">,</span><span class="w"> </span><span class="n">cpu</span><span class="p">);</span>
+
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">has_steal_clock</span><span class="p">)</span>
+<span class="w">        </span><span class="k">return</span><span class="p">;</span>
+
+<span class="w">    </span><span class="cm">/* 将共享内存物理地址 | 使能位写入 MSR */</span>
+<span class="w">    </span><span class="n">wrmsrq</span><span class="p">(</span><span class="n">MSR_KVM_STEAL_TIME</span><span class="p">,</span>
+<span class="w">           </span><span class="p">(</span><span class="n">slow_virt_to_phys</span><span class="p">(</span><span class="n">st</span><span class="p">)</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">KVM_MSR_ENABLED</span><span class="p">));</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><strong>SEV 加密虚拟机支持</strong>：per-cpu 变量使用 <code>DEFINE_PER_CPU_DECRYPTED</code> 声明，确保共享内存页在加密模式下被标记为宿主机可读写（decrypted），而非 guest 私有加密页。</p>
+<h2>4.3 kvm_steal_clock() — Seqlock 无锁读取</h2>
+<p>客户机通过 seqlock 模式无锁读取共享内存中的 steal time：</p>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="n">u64</span><span class="w"> </span><span class="nf">kvm_steal_clock</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">cpu</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">u64</span><span class="w"> </span><span class="n">steal</span><span class="p">;</span>
+<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_steal_time</span><span class="w"> </span><span class="o">*</span><span class="n">src</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">version</span><span class="p">;</span>
+
+<span class="w">    </span><span class="n">src</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&amp;</span><span class="n">per_cpu</span><span class="p">(</span><span class="n">steal_time</span><span class="p">,</span><span class="w"> </span><span class="n">cpu</span><span class="p">);</span>
+
+<span class="w">    </span><span class="k">do</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">src</span><span class="o">-&gt;</span><span class="n">version</span><span class="p">;</span><span class="w">   </span><span class="cm">/* 读 version */</span>
+<span class="w">        </span><span class="n">virt_rmb</span><span class="p">();</span><span class="w">               </span><span class="cm">/* 读屏障 */</span>
+<span class="w">        </span><span class="n">steal</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">src</span><span class="o">-&gt;</span><span class="n">steal</span><span class="p">;</span><span class="w">       </span><span class="cm">/* 读 steal 值 */</span>
+<span class="w">        </span><span class="n">virt_rmb</span><span class="p">();</span><span class="w">               </span><span class="cm">/* 读屏障 */</span>
+<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">while</span><span class="w"> </span><span class="p">((</span><span class="n">version</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="o">||</span><span class="w">     </span><span class="cm">/* 写入进行中？重读 */</span>
+<span class="w">             </span><span class="p">(</span><span class="n">version</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">src</span><span class="o">-&gt;</span><span class="n">version</span><span class="p">));</span><span class="w"> </span><span class="cm">/* version 变化？重读 */</span>
+
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">steal</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><strong>Seqlock 读取逻辑</strong>：① 读 version → ② 读屏障 → ③ 读 steal → ④ 读屏障 → ⑤ 校验 version 为偶数且未变化。若校验失败则重试，保证读到一致的数据快照。</p>
+<h1>5. 调度器集成</h1>
+<h2>5.1 steal_account_process_time()</h2>
+<p>客户机内核在每次时钟中断处理中调用 <code>steal_account_process_time()</code>，将 steal time 从进程 CPU 时间中扣除：</p>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="n">__always_inline</span><span class="w"> </span><span class="n">u64</span><span class="w"> </span><span class="n">steal_account_process_time</span><span class="p">(</span><span class="n">u64</span><span class="w"> </span><span class="n">maxtime</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">static_key_false</span><span class="p">(</span><span class="o">&amp;</span><span class="n">paravirt_steal_enabled</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">u64</span><span class="w"> </span><span class="n">steal</span><span class="p">;</span>
+
+<span class="w">        </span><span class="n">steal</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">paravirt_steal_clock</span><span class="p">(</span><span class="n">smp_processor_id</span><span class="p">());</span>
+<span class="w">        </span><span class="n">steal</span><span class="w"> </span><span class="o">-=</span><span class="w"> </span><span class="n">this_rq</span><span class="p">()</span><span class="o">-&gt;</span><span class="n">prev_steal_time</span><span class="p">;</span>
+
+<span class="w">        </span><span class="n">steal</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">min</span><span class="p">(</span><span class="n">steal</span><span class="p">,</span><span class="w"> </span><span class="n">maxtime</span><span class="p">);</span>
+<span class="w">        </span><span class="n">account_steal_time</span><span class="p">(</span><span class="n">steal</span><span class="p">);</span>
+<span class="w">        </span><span class="n">this_rq</span><span class="p">()</span><span class="o">-&gt;</span><span class="n">prev_steal_time</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">steal</span><span class="p">;</span>
+
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">steal</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<h2>5.2 account_steal_time() — 计入 CPU 统计</h2>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">account_steal_time</span><span class="p">(</span><span class="n">u64</span><span class="w"> </span><span class="n">cputime</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">u64</span><span class="w"> </span><span class="o">*</span><span class="n">cpustat</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">kcpustat_this_cpu</span><span class="o">-&gt;</span><span class="n">cpustat</span><span class="p">;</span>
+<span class="w">    </span><span class="n">cpustat</span><span class="p">[</span><span class="n">CPUTIME_STEAL</span><span class="p">]</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">cputime</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>steal time 被累加到 <code>cpustat[CPUTIME_STEAL]</code> 中，最终通过 <code>/proc/stat</code> 的 <code>steal</code> 列暴露给用户态工具。</p>
+<h2>5.3 数据流全链路</h2>
+<h2>5.4 Static Key 优化</h2>
+<p><code>paravirt_steal_enabled</code> 是一个 <strong>static key</strong>（静态分支），在非虚拟化环境或 steal time 未启用时，<code>steal_account_process_time()</code> 的分支通过 jump label 优化为 NOP，零开销。只有在 KVM guest 环境且检测到 <code>KVM_FEATURE_STEAL_TIME</code> 时才动态启用。</p>
+<h1>6. vCPU 抢占检测与 PV TLB Flush</h1>
+<h2>6.1 vCPU 抢占状态检测</h2>
+<p>steal time 结构中的 <code>preempted</code> 字段不仅用于时间统计，还支持<strong>锁优化</strong>。客户机自旋锁在等待另一个 vCPU 释放锁时，可以先检查该 vCPU 是否被抢占：</p>
+<div class="highlight"><pre><span></span><code><span class="n">__visible</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">__kvm_vcpu_is_preempted</span><span class="p">(</span><span class="kt">long</span><span class="w"> </span><span class="n">cpu</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_steal_time</span><span class="w"> </span><span class="o">*</span><span class="n">src</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&amp;</span><span class="n">per_cpu</span><span class="p">(</span><span class="n">steal_time</span><span class="p">,</span><span class="w"> </span><span class="n">cpu</span><span class="p">);</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="o">!!</span><span class="p">(</span><span class="n">src</span><span class="o">-&gt;</span><span class="n">preempted</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">KVM_VCPU_PREEMPTED</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>当持有锁的 vCPU 被抢占时，等待方可以主动退避（backoff）而非持续自旋，避免浪费 CPU 周期。这对 PV spinlock 性能有显著提升。</p>
+<h2>6.2 PV TLB Flush 优化</h2>
+<p>当客户机需要向其他 vCPU 发送 TLB Flush IPI 时，若目标 vCPU 已被抢占，则无需发送 IPI（因为它恢复运行时会通过 context switch 自动 flush TLB）。客户机利用 <code>preempted</code> 字段实现<strong>跳过被抢占 vCPU</strong> 的优化：</p>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">kvm_flush_tlb_multi</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">cpumask</span><span class="w"> </span><span class="o">*</span><span class="n">cpumask</span><span class="p">,</span>
+<span class="w">                                 </span><span class="k">const</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">flush_tlb_info</span><span class="w"> </span><span class="o">*</span><span class="n">info</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="cm">/* ... */</span>
+<span class="w">    </span><span class="n">for_each_cpu</span><span class="p">(</span><span class="n">cpu</span><span class="p">,</span><span class="w"> </span><span class="n">flushmask</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">src</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&amp;</span><span class="n">per_cpu</span><span class="p">(</span><span class="n">steal_time</span><span class="p">,</span><span class="w"> </span><span class="n">cpu</span><span class="p">);</span>
+<span class="w">        </span><span class="n">state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">READ_ONCE</span><span class="p">(</span><span class="n">src</span><span class="o">-&gt;</span><span class="n">preempted</span><span class="p">);</span>
+
+<span class="w">        </span><span class="cm">/* 如果目标 vCPU 已被抢占 */</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">((</span><span class="n">state</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">KVM_VCPU_PREEMPTED</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="cm">/* 设置 FLUSH_TLB 标志，vCPU 恢复时自行 flush */</span>
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">try_cmpxchg</span><span class="p">(</span><span class="o">&amp;</span><span class="n">src</span><span class="o">-&gt;</span><span class="n">preempted</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">state</span><span class="p">,</span>
+<span class="w">                            </span><span class="n">state</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">KVM_VCPU_FLUSH_TLB</span><span class="p">))</span>
+<span class="w">                </span><span class="n">__cpumask_clear_cpu</span><span class="p">(</span><span class="n">cpu</span><span class="p">,</span><span class="w"> </span><span class="n">flushmask</span><span class="p">);</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="cm">/* 只向未被抢占的 vCPU 发送 IPI */</span>
+<span class="w">    </span><span class="n">native_flush_tlb_multi</span><span class="p">(</span><span class="n">flushmask</span><span class="p">,</span><span class="w"> </span><span class="n">info</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<table>
+<thead>
+<tr>
+<th>标志位</th>
+<th>值</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>KVM_VCPU_PREEMPTED</code></td>
+<td>bit 0</td>
+<td>vCPU 已被宿主机抢占</td>
+</tr>
+<tr>
+<td><code>KVM_VCPU_FLUSH_TLB</code></td>
+<td>bit 1</td>
+<td>vCPU 恢复运行时需要 flush TLB</td>
+</tr>
+</tbody>
+</table>
+<h1>7. ARM64 实现</h1>
+<p>ARM64 采用 SMCCC（SMC Calling Convention）规范实现 PV steal time，而非 x86 的 MSR 机制。</p>
+<h2>7.1 超级调用接口</h2>
+<table>
+<thead>
+<tr>
+<th>SMCCC Function ID</th>
+<th>值</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PV_TIME_FEATURES</code></td>
+<td><code>0xC5000020</code></td>
+<td>查询是否支持 PV time 功能</td>
+</tr>
+<tr>
+<td><code>PV_TIME_ST</code></td>
+<td><code>0xC5000021</code></td>
+<td>获取 stolen time 共享内存地址</td>
+</tr>
+</tbody>
+</table>
+<h2>7.2 数据结构差异</h2>
+<p>ARM64 的 stolen time 结构为 16 字节，遵循 ARM 规范 DEN0057/A：</p>
+<div class="highlight"><pre><span></span><code><span class="k">struct</span><span class="w"> </span><span class="nc">pvclock_vcpu_stolen_time_info</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">__u32</span><span class="w"> </span><span class="n">revision</span><span class="p">;</span><span class="w">         </span><span class="cm">/* 规范版本 */</span>
+<span class="w">    </span><span class="n">__u32</span><span class="w"> </span><span class="n">attributes</span><span class="p">;</span><span class="w">       </span><span class="cm">/* 属性标志，当前为零 */</span>
+<span class="w">    </span><span class="n">__u64</span><span class="w"> </span><span class="n">stolen_time</span><span class="p">;</span><span class="w">      </span><span class="cm">/* 累计 stolen time（纳秒） */</span>
+<span class="p">};</span>
+</code></pre></div>
+
+<p><strong>x86</strong></p>
+<p>• MSR 寄存器交互
+• 64 字节结构体
+• Seqlock 版本控制
+• preempted 字段支持锁优化</p>
+<p><strong>ARM64</strong></p>
+<p>• SMCCC HVC 超级调用
+• 16 字节结构体
+• 无 seqlock（原子 64 位读取）
+• 无 preempted 字段</p>
+<h1>8. 实际观测方法</h1>
+<h2>8.1 用户态工具</h2>
+<table>
+<thead>
+<tr>
+<th>工具</th>
+<th>命令</th>
+<th>steal 指标位置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>top</td>
+<td><code>top</code></td>
+<td>第三行 <code>%st</code> 列</td>
+</tr>
+<tr>
+<td>vmstat</td>
+<td><code>vmstat 1</code></td>
+<td><code>st</code> 列</td>
+</tr>
+<tr>
+<td>pidstat</td>
+<td><code>pidstat -u 1</code></td>
+<td><code>%steal</code> 列</td>
+</tr>
+<tr>
+<td>/proc/stat</td>
+<td><code>cat /proc/stat</code></td>
+<td>第 8 个字段 <code>steal</code></td>
+</tr>
+<tr>
+<td>perf</td>
+<td><code>perf stat -e steal-time</code></td>
+<td>steal time 事件计数</td>
+</tr>
+</tbody>
+</table>
+<h2>8.2 关键判断指标</h2>
+<p><strong>运维建议</strong>：steal time 持续高于 <strong>5%</strong> 通常意味着宿主机 CPU 资源争抢严重，可能需要迁移虚拟机或增加 CPU 配额。瞬时峰值可接受，持续高 steal 需关注。</p>
+<h1>9. 性能影响与设计要点</h1>
+<h2>9.1 开销分析</h2>
+<table>
+<thead>
+<tr>
+<th>环节</th>
+<th>开销</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>共享内存读取</td>
+<td>极低</td>
+<td>Seqlock 无锁读取，仅缓存行访问</td>
+</tr>
+<tr>
+<td>record_steal_time</td>
+<td>低</td>
+<td>每次 vCPU load 时一次写入，O(1)</td>
+</tr>
+<tr>
+<td>调度器集成</td>
+<td>零（未启用时）</td>
+<td>Static key 优化，非 guest 环境 NOP</td>
+</tr>
+<tr>
+<td>PV TLB Flush</td>
+<td>负开销</td>
+<td>减少不必要的 IPI，实际提升性能</td>
+</tr>
+</tbody>
+</table>
+<h2>9.2 设计亮点</h2>
+<ol>
+<li>
+<p><strong>Seqlock 无锁通信</strong>：宿主机写入、客户机读取之间无需 IPI 或自旋锁，通过 version 计数器实现一致性，热路径零开销</p>
+</li>
+<li>
+<p><strong>增量上报</strong>：宿主机仅上报 steal time 增量（<code>run_delay - last_steal</code>），客户机累加，避免 64 位计数器溢出风险</p>
+</li>
+<li>
+<p><strong>Static Key 动态开关</strong>：非虚拟化环境零开销，按需启用</p>
+</li>
+<li>
+<p><strong>一石二鸟的 preempted 字段</strong>：既用于 steal time 统计，又支撑 PV spinlock 和 PV TLB flush 优化</p>
+</li>
+<li>
+<p><strong>SEV 加密兼容</strong>：通过 <code>DEFINE_PER_CPU_DECRYPTED</code> 在加密虚拟化场景下正确共享内存</p>
+</li>
+</ol>
+<hr>
+<h1>10. 参考来源</h1>
+<ul>
+<li>
+<p>Linux 内核源码 <code>arch/x86/kernel/kvm.c</code> — 客户机侧 PV steal time 实现</p>
+</li>
+<li>
+<p>Linux 内核源码 <code>arch/x86/kvm/x86.c</code> — 宿主机侧 record_steal_time 实现</p>
+</li>
+<li>
+<p>Linux 内核源码 <code>kernel/sched/cputime.c</code> — 调度器 steal time 集成</p>
+</li>
+<li>
+<p>Linux 内核文档 <code>Documentation/virt/kvm/x86/msr.rst</code> — MSR_KVM_STEAL_TIME 规范</p>
+</li>
+<li>
+<p>Linux 内核文档 <code>Documentation/virt/kvm/arm/pvtime.rst</code> — ARM64 PV time 规范</p>
+</li>
+<li>
+<p>LWN.net: "KVM steal time" patch series (lwn.net/Articles/447376) — Glauber Costa 原始补丁系列</p>
+</li>
+</ul>
+<blockquote>
+<p>(注：内容由 AI 生成，请谨慎参考）</p>
+</blockquote>
+
+
+             
+ 
+                <p id="post-share-links">
+    Share on:
+      <a href="https://twitter.com/intent/tweet?text=KVM%20PV%20Steal%20Time%20%E6%9C%BA%E5%88%B6%E5%88%86%E6%9E%90&url=https%3A//blog.kernel.love/kvm-pv-steal-time.html&hashtags=virtualization,kvm,paravirtualization" target="_blank" rel="nofollow noopener noreferrer" title="Share on Twitter">Twitter</a>
+ ❄       <a href="https://www.facebook.com/sharer/sharer.php?u=https%3A//blog.kernel.love/kvm-pv-steal-time.html" target="_blank" rel="nofollow noopener noreferrer" title="Share on Facebook">Facebook</a>
+ ❄       <a href="mailto:?subject=KVM%20PV%20Steal%20Time%20%E6%9C%BA%E5%88%B6%E5%88%86%E6%9E%90&amp;body=https%3A//blog.kernel.love/kvm-pv-steal-time.html" target="_blank" rel="nofollow noopener noreferrer" title="Share via Email">Email</a>
+
+            
+            
+
+
+
+
+
+
+
+            <hr/>
+<section>
+    <h2>Related Posts</h2>
+<ul class="related-posts-list">
+<li><a href="https://blog.kernel.love/virtio-overview.html" title="Virtio Spec Overview">Virtio Spec Overview</a></li>
+<li><a href="https://blog.kernel.love/amd-x2avic.html" title="AMD X2AVIC 理解">AMD X2AVIC 理解</a></li>
+<li><a href="https://blog.kernel.love/x86 nested virtualization.html" title="X86 Nested Virtualization">X86 Nested Virtualization</a></li>
+<li><a href="https://blog.kernel.love/vmx-vmcs-shadowing.html" title="VMCS Shadowing 技术详解">VMCS Shadowing 技术详解</a></li>
+<li><a href="https://blog.kernel.love/x86-nested-virt-performance.html" title="x86 嵌套虚拟化性能优化项总结">x86 嵌套虚拟化性能优化项总结</a></li>
+</ul>
+<hr />
+</section>
+            <aside>
+            <nav>
+            <ul class="articles-timeline">
+                <li class="previous-article">« <a href="https://blog.kernel.love/x86-nested-virt-performance.html" title="Previous: x86 嵌套虚拟化性能优化项总结">x86 嵌套虚拟化性能优化项总结</a></li>
+            </ul>
+            </nav>
+            </aside>
+        </div>
+        <section id="article-sidebar" class="span2">
+            <h4>Published</h4>
+            <time itemprop="dateCreated" datetime="2026-07-04T10:00:00+08:00">Sat 04 July 2026</time>
+
+            <h4>Category</h4>
+            <a class="category-link" href="https://blog.kernel.love/categories.html#virt-ref">virt</a>
+            <h4>Tags</h4>
+            <ul class="list-of-tags tags-in-article">
+                <li><a href="https://blog.kernel.love/tags.html#kvm-ref">kvm
+                    <span class="superscript">1</span>
+</a></li>
+                <li><a href="https://blog.kernel.love/tags.html#paravirtualization-ref">paravirtualization
+                    <span class="superscript">1</span>
+</a></li>
+                <li><a href="https://blog.kernel.love/tags.html#virtualization-ref">virtualization
+                    <span class="superscript">17</span>
+</a></li>
+            </ul>
+<h4>Contact</h4>
+<div id="sidebar-social-link">
+    <a href="https://github.com/fangying" title="" target="_blank" rel="nofollow noopener noreferrer">
+        <svg xmlns="http://www.w3.org/2000/svg" aria-label="GitHub" role="img" viewBox="0 0 512 512"><rect width="512" height="512" rx="15%" fill="#1B1817"/><path fill="#fff" d="M335 499c14 0 12 17 12 17H165s-2-17 12-17c13 0 16-6 16-12l-1-50c-71 16-86-28-86-28-12-30-28-37-28-37-24-16 1-16 1-16 26 2 40 26 40 26 22 39 59 28 74 22 2-17 9-28 16-35-57-6-116-28-116-126 0-28 10-51 26-69-3-6-11-32 3-67 0 0 21-7 70 26 42-12 86-12 128 0 49-33 70-26 70-26 14 35 6 61 3 67 16 18 26 41 26 69 0 98-60 120-117 126 10 8 18 24 18 48l-1 70c0 6 3 12 16 12z"/></svg>
+    </a>
+</div>
+            
+
+
+
+
+
+            
+
+
+
+
+
+        </section>
+</div>
+</article>
+<!-- Root element of PhotoSwipe. Must have class pswp. -->
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    <!-- Background of PhotoSwipe.
+         It's a separate element as animating opacity is faster than rgba(). -->
+    <div class="pswp__bg"></div>
+
+    <!-- Slides wrapper with overflow:hidden. -->
+    <div class="pswp__scroll-wrap">
+
+        <!-- Container that holds slides.
+            PhotoSwipe keeps only 3 of them in the DOM to save memory.
+            Don't modify these 3 pswp__item elements, data is added later on. -->
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        <!-- Default (PhotoSwipeUI_Default) interface on top of sliding area. Can be changed. -->
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                <!--  Controls are self-explanatory. Order can be changed. -->
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                <!-- Preloader demo https://codepen.io/dimsemenov/pen/yyBWoR -->
+                <!-- element will get class pswp__preloader--active when preloader is running -->
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                      <div class="pswp__preloader__cut">
+                        <div class="pswp__preloader__donut"></div>
+                      </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>                    </div>
+                    <div class="span1"></div>
+                </div>
+            </div>
+        </div>
+<footer>
+    <div>
+        <span xmlns:dct="http://purl.org/dc/terms/" property="dct:title"> blog.kernel.love"</span> by <a xmlns:cc="http://creativecommons.org/ns#" href="https://blog.kernel.love" property="cc:attributionName" rel="cc:attributionURL">Yori Fang</a> is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/3.0/deed.en_US">Creative Commons Attribution-ShareAlike 3.0 Unported License</a>.
+    </div>
+
+
+
+
+    <div id="fpowered">
+        Powered by: <a href="http://getpelican.com/" title="Pelican Home Page" target="_blank" rel="nofollow noopener noreferrer">Pelican</a>
+        Theme: <a href="https://elegant.oncrashreboot.com/" title="Theme Elegant Home Page" target="_blank" rel="nofollow noopener noreferrer">Elegant</a>
+    </div>
+</footer>            <script src="//code.jquery.com/jquery.min.js"></script>
+        <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/js/bootstrap.min.js"></script>
+        <script src="https://blog.kernel.love/theme/js/elegant.prod.9e9d5ce754.js"></script>
+        <script>
+            function validateForm(query)
+            {
+                return (query.length > 0);
+            }
+        </script>
+
+    <script>
+    (function () {
+        if (window.location.hash.match(/^#comment-\d+$/)) {
+            $('#comment_thread').collapse('show');
+        }
+    })();
+    window.onhashchange=function(){
+        if (window.location.hash.match(/^#comment-\d+$/))
+            window.location.reload(true);
+    }
+    $('#comment_thread').on('shown', function () {
+        var link = document.getElementById('comment-accordion-toggle');
+        var old_innerHTML = link.innerHTML;
+        $(link).fadeOut(200, function() {
+            $(this).text('Click here to hide comments').fadeIn(200);
+        });
+        $('#comment_thread').on('hidden', function () {
+            $(link).fadeOut(200, function() {
+                $(this).text(old_innerHTML).fadeIn(200);
+            });
+        })
+    })
+</script>
+
+    </body>
+    <!-- Theme: Elegant built for Pelican
+        License : MIT -->
+</html>
