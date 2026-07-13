@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://blog.kernel.love/theme/css/style.min.css?2fcac227">
+
+        <link rel="dns-prefetch" href="//fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin>
+
+        <meta name="author" content="Yori Fang" />
+
+        <meta name="description" content="对 Linux 5.15 KVM x86 核心函数 vcpu_enter_guest 的行级注释，覆盖 VM Entry 前的请求处理、事件注入、状态同步与 VM Exit 后的清理派发流程。
+" />
+        <meta property="og:type" content="article" />
+        <meta name="twitter:card" content="summary">
+
+<meta name="keywords" content="virtualization, kvm, kernel, virt, " />
+
+<meta property="og:title" content="Linux 5.15 KVM vcpu_enter_guest 函数行级注释 "/>
+<meta property="og:url" content="https://blog.kernel.love/vcpu-enter-guest.html" />
+<meta property="og:description" content="对 Linux 5.15 KVM x86 核心函数 vcpu_enter_guest 的行级注释，覆盖 VM Entry 前的请求处理、事件注入、状态同步与 VM Exit 后的清理派发流程。" />
+<meta property="og:site_name" content="blog.kernel.love" />
+<meta property="og:article:author" content="Yori Fang" />
+<meta property="og:article:published_time" content="2026-07-13T08:00:00+08:00" />
+<meta property="og:article:modified_time" content="2026-07-13T08:00:00+08:00" />
+<meta name="twitter:title" content="Linux 5.15 KVM vcpu_enter_guest 函数行级注释 ">
+<meta name="twitter:description" content="对 Linux 5.15 KVM x86 核心函数 vcpu_enter_guest 的行级注释，覆盖 VM Entry 前的请求处理、事件注入、状态同步与 VM Exit 后的清理派发流程。">
+
+        <title>Linux 5.15 KVM vcpu_enter_guest 函数行级注释  · blog.kernel.love
+</title>
+
+<script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+     (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+     m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+     })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+    ga('create', 'UA-107392039-2', 'auto');
+    ga('send', 'pageview');
+</script>
+
+
+    </head>
+    <body>
+        <div id="content">
+            <div class="navbar navbar-static-top">
+                <div class="navbar-inner">
+                    <div class="container-fluid">
+                        <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                        </a>
+                        <a class="brand" href="https://blog.kernel.love/"><span class=site-name>blog.kernel.love</span></a>
+                        <div class="nav-collapse collapse">
+                            <ul class="nav pull-right top-menu">
+                                <li >
+                                    <a href=
+                                       https://blog.kernel.love
+                                    >Home</a>
+                                </li>
+                                <li ><a href="https://blog.kernel.love/pages/about.html">About</a></li>
+                                <li ><a href="https://blog.kernel.love/categories.html">Categories</a></li>
+                                <li ><a href="https://blog.kernel.love/tags.html">Tags</a></li>
+                                <li ><a href="https://blog.kernel.love/archives.html">Archives</a></li>
+                                <li><form class="navbar-search" action="https://blog.kernel.love/search.html" onsubmit="return validateForm(this.elements['q'].value);"> <input type="text" class="search-query" placeholder="Search" name="q" id="tipue_search_input"></form></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="container-fluid">
+                <div class="row-fluid">
+                    <div class="span1"></div>
+                    <div class="span10">
+<article itemscope>
+<div class="row-fluid">
+    <header class="page-header span10 offset2">
+        <h1>
+            <a href="https://blog.kernel.love/vcpu-enter-guest.html">
+                Linux 5.15 KVM vcpu_enter_guest 函数行级注释
+            </a>
+        </h1>
+    </header>
+</div>
+
+<div class="row-fluid">
+        <div class="span8 offset2 article-content">
+            
+            <h1>Linux 5.15.120 KVM vcpu_enter_guest 函数行级注释</h1>
+<p><strong>函数位置</strong>：<code>arch/x86/kvm/x86.c</code>，第 9697 - 10045 行(共约 348 行)</p>
+<p><strong>功能概述</strong>：这是 KVM x86 架构中控制 vCPU 进入 Guest 模式(VM Entry)的核心函数。它在执行 VMLAUNCH/VMRESUME 之前完成所有必要的请求处理、事件注入、状态同步和硬件准备工作;在 VM Exit 之后进行必要的清理并派发退出处理。</p>
+<p><strong>返回值</strong>:<code>&gt; 0</code> 表示可继续运行 Guest;<code>0</code> 表示需要返回用户态处理(如 KVM_EXIT_*);<code>&lt; 0</code> 表示出错。</p>
+<h2>1. 函数签名与局部变量</h2>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="nf">vcpu_enter_guest</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">r</span><span class="p">;</span><span class="w">                                             </span><span class="c1">// 返回值:&gt;0 继续 Guest,0 返回用户态,&lt;0 出错</span>
+<span class="w">    </span><span class="kt">bool</span><span class="w"> </span><span class="n">req_int_win</span><span class="w"> </span><span class="o">=</span><span class="w">                                 </span><span class="c1">// 是否需要打开&quot;中断窗口&quot;(让 Guest 尽快接受用户态注入的中断)</span>
+<span class="w">        </span><span class="n">dm_request_for_irq_injection</span><span class="p">(</span><span class="n">vcpu</span><span class="p">)</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w">         </span><span class="c1">//   条件 1:device model(qemu)请求注入 IRQ</span>
+<span class="w">        </span><span class="n">kvm_cpu_accept_dm_intr</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span><span class="w">                  </span><span class="c1">//   条件 2:当前 vCPU 处于可接受中断的状态</span>
+<span class="w">    </span><span class="n">fastpath_t</span><span class="w"> </span><span class="n">exit_fastpath</span><span class="p">;</span><span class="w">                          </span><span class="c1">// VM Exit 的快速路径类型(NONE / REENTER_GUEST / EXIT_HANDLED)</span>
+
+<span class="w">    </span><span class="kt">bool</span><span class="w"> </span><span class="n">req_immediate_exit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span><span class="w">                   </span><span class="c1">// 是否需要在进入 Guest 后立刻触发一次 VM Exit</span>
+<span class="w">                                                       </span><span class="c1">// (用于注入事件后立刻回到 KVM 检查后续状态)</span>
+</code></pre></div>
+
+<h2>2. 前置检查:脏页环缓冲区(dirty ring)是否已满</h2>
+<div class="highlight"><pre><span></span><code><span class="cm">/* Forbid vmenter if vcpu dirty ring is soft-full */</span>
+<span class="w">    </span><span class="c1">// 若开启了脏页环(用于热迁移的脏页跟踪),且环形缓冲区已&quot;软满&quot;,</span>
+<span class="w">    </span><span class="c1">// 则禁止进入 Guest,返回用户态腾出空间避免 Guest 继续脏页导致硬满溢出。</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">unlikely</span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">kvm</span><span class="o">-&gt;</span><span class="n">dirty_ring_size</span><span class="w"> </span><span class="o">&amp;&amp;</span>
+<span class="w">             </span><span class="n">kvm_dirty_ring_soft_full</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">dirty_ring</span><span class="p">)))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">run</span><span class="o">-&gt;</span><span class="n">exit_reason</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">KVM_EXIT_DIRTY_RING_FULL</span><span class="p">;</span><span class="w">  </span><span class="c1">// 通知用户态原因</span>
+<span class="w">        </span><span class="n">trace_kvm_dirty_ring_exit</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span><span class="w">                    </span><span class="c1">// tracepoint 记录</span>
+<span class="w">        </span><span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w">                                              </span><span class="c1">// 0 表示需要退出到用户态</span>
+<span class="w">        </span><span class="k">goto</span><span class="w"> </span><span class="n">out</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+</code></pre></div>
+
+<h2>3. 处理挂起的 KVM 请求(kvm_request_pending)</h2>
+<p>下面的整段 <code>if (kvm_request_pending(vcpu))</code> 用于集中处理由其他 CPU、qemu 用户态或 KVM 自身发起的各类异步请求(KVM_REQ_*)。每个 <code>kvm_check_request()</code> 在读取标志的同时清除该标志,保证幂等性。</p>
+<div class="highlight"><pre><span></span><code><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_request_pending</span><span class="p">(</span><span class="n">vcpu</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// === 3.1 致命请求:VM 已损坏,直接返回 -EIO ===</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_check_request</span><span class="p">(</span><span class="n">KVM_REQ_VM_BUGGED</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">-</span><span class="n">EIO</span><span class="p">;</span>
+<span class="w">            </span><span class="k">goto</span><span class="w"> </span><span class="n">out</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
+
+<span class="w">        </span><span class="c1">// === 3.2 嵌套虚拟化:加载嵌套状态所需的物理页 ===</span>
+<span class="w">        </span><span class="c1">// 若失败(如 gpa 无效),返回用户态处理</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_check_request</span><span class="p">(</span><span class="n">KVM_REQ_GET_NESTED_STATE_PAGES</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">unlikely</span><span class="p">(</span><span class="o">!</span><span class="n">kvm_x86_ops</span><span class="p">.</span><span class="n">nested_ops</span><span class="o">-&gt;</span><span class="n">get_nested_state_pages</span><span class="p">(</span><span class="n">vcpu</span><span class="p">)))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">                </span><span class="k">goto</span><span class="w"> </span><span class="n">out</span><span class="p">;</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">}</span>
+
+<span class="w">        </span><span class="c1">// === 3.3 MMU 重载:卸载当前影子页表/EPT 根,下面 kvm_mmu_reload 会重建 ===</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_check_request</span><span class="p">(</span><span class="n">KVM_REQ_MMU_RELOAD</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">))</span>
+<span class="w">            </span><span class="n">kvm_mmu_unload</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
+
+<span class="w">        </span><span class="c1">// === 3.4 迁移定时器:vCPU 换 CPU 后需要重新迁移 APIC/PIT 定时器 ===</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_check_request</span><span class="p">(</span><span class="n">KVM_REQ_MIGRATE_TIMER</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">))</span>
+<span class="w">            </span><span class="n">__kvm_migrate_timers</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
+
+<span class="w">        </span><span class="c1">// === 3.5 主时钟更新:同步 kvmclock 主参考时间 ===</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_check_request</span><span class="p">(</span><span class="n">KVM_REQ_MASTERCLOCK_UPDATE</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">))</span>
+<span class="w">            </span><span class="n">kvm_gen_update_masterclock</span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">kvm</span><span class="p">);</span>
+
+<span class="w">        </span><span class="c1">// === 3.6 全局 kvmclock 更新(所有 vCPU 都需要更新) ===</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_check_request</span><span class="p">(</span><span class="n">KVM_REQ_GLOBAL_CLOCK_UPDATE</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">))</span>
+<span class="w">            </span><span class="n">kvm_gen_kvmclock_update</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
+
+<span class="w">        </span><span class="c1">// === 3.7 单 vCPU 的 kvmclock 更新(TSC 频率变化、热插拔等) ===</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_check_request</span><span class="p">(</span><span class="n">KVM_REQ_CLOCK_UPDATE</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">kvm_guest_time_update</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">unlikely</span><span class="p">(</span><span class="n">r</span><span class="p">))</span>
+<span class="w">                </span><span class="k">goto</span><span class="w"> </span><span class="n">out</span><span class="p">;</span><span class="w">                              </span><span class="c1">// 更新失败直接退出</span>
+<span class="w">        </span><span class="p">}</span>
+
+<span class="w">        </span><span class="c1">// === 3.8 同步影子页表根(shadow page 需要 write-protect 时) ===</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_check_request</span><span class="p">(</span><span class="n">KVM_REQ_MMU_SYNC</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">))</span>
+<span class="w">            </span><span class="n">kvm_mmu_sync_roots</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
+
+<span class="w">        </span><span class="c1">// === 3.9 重新加载页表根到硬件寄存器(CR3 / EPTP) ===</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_check_request</span><span class="p">(</span><span class="n">KVM_REQ_LOAD_MMU_PGD</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">))</span>
+<span class="w">            </span><span class="n">kvm_mmu_load_pgd</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
+
+<span class="w">        </span><span class="c1">// === 3.10 全 TLB flush 请求(所有 ASID / VPID) ===</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_check_request</span><span class="p">(</span><span class="n">KVM_REQ_TLB_FLUSH</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">kvm_vcpu_flush_tlb_all</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
+
+<span class="w">            </span><span class="cm">/* Flushing all ASIDs flushes the current ASID... */</span>
+<span class="w">            </span><span class="c1">// 既然全部刷了,当前 ASID 的请求也就没必要再刷一次,顺手清除</span>
+<span class="w">            </span><span class="n">kvm_clear_request</span><span class="p">(</span><span class="n">KVM_REQ_TLB_FLUSH_CURRENT</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">);</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">        </span><span class="c1">// 处理其他细粒度 TLB flush(如 TLB_FLUSH_CURRENT / TLB_FLUSH_GUEST)</span>
+<span class="w">        </span><span class="n">kvm_service_local_tlb_flush_requests</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
+
+<span class="w">        </span><span class="c1">// === 3.11 上报 TPR 访问:Guest 修改了 TPR,通知用户态(常见于旧 Windows) ===</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_check_request</span><span class="p">(</span><span class="n">KVM_REQ_REPORT_TPR_ACCESS</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">run</span><span class="o">-&gt;</span><span class="n">exit_reason</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">KVM_EXIT_TPR_ACCESS</span><span class="p">;</span>
+<span class="w">            </span><span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">            </span><span class="k">goto</span><span class="w"> </span><span class="n">out</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
+
+<span class="w">        </span><span class="c1">// === 3.12 Triple Fault(三重错):在嵌套场景中通知 L1,否则关机 ===</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_check_request</span><span class="p">(</span><span class="n">KVM_REQ_TRIPLE_FAULT</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">is_guest_mode</span><span class="p">(</span><span class="n">vcpu</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="c1">// Guest-in-Guest:让 L1 hypervisor 处理这次 triple fault</span>
+<span class="w">                </span><span class="n">kvm_x86_ops</span><span class="p">.</span><span class="n">nested_ops</span><span class="o">-&gt;</span><span class="n">triple_fault</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
+<span class="w">            </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">run</span><span class="o">-&gt;</span><span class="n">exit_reason</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">KVM_EXIT_SHUTDOWN</span><span class="p">;</span>
+<span class="w">                </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">mmio_needed</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w">                 </span><span class="c1">// 清除 mmio 待处理标记</span>
+<span class="w">                </span><span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">                </span><span class="k">goto</span><span class="w"> </span><span class="n">out</span><span class="p">;</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">}</span>
+
+<span class="w">        </span><span class="c1">// === 3.13 异步缺页(Async Page Fault):目标页尚在换入,合成 HLT 让 Guest 等待 ===</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_check_request</span><span class="p">(</span><span class="n">KVM_REQ_APF_HALT</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="cm">/* Page is swapped out. Do synthetic halt */</span>
+<span class="w">            </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">apf</span><span class="p">.</span><span class="n">halted</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span>
+<span class="w">            </span><span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w">                                     </span><span class="c1">// 返回 1:vcpu_run 会走 halt 逻辑</span>
+<span class="w">            </span><span class="k">goto</span><span class="w"> </span><span class="n">out</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
+
+<span class="w">        </span><span class="c1">// === 3.14 更新 steal time(半虚拟化时钟偷取时间统计) ===</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_check_request</span><span class="p">(</span><span class="n">KVM_REQ_STEAL_UPDATE</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">))</span>
+<span class="w">            </span><span class="n">record_steal_time</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
+
+<span class="w">        </span><span class="c1">// === 3.15 处理 SMI(系统管理中断) ===</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_check_request</span><span class="p">(</span><span class="n">KVM_REQ_SMI</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">))</span>
+<span class="w">            </span><span class="n">process_smi</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
+
+<span class="w">        </span><span class="c1">// === 3.16 处理 NMI(不可屏蔽中断) ===</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_check_request</span><span class="p">(</span><span class="n">KVM_REQ_NMI</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">))</span>
+<span class="w">            </span><span class="n">process_nmi</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
+
+<span class="w">        </span><span class="c1">// === 3.17 PMU 事件处理(性能计数器溢出等) ===</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_check_request</span><span class="p">(</span><span class="n">KVM_REQ_PMU</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">))</span>
+<span class="w">            </span><span class="n">kvm_pmu_handle_event</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
+
+<span class="w">        </span><span class="c1">// === 3.18 投递 PMU 中断(PMI)给 Guest ===</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_check_request</span><span class="p">(</span><span class="n">KVM_REQ_PMI</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">))</span>
+<span class="w">            </span><span class="n">kvm_pmu_deliver_pmi</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
+
+<span class="w">        </span><span class="c1">// === 3.19 IOAPIC EOI 退出:某中断向量需要在 EOI 时退出到用户态 ===</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_check_request</span><span class="p">(</span><span class="n">KVM_REQ_IOAPIC_EOI_EXIT</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">BUG_ON</span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">pending_ioapic_eoi</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">255</span><span class="p">);</span><span class="w">   </span><span class="c1">// 向量号必须合法</span>
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">test_bit</span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">pending_ioapic_eoi</span><span class="p">,</span>
+<span class="w">                     </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">ioapic_handled_vectors</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">run</span><span class="o">-&gt;</span><span class="n">exit_reason</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">KVM_EXIT_IOAPIC_EOI</span><span class="p">;</span>
+<span class="w">                </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">run</span><span class="o">-&gt;</span><span class="n">eoi</span><span class="p">.</span><span class="n">vector</span><span class="w"> </span><span class="o">=</span>
+<span class="w">                        </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">pending_ioapic_eoi</span><span class="p">;</span>
+<span class="w">                </span><span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">                </span><span class="k">goto</span><span class="w"> </span><span class="n">out</span><span class="p">;</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">}</span><span class="w"> </span>
+
+<span class="w">        </span><span class="c1">// === 3.20 扫描 IOAPIC,更新 EOI 退出位图 ===</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_check_request</span><span class="p">(</span><span class="n">KVM_REQ_SCAN_IOAPIC</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">))</span>
+<span class="w">            </span><span class="n">vcpu_scan_ioapic</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
+
+<span class="w">        </span><span class="c1">// === 3.21 加载 EOI 退出位图(APICv 相关) ===</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_check_request</span><span class="p">(</span><span class="n">KVM_REQ_LOAD_EOI_EXITMAP</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">))</span>
+<span class="w">            </span><span class="n">vcpu_load_eoi_exitmap</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
+
+<span class="w">        </span><span class="c1">// === 3.22 重新加载 APIC access page(虚拟化 APIC 访问页) ===</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_check_request</span><span class="p">(</span><span class="n">KVM_REQ_APIC_PAGE_RELOAD</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">))</span>
+<span class="w">            </span><span class="n">kvm_vcpu_reload_apic_access_page</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
+
+<span class="w">        </span><span class="c1">// === 3.23 Hyper-V 半虚拟化:Guest crash 通知 ===</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_check_request</span><span class="p">(</span><span class="n">KVM_REQ_HV_CRASH</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">run</span><span class="o">-&gt;</span><span class="n">exit_reason</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">KVM_EXIT_SYSTEM_EVENT</span><span class="p">;</span>
+<span class="w">            </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">run</span><span class="o">-&gt;</span><span class="n">system_event</span><span class="p">.</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">KVM_SYSTEM_EVENT_CRASH</span><span class="p">;</span>
+<span class="w">            </span><span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">            </span><span class="k">goto</span><span class="w"> </span><span class="n">out</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
+
+<span class="w">        </span><span class="c1">// === 3.24 Hyper-V:Guest 请求 reset ===</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_check_request</span><span class="p">(</span><span class="n">KVM_REQ_HV_RESET</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">run</span><span class="o">-&gt;</span><span class="n">exit_reason</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">KVM_EXIT_SYSTEM_EVENT</span><span class="p">;</span>
+<span class="w">            </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">run</span><span class="o">-&gt;</span><span class="n">system_event</span><span class="p">.</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">KVM_SYSTEM_EVENT_RESET</span><span class="p">;</span>
+<span class="w">            </span><span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">            </span><span class="k">goto</span><span class="w"> </span><span class="n">out</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
+
+<span class="w">        </span><span class="c1">// === 3.25 Hyper-V 显式退出请求(vmexit 到用户态) ===</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_check_request</span><span class="p">(</span><span class="n">KVM_REQ_HV_EXIT</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu_hv</span><span class="w"> </span><span class="o">*</span><span class="n">hv_vcpu</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">to_hv_vcpu</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
+
+<span class="w">            </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">run</span><span class="o">-&gt;</span><span class="n">exit_reason</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">KVM_EXIT_HYPERV</span><span class="p">;</span>
+<span class="w">            </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">run</span><span class="o">-&gt;</span><span class="n">hyperv</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">hv_vcpu</span><span class="o">-&gt;</span><span class="n">exit</span><span class="p">;</span>
+<span class="w">            </span><span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">            </span><span class="k">goto</span><span class="w"> </span><span class="n">out</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
+
+<span class="w">        </span><span class="cm">/*</span>
+<span class="cm">         * KVM_REQ_HV_STIMER has to be processed after</span>
+<span class="cm">         * KVM_REQ_CLOCK_UPDATE, because Hyper-V SynIC timers</span>
+<span class="cm">         * depend on the guest clock being up-to-date</span>
+<span class="cm">         */</span>
+<span class="w">        </span><span class="c1">// === 3.26 Hyper-V SynIC 合成定时器(必须在 CLOCK_UPDATE 之后) ===</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_check_request</span><span class="p">(</span><span class="n">KVM_REQ_HV_STIMER</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">))</span>
+<span class="w">            </span><span class="n">kvm_hv_process_stimers</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
+
+<span class="w">        </span><span class="c1">// === 3.27 APICv(APIC 虚拟化)启用状态更新 ===</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_check_request</span><span class="p">(</span><span class="n">KVM_REQ_APICV_UPDATE</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">))</span>
+<span class="w">            </span><span class="n">kvm_vcpu_update_apicv</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
+
+<span class="w">        </span><span class="c1">// === 3.28 异步缺页已就绪:注入 APF 就绪事件给 Guest ===</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_check_request</span><span class="p">(</span><span class="n">KVM_REQ_APF_READY</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">))</span>
+<span class="w">            </span><span class="n">kvm_check_async_pf_completion</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
+
+<span class="w">        </span><span class="c1">// === 3.29 MSR filter 已变化:通知底层(VMX/SVM)重建 MSR bitmap ===</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_check_request</span><span class="p">(</span><span class="n">KVM_REQ_MSR_FILTER_CHANGED</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">))</span>
+<span class="w">            </span><span class="n">static_call</span><span class="p">(</span><span class="n">kvm_x86_msr_filter_changed</span><span class="p">)(</span><span class="n">vcpu</span><span class="p">);</span>
+
+<span class="w">        </span><span class="c1">// === 3.30 更新 CPU 脏页跟踪配置(PML 等) ===</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_check_request</span><span class="p">(</span><span class="n">KVM_REQ_UPDATE_CPU_DIRTY_LOGGING</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">))</span>
+<span class="w">            </span><span class="n">static_call</span><span class="p">(</span><span class="n">kvm_x86_update_cpu_dirty_logging</span><span class="p">)(</span><span class="n">vcpu</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+</code></pre></div>
+
+<h2>4. 事件注入(异常 / 中断 / NMI / SMI)</h2>
+<div class="highlight"><pre><span></span><code><span class="c1">// 触发条件:</span>
+<span class="w">    </span><span class="c1">//   - 有 KVM_REQ_EVENT 请求(有新事件待注入)</span>
+<span class="w">    </span><span class="c1">//   - 或需要打开中断窗口(用户态待注入 IRQ)</span>
+<span class="w">    </span><span class="c1">//   - 或 Xen 半虚拟化有待注入中断</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_check_request</span><span class="p">(</span><span class="n">KVM_REQ_EVENT</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">)</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="n">req_int_win</span><span class="w"> </span><span class="o">||</span>
+<span class="w">        </span><span class="n">kvm_xen_has_interrupt</span><span class="p">(</span><span class="n">vcpu</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="o">++</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">stat</span><span class="p">.</span><span class="n">req_event</span><span class="p">;</span><span class="w">                        </span><span class="c1">// 统计计数</span>
+
+<span class="w">        </span><span class="c1">// 处理 APIC 事件:INIT / SIPI / start-up 等</span>
+<span class="w">        </span><span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">kvm_apic_accept_events</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">r</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">            </span><span class="k">goto</span><span class="w"> </span><span class="n">out</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">        </span><span class="c1">// 若收到 INIT,vCPU 进入等待 SIPI 状态,直接返回让 vcpu_run 决策</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">mp_state</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">KVM_MP_STATE_INIT_RECEIVED</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<span class="w">            </span><span class="k">goto</span><span class="w"> </span><span class="n">out</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
+
+<span class="w">        </span><span class="c1">// 核心:选择并注入一个待处理事件(异常优先级 &gt; NMI &gt; 中断)</span>
+<span class="w">        </span><span class="c1">// 若注入后需要立即 VM Exit(如注入 IRQ 后想立刻检查更多事件),</span>
+<span class="w">        </span><span class="c1">// 会把 req_immediate_exit 置 true</span>
+<span class="w">        </span><span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">inject_pending_event</span><span class="p">(</span><span class="n">vcpu</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">req_immediate_exit</span><span class="p">);</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">r</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">            </span><span class="k">goto</span><span class="w"> </span><span class="n">out</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">        </span><span class="c1">// 用户态有 IRQ 待注入,请求硬件打开中断窗口(等 Guest 一开中断就 VM Exit)</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">req_int_win</span><span class="p">)</span>
+<span class="w">            </span><span class="n">static_call</span><span class="p">(</span><span class="n">kvm_x86_enable_irq_window</span><span class="p">)(</span><span class="n">vcpu</span><span class="p">);</span>
+
+<span class="w">        </span><span class="c1">// 同步虚拟 APIC 状态:更新 CR8 拦截策略,把 KVM 的 vAPIC 同步到 Guest 内存里的 vapic_page</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_lapic_enabled</span><span class="p">(</span><span class="n">vcpu</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">update_cr8_intercept</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
+<span class="w">            </span><span class="n">kvm_lapic_sync_to_vapic</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+</code></pre></div>
+
+<h2>5. 确保 MMU 已加载(不成功则取消注入)</h2>
+<div class="highlight"><pre><span></span><code><span class="c1">// 重新加载 MMU(如果之前 kvm_mmu_unload 卸载过、或影子页表未就绪)</span>
+<span class="w">    </span><span class="c1">// 失败通常意味着内存分配失败,此时需要撤销上面已经&quot;半提交&quot;的事件注入</span>
+<span class="w">    </span><span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">kvm_mmu_reload</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">unlikely</span><span class="p">(</span><span class="n">r</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">goto</span><span class="w"> </span><span class="n">cancel_injection</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+</code></pre></div>
+
+<h2>6. 进入临界区:关抢占 → 关中断 → 切换到 IN_GUEST_MODE</h2>
+<div class="highlight"><pre><span></span><code><span class="n">preempt_disable</span><span class="p">();</span><span class="w">                                 </span><span class="c1">// 关闭抢占,确保接下来不被内核调度出去</span>
+
+<span class="w">    </span><span class="c1">// VMX/SVM 各自的&quot;进入 Guest 前&quot;准备:保存 host 状态、加载 guest 状态</span>
+<span class="w">    </span><span class="c1">// (MSR、段寄存器、XSAVE 等)</span>
+<span class="w">    </span><span class="n">static_call</span><span class="p">(</span><span class="n">kvm_x86_prepare_guest_switch</span><span class="p">)(</span><span class="n">vcpu</span><span class="p">);</span>
+
+<span class="w">    </span><span class="cm">/*</span>
+<span class="cm">     * Disable IRQs before setting IN_GUEST_MODE.  Posted interrupt</span>
+<span class="cm">     * IPI are then delayed after guest entry, which ensures that they</span>
+<span class="cm">     * result in virtual interrupt delivery.</span>
+<span class="cm">     */</span>
+<span class="w">    </span><span class="c1">// 关中断必须在设置 IN_GUEST_MODE 之前,</span>
+<span class="w">    </span><span class="c1">// 这样其他 CPU 通过 posted interrupt IPI 发送的中断,</span>
+<span class="w">    </span><span class="c1">// 会被延迟到 Guest 进入后由硬件直接投递为虚拟中断</span>
+<span class="w">    </span><span class="n">local_irq_disable</span><span class="p">();</span>
+<span class="w">    </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">IN_GUEST_MODE</span><span class="p">;</span><span class="w">                        </span><span class="c1">// 标记 vCPU 状态:即将/正在 Guest 中运行</span>
+
+<span class="w">    </span><span class="c1">// 释放 SRCU 读锁(此前长时间持有会阻塞 memslot 更新等 synchronize_srcu 调用者)</span>
+<span class="w">    </span><span class="n">srcu_read_unlock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">kvm</span><span class="o">-&gt;</span><span class="n">srcu</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">srcu_idx</span><span class="p">);</span>
+
+<span class="w">    </span><span class="cm">/*</span>
+<span class="cm">     * 1) We should set -&gt;mode before checking -&gt;requests.</span>
+<span class="cm">     * 2) For APICv, ordering pairs with pi_test_and_set_on.</span>
+<span class="cm">     * 3) Orders mode write vs page table reads while VCPU running.</span>
+<span class="cm">     */</span>
+<span class="w">    </span><span class="c1">// 内存屏障:</span>
+<span class="w">    </span><span class="c1">//   (1) 保证 mode 写入对其他 CPU 可见后,再读 requests</span>
+<span class="w">    </span><span class="c1">//   (2) 与 posted-interrupt 的 PID.ON 位测试形成配对</span>
+<span class="w">    </span><span class="c1">//   (3) 保证 mode 写入 与 Guest 运行期间的页表读之间的顺序</span>
+<span class="w">    </span><span class="n">smp_mb__after_srcu_read_unlock</span><span class="p">();</span>
+
+<span class="w">    </span><span class="cm">/*</span>
+<span class="cm">     * This handles the case where a posted interrupt was</span>
+<span class="cm">     * notified with kvm_vcpu_kick.  Assigned devices can</span>
+<span class="cm">     * use the POSTED_INTR_VECTOR even if APICv is disabled.</span>
+<span class="cm">     */</span>
+<span class="w">    </span><span class="c1">// 把 Posted Interrupt Descriptor 中的中断同步到虚拟 IRR</span>
+<span class="w">    </span><span class="c1">// (处理 kvm_vcpu_kick 触发的 posted intr;透传设备也可能用此向量)</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_lapic_enabled</span><span class="p">(</span><span class="n">vcpu</span><span class="p">))</span>
+<span class="w">        </span><span class="n">static_call_cond</span><span class="p">(</span><span class="n">kvm_x86_sync_pir_to_irr</span><span class="p">)(</span><span class="n">vcpu</span><span class="p">);</span>
+</code></pre></div>
+
+<h2>7. 二次检查:是否又有请求要求退出(取消进入 Guest)</h2>
+<div class="highlight"><pre><span></span><code><span class="c1">// 在关中断 + 设置 IN_GUEST_MODE + 屏障之后,再检查一次是否仍应该继续</span>
+<span class="w">    </span><span class="c1">// (比如刚才被投递了新的 signal / request / kick)</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_vcpu_exit_request</span><span class="p">(</span><span class="n">vcpu</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">OUTSIDE_GUEST_MODE</span><span class="p">;</span><span class="w">               </span><span class="c1">// 撤销 IN_GUEST_MODE</span>
+<span class="w">        </span><span class="n">smp_wmb</span><span class="p">();</span><span class="w">                                     </span><span class="c1">// 让状态改动对其他 CPU 可见</span>
+<span class="w">        </span><span class="n">local_irq_enable</span><span class="p">();</span><span class="w">                            </span><span class="c1">// 恢复中断</span>
+<span class="w">        </span><span class="n">preempt_enable</span><span class="p">();</span><span class="w">                              </span><span class="c1">// 恢复抢占</span>
+<span class="w">        </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">srcu_idx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">srcu_read_lock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">kvm</span><span class="o">-&gt;</span><span class="n">srcu</span><span class="p">);</span><span class="w">   </span><span class="c1">// 重新拿 SRCU 读锁</span>
+<span class="w">        </span><span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w">                                         </span><span class="c1">// 1 表示 vcpu_run 循环继续</span>
+<span class="w">        </span><span class="k">goto</span><span class="w"> </span><span class="n">cancel_injection</span><span class="p">;</span><span class="w">                         </span><span class="c1">// 需要撤销刚才的事件注入</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="c1">// 需要立即 VM Exit:通常是 inject_pending_event 注入了事件后,想马上回来</span>
+<span class="w">    </span><span class="c1">// 做法:请求一次 KVM_REQ_EVENT,并让底层设置 preemption timer 或类似机制</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">req_immediate_exit</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">kvm_make_request</span><span class="p">(</span><span class="n">KVM_REQ_EVENT</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">);</span>
+<span class="w">        </span><span class="n">static_call</span><span class="p">(</span><span class="n">kvm_x86_request_immediate_exit</span><span class="p">)(</span><span class="n">vcpu</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+</code></pre></div>
+
+<h2>8. FPU 与调试寄存器准备</h2>
+<div class="highlight"><pre><span></span><code><span class="c1">// 确保 FPU 状态一致(WARN 检查),必要时切换 FPU</span>
+<span class="w">    </span><span class="n">fpregs_assert_state_consistent</span><span class="p">();</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">test_thread_flag</span><span class="p">(</span><span class="n">TIF_NEED_FPU_LOAD</span><span class="p">))</span>
+<span class="w">        </span><span class="n">switch_fpu_return</span><span class="p">();</span><span class="w">                           </span><span class="c1">// 加载 Guest 的 FPU 状态</span>
+
+<span class="w">    </span><span class="c1">// 调试寄存器切换:</span>
+<span class="w">    </span><span class="c1">//   - 若 Guest 使用了 DR0-DR3(switch_db_regs 有效),把 Guest 的调试地址装入硬件,</span>
+<span class="w">    </span><span class="c1">//     并把 DR7 清零(防止在进入 Guest 前就命中断点)</span>
+<span class="w">    </span><span class="c1">//   - 否则若 host 有硬件断点激活,清零 DR7 让 Guest 不受影响</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">unlikely</span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">switch_db_regs</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">set_debugreg</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">7</span><span class="p">);</span>
+<span class="w">        </span><span class="n">set_debugreg</span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">eff_db</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span>
+<span class="w">        </span><span class="n">set_debugreg</span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">eff_db</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span>
+<span class="w">        </span><span class="n">set_debugreg</span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">eff_db</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span><span class="w"> </span><span class="mi">2</span><span class="p">);</span>
+<span class="w">        </span><span class="n">set_debugreg</span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">eff_db</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span><span class="w"> </span><span class="mi">3</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">unlikely</span><span class="p">(</span><span class="n">hw_breakpoint_active</span><span class="p">()))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">set_debugreg</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">7</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+</code></pre></div>
+
+<h2>9. 核心:VMLAUNCH / VMRESUME 循环(含 Fastpath 重入)</h2>
+<div class="highlight"><pre><span></span><code><span class="c1">// 这里的 for 循环用于支持 &quot;fastpath 重入&quot;:</span>
+<span class="w">    </span><span class="c1">//   某些 VM Exit(如 WRMSR TSC_DEADLINE)可以在关中断/关抢占的状态下</span>
+<span class="w">    </span><span class="c1">//   直接处理完并重新进入 Guest,避免走完整退出路径的开销。</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(;;)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// === 真正的 VM Entry:进入 Guest 执行,直到发生 VM Exit ===</span>
+<span class="w">        </span><span class="c1">// static_call 是 VMX 下的 vmx_vcpu_run 或 SVM 下的 svm_vcpu_run</span>
+<span class="w">        </span><span class="n">exit_fastpath</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">static_call</span><span class="p">(</span><span class="n">kvm_x86_run</span><span class="p">)(</span><span class="n">vcpu</span><span class="p">);</span>
+
+<span class="w">        </span><span class="c1">// 大多数退出情况:跳出循环,走完整的退出处理</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">likely</span><span class="p">(</span><span class="n">exit_fastpath</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">EXIT_FASTPATH_REENTER_GUEST</span><span class="p">))</span>
+<span class="w">            </span><span class="k">break</span><span class="p">;</span>
+
+<span class="w">        </span><span class="c1">// Fastpath 已处理,需要重入 Guest 前:再同步一次 posted interrupt</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_lapic_enabled</span><span class="p">(</span><span class="n">vcpu</span><span class="p">))</span>
+<span class="w">            </span><span class="n">static_call_cond</span><span class="p">(</span><span class="n">kvm_x86_sync_pir_to_irr</span><span class="p">)(</span><span class="n">vcpu</span><span class="p">);</span>
+
+<span class="w">        </span><span class="c1">// 重入前也要再检查一次是否有紧急退出请求</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">unlikely</span><span class="p">(</span><span class="n">kvm_vcpu_exit_request</span><span class="p">(</span><span class="n">vcpu</span><span class="p">)))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">exit_fastpath</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">EXIT_FASTPATH_EXIT_HANDLED</span><span class="p">;</span>
+<span class="w">            </span><span class="k">break</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
+
+<span class="w">        </span><span class="cm">/* Note, VM-Exits that go down the &quot;slow&quot; path are accounted below. */</span>
+<span class="w">        </span><span class="c1">// 走 fastpath 的退出在这里统计;走 slow path 的下面还会再统计一次</span>
+<span class="w">        </span><span class="o">++</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">stat</span><span class="p">.</span><span class="n">exits</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+</code></pre></div>
+
+<h2>10. VM Exit 后:调试寄存器回收</h2>
+<div class="highlight"><pre><span></span><code><span class="cm">/*</span>
+<span class="cm">     * Do this here before restoring debug registers on the host.</span>
+<span class="cm">     * A DR access vmexit can then read correct DR values and set</span>
+<span class="cm">     * KVM_DEBUGREG_WONT_EXIT again.</span>
+<span class="cm">     */</span>
+<span class="w">    </span><span class="c1">// 如果 Guest 用过 DR 而且底层设置了 WONT_EXIT 优化(减少 DR VM Exit),</span>
+<span class="w">    </span><span class="c1">// 必须在恢复 host DR 之前,先把硬件 DR 值同步回 vcpu 结构体,</span>
+<span class="w">    </span><span class="c1">// 否则后续 DR VM Exit 会读到错误的值</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">unlikely</span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">switch_db_regs</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">KVM_DEBUGREG_WONT_EXIT</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">WARN_ON</span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">guest_debug</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">KVM_GUESTDBG_USE_HW_BP</span><span class="p">);</span><span class="w">    </span><span class="c1">// 用户态调试与此优化互斥</span>
+<span class="w">        </span><span class="n">static_call</span><span class="p">(</span><span class="n">kvm_x86_sync_dirty_debug_regs</span><span class="p">)(</span><span class="n">vcpu</span><span class="p">);</span>
+<span class="w">        </span><span class="n">kvm_update_dr0123</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
+<span class="w">        </span><span class="n">kvm_update_dr7</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="cm">/*</span>
+<span class="cm">     * If the guest has used debug registers, at least dr7 will be</span>
+<span class="cm">     * disabled while returning to the host. Restore host breakpoints</span>
+<span class="cm">     * if any were active.</span>
+<span class="cm">     */</span>
+<span class="w">    </span><span class="c1">// Guest 运行时 host 的硬件断点会被清掉,</span>
+<span class="w">    </span><span class="c1">// 若 host 原本有活动断点,现在需要恢复</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">hw_breakpoint_active</span><span class="p">())</span>
+<span class="w">        </span><span class="n">hw_breakpoint_restore</span><span class="p">();</span>
+</code></pre></div>
+
+<h2>11. VM Exit 后:状态记账与初步处理</h2>
+<div class="highlight"><pre><span></span><code><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">last_vmentry_cpu</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">cpu</span><span class="p">;</span><span class="w">           </span><span class="c1">// 记录本次 VM Entry 时所在的物理 CPU</span>
+<span class="w">    </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">last_guest_tsc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">kvm_read_l1_tsc</span><span class="p">(</span><span class="n">vcpu</span><span class="p">,</span><span class="w"> </span><span class="n">rdtsc</span><span class="p">());</span><span class="w">  </span><span class="c1">// 记录退出瞬间 Guest 的 TSC</span>
+
+<span class="w">    </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">OUTSIDE_GUEST_MODE</span><span class="p">;</span><span class="w">                   </span><span class="c1">// 状态切回 Host 模式</span>
+<span class="w">    </span><span class="n">smp_wmb</span><span class="p">();</span><span class="w">                                         </span><span class="c1">// 让其他 CPU 立刻看到状态变化</span>
+
+<span class="w">    </span><span class="c1">// 关中断状态下预处理 VM Exit(比如 VMX 里 ACK 外部中断)</span>
+<span class="w">    </span><span class="c1">// 这一步必须在开中断之前完成</span>
+<span class="w">    </span><span class="n">static_call</span><span class="p">(</span><span class="n">kvm_x86_handle_exit_irqoff</span><span class="p">)(</span><span class="n">vcpu</span><span class="p">);</span>
+
+<span class="w">    </span><span class="cm">/*</span>
+<span class="cm">     * Consume any pending interrupts. An instruction is required</span>
+<span class="cm">     * after local_irq_enable() to fully unblock interrupts on</span>
+<span class="cm">     * processors that implement an interrupt shadow.</span>
+<span class="cm">     */</span>
+<span class="w">    </span><span class="c1">// 这一段&quot;开中断 → 增计数 → 关中断&quot;是有讲究的:</span>
+<span class="w">    </span><span class="c1">//   Intel CPU 在 STI 后有一个&quot;interrupt shadow&quot;(一条指令的窗口)才真正接受中断,</span>
+<span class="w">    </span><span class="c1">//   所以必须在 enable 后至少执行一条指令(这里用 ++stat.exits 充数),</span>
+<span class="w">    </span><span class="c1">//   才能确保之前挂起的外部中断/NMI 被处理器 dispatch</span>
+<span class="w">    </span><span class="n">kvm_before_interrupt</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span><span class="w">                        </span><span class="c1">// 通知 context tracking:即将处理中断</span>
+<span class="w">    </span><span class="n">local_irq_enable</span><span class="p">();</span>
+<span class="w">    </span><span class="o">++</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">stat</span><span class="p">.</span><span class="n">exits</span><span class="p">;</span><span class="w">                                </span><span class="c1">// 走 slow path 的 VM Exit 计数</span>
+<span class="w">    </span><span class="n">local_irq_disable</span><span class="p">();</span>
+<span class="w">    </span><span class="n">kvm_after_interrupt</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
+</code></pre></div>
+
+<h2>12. Guest 时间记账 与 LAPIC 定时器处理</h2>
+<div class="highlight"><pre><span></span><code><span class="cm">/*</span>
+<span class="cm">     * Wait until after servicing IRQs to account guest time so that</span>
+<span class="cm">     * any ticks that occurred while running the guest are properly</span>
+<span class="cm">     * accounted to the guest.</span>
+<span class="cm">     */</span>
+<span class="w">    </span><span class="c1">// 记账 Guest 时间要放在处理完中断之后,</span>
+<span class="w">    </span><span class="c1">// 这样刚才开中断处理的 tick 会算到 Guest 头上,而不是 Host</span>
+<span class="w">    </span><span class="n">vtime_account_guest_exit</span><span class="p">();</span>
+
+<span class="w">    </span><span class="c1">// 若使用内核内 LAPIC,记录 lapic timer advance 的延迟统计</span>
+<span class="w">    </span><span class="c1">// (KVM 会提前触发 lapic timer 以补偿 VM Exit 的开销)</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">lapic_in_kernel</span><span class="p">(</span><span class="n">vcpu</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">s64</span><span class="w"> </span><span class="n">delta</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">apic</span><span class="o">-&gt;</span><span class="n">lapic_timer</span><span class="p">.</span><span class="n">advance_expire_delta</span><span class="p">;</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">delta</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">S64_MIN</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">trace_kvm_wait_lapic_expire</span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">vcpu_id</span><span class="p">,</span><span class="w"> </span><span class="n">delta</span><span class="p">);</span>
+<span class="w">            </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">apic</span><span class="o">-&gt;</span><span class="n">lapic_timer</span><span class="p">.</span><span class="n">advance_expire_delta</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">S64_MIN</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="n">local_irq_enable</span><span class="p">();</span><span class="w">                                </span><span class="c1">// 正式恢复中断</span>
+<span class="w">    </span><span class="n">preempt_enable</span><span class="p">();</span><span class="w">                                  </span><span class="c1">// 正式恢复抢占</span>
+
+<span class="w">    </span><span class="c1">// 重新拿 SRCU 读锁(memslot、IRQ routing 等读操作需要)</span>
+<span class="w">    </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">srcu_idx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">srcu_read_lock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">kvm</span><span class="o">-&gt;</span><span class="n">srcu</span><span class="p">);</span>
+</code></pre></div>
+
+<h2>13. 收尾:profiling / TSC catchup / vAPIC 同步 / 派发退出处理</h2>
+<div class="highlight"><pre><span></span><code><span class="cm">/*</span>
+<span class="cm">     * Profile KVM exit RIPs:</span>
+<span class="cm">     */</span>
+<span class="w">    </span><span class="c1">// 若开启了 KVM_PROFILING,采样退出时的 Guest RIP 供 readprofile 使用</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">unlikely</span><span class="p">(</span><span class="n">prof_on</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">KVM_PROFILING</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="n">rip</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">kvm_rip_read</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
+<span class="w">        </span><span class="n">profile_hit</span><span class="p">(</span><span class="n">KVM_PROFILING</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="n">rip</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="c1">// 若 CPU 需要&quot;始终追赶 TSC&quot;(host TSC 不稳定),</span>
+<span class="w">    </span><span class="c1">// 请求下一轮循环再做一次 CLOCK_UPDATE</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">unlikely</span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">tsc_always_catchup</span><span class="p">))</span>
+<span class="w">        </span><span class="n">kvm_make_request</span><span class="p">(</span><span class="n">KVM_REQ_CLOCK_UPDATE</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// 若 Guest 通过 vapic_addr 使用了内存态 vAPIC,把 Guest 内存里的 vAPIC 同步回 KVM</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">apic_attention</span><span class="p">)</span>
+<span class="w">        </span><span class="n">kvm_lapic_sync_from_vapic</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// === 派发到具体的 VM Exit handler(handle_ept_violation / handle_io / ...) ===</span>
+<span class="w">    </span><span class="c1">// exit_fastpath 用于告知 handler:这次退出是否已经在 fastpath 处理过一部分</span>
+<span class="w">    </span><span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">static_call</span><span class="p">(</span><span class="n">kvm_x86_handle_exit</span><span class="p">)(</span><span class="n">vcpu</span><span class="p">,</span><span class="w"> </span><span class="n">exit_fastpath</span><span class="p">);</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">r</span><span class="p">;</span><span class="w">                                          </span><span class="c1">// 返回值决定 vcpu_run 的下一步动作</span>
+</code></pre></div>
+
+<h2>14. 异常出口:cancel_injection 与 out</h2>
+<div class="highlight"><pre><span></span><code><span class="nl">cancel_injection</span><span class="p">:</span>
+<span class="w">    </span><span class="c1">// 之前 inject_pending_event 已经&quot;半提交&quot;了事件到 VMCS/VMCB,</span>
+<span class="w">    </span><span class="c1">// 但由于我们决定不进入 Guest,需要撤销;否则下次会重复注入</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">req_immediate_exit</span><span class="p">)</span>
+<span class="w">        </span><span class="n">kvm_make_request</span><span class="p">(</span><span class="n">KVM_REQ_EVENT</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="p">);</span><span class="w">         </span><span class="c1">// 保留 EVENT 请求,下次再试注入</span>
+<span class="w">    </span><span class="n">static_call</span><span class="p">(</span><span class="n">kvm_x86_cancel_injection</span><span class="p">)(</span><span class="n">vcpu</span><span class="p">);</span><span class="w">        </span><span class="c1">// 底层撤销 VMX/SVM 的注入字段</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">unlikely</span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">apic_attention</span><span class="p">))</span>
+<span class="w">        </span><span class="n">kvm_lapic_sync_from_vapic</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span><span class="w">               </span><span class="c1">// 与正常路径一致,同步 vAPIC</span>
+
+<span class="nl">out</span><span class="p">:</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">r</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<h2>15. 总结:关键控制流</h2>
+<p><strong>vCPU 进入 Guest 的完整生命周期</strong>可归纳为三大阶段:</p>
+<ol>
+<li>
+<p><strong>Entry 准备</strong>(第 1-8 节):处理挂起请求 → 注入事件 → 加载 MMU → 关抢占/中断 → 切 IN_GUEST_MODE → 二次检查 → 准备 FPU/DR</p>
+</li>
+<li>
+<p><strong>Entry 本体</strong>(第 9 节):<code>static_call(kvm_x86_run)</code> 执行 VMLAUNCH/VMRESUME,循环支持 fastpath 重入</p>
+</li>
+<li>
+<p><strong>Exit 处理</strong>(第 10-13 节):同步 DR → 记账 → 关中断处理 → 开中断消费 pending IRQ → Guest 时间记账 → 恢复抢占 → 拿回 SRCU → 派发 handle_exit</p>
+</li>
+</ol>
+<p><strong>关键内存序保护</strong>:<code>vcpu-&gt;mode</code> 的读写与 <code>vcpu-&gt;requests</code> 的检查之间必须有 <code>smp_mb</code> 屏障,否则会漏掉 <code>kvm_vcpu_kick</code> 发来的请求。</p>
+<p><strong>关键性能优化</strong>:fastpath 重入避免了 srcu 锁、preempt、irq、mode 切换等所有 heavy 操作,对 WRMSR-heavy 场景(尤其是虚拟化 TSC deadline 定时器)极其重要。</p>
+<blockquote>
+<p>（注：部分内容可能由 AI 生成）</p>
+</blockquote>
+
+
+             
+ 
+                <p id="post-share-links">
+    Share on:
+      <a href="https://twitter.com/intent/tweet?text=Linux%205.15%20KVM%20vcpu_enter_guest%20%E5%87%BD%E6%95%B0%E8%A1%8C%E7%BA%A7%E6%B3%A8%E9%87%8A&url=https%3A//blog.kernel.love/vcpu-enter-guest.html&hashtags=virtualization,kvm,kernel" target="_blank" rel="nofollow noopener noreferrer" title="Share on Twitter">Twitter</a>
+ ❄       <a href="https://www.facebook.com/sharer/sharer.php?u=https%3A//blog.kernel.love/vcpu-enter-guest.html" target="_blank" rel="nofollow noopener noreferrer" title="Share on Facebook">Facebook</a>
+ ❄       <a href="mailto:?subject=Linux%205.15%20KVM%20vcpu_enter_guest%20%E5%87%BD%E6%95%B0%E8%A1%8C%E7%BA%A7%E6%B3%A8%E9%87%8A&amp;body=https%3A//blog.kernel.love/vcpu-enter-guest.html" target="_blank" rel="nofollow noopener noreferrer" title="Share via Email">Email</a>
+
+            
+            
+
+
+
+
+
+
+
+            <hr/>
+<section>
+    <h2>Related Posts</h2>
+<ul class="related-posts-list">
+<li><a href="https://blog.kernel.love/x86 nested virtualization.html" title="X86 Nested Virtualization">X86 Nested Virtualization</a></li>
+<li><a href="https://blog.kernel.love/vmx-vmcs-shadowing.html" title="VMCS Shadowing 技术详解">VMCS Shadowing 技术详解</a></li>
+<li><a href="https://blog.kernel.love/x86-nested-virt-performance.html" title="x86 嵌套虚拟化性能优化项总结">x86 嵌套虚拟化性能优化项总结</a></li>
+<li><a href="https://blog.kernel.love/kvm-pv-steal-time.html" title="KVM PV Steal Time 机制分析">KVM PV Steal Time 机制分析</a></li>
+<li><a href="https://blog.kernel.love/mediated-vpmu.html" title="Mediated vPMU 特性分析">Mediated vPMU 特性分析</a></li>
+</ul>
+<hr />
+</section>
+            <aside>
+            <nav>
+            <ul class="articles-timeline">
+                <li class="previous-article">« <a href="https://blog.kernel.love/renode-intro-guide.html" title="Previous: Renode 入门学习指南">Renode 入门学习指南</a></li>
+            </ul>
+            </nav>
+            </aside>
+        </div>
+        <section id="article-sidebar" class="span2">
+            <h4>Published</h4>
+            <time itemprop="dateCreated" datetime="2026-07-13T08:00:00+08:00">Mon 13 July 2026</time>
+
+            <h4>Category</h4>
+            <a class="category-link" href="https://blog.kernel.love/categories.html#virt-ref">virt</a>
+            <h4>Tags</h4>
+            <ul class="list-of-tags tags-in-article">
+                <li><a href="https://blog.kernel.love/tags.html#kernel-ref">kernel
+                    <span class="superscript">1</span>
+</a></li>
+                <li><a href="https://blog.kernel.love/tags.html#kvm-ref">kvm
+                    <span class="superscript">3</span>
+</a></li>
+                <li><a href="https://blog.kernel.love/tags.html#virtualization-ref">virtualization
+                    <span class="superscript">19</span>
+</a></li>
+            </ul>
+<h4>Contact</h4>
+<div id="sidebar-social-link">
+    <a href="https://github.com/fangying" title="" target="_blank" rel="nofollow noopener noreferrer">
+        <svg xmlns="http://www.w3.org/2000/svg" aria-label="GitHub" role="img" viewBox="0 0 512 512"><rect width="512" height="512" rx="15%" fill="#1B1817"/><path fill="#fff" d="M335 499c14 0 12 17 12 17H165s-2-17 12-17c13 0 16-6 16-12l-1-50c-71 16-86-28-86-28-12-30-28-37-28-37-24-16 1-16 1-16 26 2 40 26 40 26 22 39 59 28 74 22 2-17 9-28 16-35-57-6-116-28-116-126 0-28 10-51 26-69-3-6-11-32 3-67 0 0 21-7 70 26 42-12 86-12 128 0 49-33 70-26 70-26 14 35 6 61 3 67 16 18 26 41 26 69 0 98-60 120-117 126 10 8 18 24 18 48l-1 70c0 6 3 12 16 12z"/></svg>
+    </a>
+</div>
+            
+
+
+
+
+
+            
+
+
+
+
+
+        </section>
+</div>
+</article>
+<!-- Root element of PhotoSwipe. Must have class pswp. -->
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    <!-- Background of PhotoSwipe.
+         It's a separate element as animating opacity is faster than rgba(). -->
+    <div class="pswp__bg"></div>
+
+    <!-- Slides wrapper with overflow:hidden. -->
+    <div class="pswp__scroll-wrap">
+
+        <!-- Container that holds slides.
+            PhotoSwipe keeps only 3 of them in the DOM to save memory.
+            Don't modify these 3 pswp__item elements, data is added later on. -->
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        <!-- Default (PhotoSwipeUI_Default) interface on top of sliding area. Can be changed. -->
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                <!--  Controls are self-explanatory. Order can be changed. -->
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                <!-- Preloader demo https://codepen.io/dimsemenov/pen/yyBWoR -->
+                <!-- element will get class pswp__preloader--active when preloader is running -->
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                      <div class="pswp__preloader__cut">
+                        <div class="pswp__preloader__donut"></div>
+                      </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>                    </div>
+                    <div class="span1"></div>
+                </div>
+            </div>
+        </div>
+<footer>
+    <div>
+        <span xmlns:dct="http://purl.org/dc/terms/" property="dct:title"> blog.kernel.love"</span> by <a xmlns:cc="http://creativecommons.org/ns#" href="https://blog.kernel.love" property="cc:attributionName" rel="cc:attributionURL">Yori Fang</a> is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/3.0/deed.en_US">Creative Commons Attribution-ShareAlike 3.0 Unported License</a>.
+    </div>
+
+
+
+
+    <div id="fpowered">
+        Powered by: <a href="http://getpelican.com/" title="Pelican Home Page" target="_blank" rel="nofollow noopener noreferrer">Pelican</a>
+        Theme: <a href="https://elegant.oncrashreboot.com/" title="Theme Elegant Home Page" target="_blank" rel="nofollow noopener noreferrer">Elegant</a>
+    </div>
+</footer>            <script src="//code.jquery.com/jquery.min.js"></script>
+        <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/js/bootstrap.min.js"></script>
+        <script src="https://blog.kernel.love/theme/js/elegant.prod.9e9d5ce754.js"></script>
+        <script>
+            function validateForm(query)
+            {
+                return (query.length > 0);
+            }
+        </script>
+
+    <script>
+    (function () {
+        if (window.location.hash.match(/^#comment-\d+$/)) {
+            $('#comment_thread').collapse('show');
+        }
+    })();
+    window.onhashchange=function(){
+        if (window.location.hash.match(/^#comment-\d+$/))
+            window.location.reload(true);
+    }
+    $('#comment_thread').on('shown', function () {
+        var link = document.getElementById('comment-accordion-toggle');
+        var old_innerHTML = link.innerHTML;
+        $(link).fadeOut(200, function() {
+            $(this).text('Click here to hide comments').fadeIn(200);
+        });
+        $('#comment_thread').on('hidden', function () {
+            $(link).fadeOut(200, function() {
+                $(this).text(old_innerHTML).fadeIn(200);
+            });
+        })
+    })
+</script>
+
+    </body>
+    <!-- Theme: Elegant built for Pelican
+        License : MIT -->
+</html>
