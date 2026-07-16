@@ -18,17 +18,17 @@
 
 <meta name="keywords" content="virtualization, kvm, vmx, svm, vmexit, virt, " />
 
-<meta property="og:title" content="x86 架构 VMExit 类型全览（Intel VMX &amp; AMD SVM） "/>
+<meta property="og:title" content="x86 vmexit "/>
 <meta property="og:url" content="https://blog.kernel.love/x86-vmexit.html" />
 <meta property="og:description" content="系统梳理 x86 虚拟化架构下 Intel VMX 与 AMD SVM 两个平台的所有 VMExit 类型，涵盖退出码、触发原因及 VMM 典型处理方式。" />
 <meta property="og:site_name" content="blog.kernel.love" />
 <meta property="og:article:author" content="Yori Fang" />
 <meta property="og:article:published_time" content="2026-07-16T14:00:00+08:00" />
 <meta property="og:article:modified_time" content="2026-07-16T14:00:00+08:00" />
-<meta name="twitter:title" content="x86 架构 VMExit 类型全览（Intel VMX &amp; AMD SVM） ">
+<meta name="twitter:title" content="x86 vmexit ">
 <meta name="twitter:description" content="系统梳理 x86 虚拟化架构下 Intel VMX 与 AMD SVM 两个平台的所有 VMExit 类型，涵盖退出码、触发原因及 VMM 典型处理方式。">
 
-        <title>x86 架构 VMExit 类型全览（Intel VMX &amp; AMD SVM）  · blog.kernel.love
+        <title>x86 vmexit  · blog.kernel.love
 </title>
 
 <script>
@@ -79,7 +79,7 @@
     <header class="page-header span10 offset2">
         <h1>
             <a href="https://blog.kernel.love/x86-vmexit.html">
-                x86 架构 VMExit 类型全览（Intel VMX & AMD SVM）
+                x86 vmexit
             </a>
         </h1>
     </header>
@@ -88,7 +88,7 @@
 <div class="row-fluid">
         <div class="span8 offset2 article-content">
             
-            <h1>x86 架构 VMExit 类型全览（Intel VMX \&amp; AMD SVM）</h1>
+            <h1>x86 VMExit</h1>
 <p>本文档系统梳理了 x86 虚拟化架构下 <strong>Intel VMX</strong> 和 <strong>AMD SVM</strong> 两个平台的所有 VMExit（虚拟机退出）类型，涵盖每种退出的退出码、触发原因、以及 VMM（虚拟机监控器）的典型处理方式。</p>
 <p>数据来源：Intel SDM Vol.3D Appendix C、AMD APM Vol.2 Chapter 15、Linux 内核 <code>arch/x86/include/uapi/asm/vmx.h</code> 及 <code>svm.h</code>。</p>
 <h1>一、Intel VMX VM Exit 退出原因</h1>
@@ -1861,9 +1861,9 @@
  
                 <p id="post-share-links">
     Share on:
-      <a href="https://twitter.com/intent/tweet?text=x86%20%E6%9E%B6%E6%9E%84%20VMExit%20%E7%B1%BB%E5%9E%8B%E5%85%A8%E8%A7%88%EF%BC%88Intel%20VMX%20%26%20AMD%20SVM%EF%BC%89&url=https%3A//blog.kernel.love/x86-vmexit.html&hashtags=virtualization,kvm,vmx,svm,vmexit" target="_blank" rel="nofollow noopener noreferrer" title="Share on Twitter">Twitter</a>
+      <a href="https://twitter.com/intent/tweet?text=x86%20vmexit&url=https%3A//blog.kernel.love/x86-vmexit.html&hashtags=virtualization,kvm,vmx,svm,vmexit" target="_blank" rel="nofollow noopener noreferrer" title="Share on Twitter">Twitter</a>
  ❄       <a href="https://www.facebook.com/sharer/sharer.php?u=https%3A//blog.kernel.love/x86-vmexit.html" target="_blank" rel="nofollow noopener noreferrer" title="Share on Facebook">Facebook</a>
- ❄       <a href="mailto:?subject=x86%20%E6%9E%B6%E6%9E%84%20VMExit%20%E7%B1%BB%E5%9E%8B%E5%85%A8%E8%A7%88%EF%BC%88Intel%20VMX%20%26%20AMD%20SVM%EF%BC%89&amp;body=https%3A//blog.kernel.love/x86-vmexit.html" target="_blank" rel="nofollow noopener noreferrer" title="Share via Email">Email</a>
+ ❄       <a href="mailto:?subject=x86%20vmexit&amp;body=https%3A//blog.kernel.love/x86-vmexit.html" target="_blank" rel="nofollow noopener noreferrer" title="Share via Email">Email</a>
 
             
             
