@@ -2,6 +2,7 @@ Title: KVM中的HperV增强
 Date: 2022-11-11 20:20
 Tags: hyperv
 Slug: hyperv-enlightenment
+Status: published
 
 
 ![hyperv-logo](https://www.pikpng.com/pngl/m/361-3613517_microsoft-hyper-v-logo-microsoft-hyper-v-logo.png)
