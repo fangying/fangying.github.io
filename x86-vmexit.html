@@ -1,0 +1,2061 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://blog.kernel.love/theme/css/style.min.css?2fcac227">
+
+        <link rel="dns-prefetch" href="//fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin>
+
+        <meta name="author" content="Yori Fang" />
+
+        <meta name="description" content="系统梳理 x86 虚拟化架构下 Intel VMX 与 AMD SVM 两个平台的所有 VMExit 类型，涵盖退出码、触发原因及 VMM 典型处理方式。
+" />
+        <meta property="og:type" content="article" />
+        <meta name="twitter:card" content="summary">
+
+<meta name="keywords" content="virtualization, kvm, vmx, svm, vmexit, virt, " />
+
+<meta property="og:title" content="x86 架构 VMExit 类型全览（Intel VMX &amp; AMD SVM） "/>
+<meta property="og:url" content="https://blog.kernel.love/x86-vmexit.html" />
+<meta property="og:description" content="系统梳理 x86 虚拟化架构下 Intel VMX 与 AMD SVM 两个平台的所有 VMExit 类型，涵盖退出码、触发原因及 VMM 典型处理方式。" />
+<meta property="og:site_name" content="blog.kernel.love" />
+<meta property="og:article:author" content="Yori Fang" />
+<meta property="og:article:published_time" content="2026-07-16T14:00:00+08:00" />
+<meta property="og:article:modified_time" content="2026-07-16T14:00:00+08:00" />
+<meta name="twitter:title" content="x86 架构 VMExit 类型全览（Intel VMX &amp; AMD SVM） ">
+<meta name="twitter:description" content="系统梳理 x86 虚拟化架构下 Intel VMX 与 AMD SVM 两个平台的所有 VMExit 类型，涵盖退出码、触发原因及 VMM 典型处理方式。">
+
+        <title>x86 架构 VMExit 类型全览（Intel VMX &amp; AMD SVM）  · blog.kernel.love
+</title>
+
+<script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+     (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+     m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+     })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+    ga('create', 'UA-107392039-2', 'auto');
+    ga('send', 'pageview');
+</script>
+
+
+    </head>
+    <body>
+        <div id="content">
+            <div class="navbar navbar-static-top">
+                <div class="navbar-inner">
+                    <div class="container-fluid">
+                        <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                        </a>
+                        <a class="brand" href="https://blog.kernel.love/"><span class=site-name>blog.kernel.love</span></a>
+                        <div class="nav-collapse collapse">
+                            <ul class="nav pull-right top-menu">
+                                <li >
+                                    <a href=
+                                       https://blog.kernel.love
+                                    >Home</a>
+                                </li>
+                                <li ><a href="https://blog.kernel.love/pages/about.html">About</a></li>
+                                <li ><a href="https://blog.kernel.love/categories.html">Categories</a></li>
+                                <li ><a href="https://blog.kernel.love/tags.html">Tags</a></li>
+                                <li ><a href="https://blog.kernel.love/archives.html">Archives</a></li>
+                                <li><form class="navbar-search" action="https://blog.kernel.love/search.html" onsubmit="return validateForm(this.elements['q'].value);"> <input type="text" class="search-query" placeholder="Search" name="q" id="tipue_search_input"></form></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="container-fluid">
+                <div class="row-fluid">
+                    <div class="span1"></div>
+                    <div class="span10">
+<article itemscope>
+<div class="row-fluid">
+    <header class="page-header span10 offset2">
+        <h1>
+            <a href="https://blog.kernel.love/x86-vmexit.html">
+                x86 架构 VMExit 类型全览（Intel VMX & AMD SVM）
+            </a>
+        </h1>
+    </header>
+</div>
+
+<div class="row-fluid">
+        <div class="span8 offset2 article-content">
+            
+            <h1>x86 架构 VMExit 类型全览（Intel VMX \&amp; AMD SVM）</h1>
+<p>本文档系统梳理了 x86 虚拟化架构下 <strong>Intel VMX</strong> 和 <strong>AMD SVM</strong> 两个平台的所有 VMExit（虚拟机退出）类型，涵盖每种退出的退出码、触发原因、以及 VMM（虚拟机监控器）的典型处理方式。</p>
+<p>数据来源：Intel SDM Vol.3D Appendix C、AMD APM Vol.2 Chapter 15、Linux 内核 <code>arch/x86/include/uapi/asm/vmx.h</code> 及 <code>svm.h</code>。</p>
+<h1>一、Intel VMX VM Exit 退出原因</h1>
+<p><strong>Intel VMX VM Exit 概述</strong></p>
+<p>VM Exit 是从 VMX 非根操作模式（客户机）切换回 VMX 根操作模式（VMM/宿主机）的过程。当 VM Exit 发生时，CPU 自动将客户机状态保存到 VMCS 的客户机状态区，从 VMCS 的宿主机状态区加载宿主机状态，并在 VMCS 中记录<strong>退出原因</strong>。VMM 通过读取退出原因来确定触发原因并执行相应处理。退出原因码定义于 Intel SDM Vol. 3D, Appendix C。16 位基本退出原因存储在 VMCS 字段 <code>VM_EXIT_REASON</code>（偏移 <strong>0x4402</strong>）中。Bits 15:0 包含<strong>基本退出原因</strong>；Bit 31 指示 VM-entry 失败是否由 VM-entry <strong>不一致性</strong>引起。</p>
+<hr>
+<h2>1. 异常与中断（退出码 0-8）</h2>
+<p>这些退出在客户机执行期间由异常、中断和系统管理信号触发。它们是与事件投递相关的最基础的 VM 退出类别。</p>
+<table>
+<thead>
+<tr>
+<th>退出码</th>
+<th>名称</th>
+<th>触发原因</th>
+<th>VMM 处理方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>EXIT_REASON_EXCEPTION_NMI</td>
+<td>客户机执行期间发生异常（故障、陷阱或中止）或 NMI，且对应的 VM-exit 控制位已设置（例如，异常位图中对应异常向量的位已设置，或 NMI exiting 已启用）。</td>
+<td>VMM 检查 VMCS 的 <code>VM_EXIT_INTR_INFO</code> 和 <code>VM_EXIT_INTR_ERROR_CODE</code> 字段以识别异常向量和类型。它可以通过 VM-entry 事件注入机制将事件重新注入客户机，内部处理（如页错误反射），或将其传递给宿主机 OS。</td>
+</tr>
+<tr>
+<td>1</td>
+<td>EXIT_REASON_EXTERNAL_INTERRUPT</td>
+<td>客户机执行期间收到外部中断，且 "external-interrupt exiting" VM-execution control 已设置。如果中断未被屏蔽，CPU 触发 VM exit。</td>
+<td>VMM 读取 <code>VM_EXIT_INTR_INFO</code><strong>以获取中断向量</strong>。它将中断分发给宿主机中断处理程序。处理完成后，VMM 通过 VMRESUME 恢复客户机执行。如果启用了虚拟中断投递，VMM 也可以将其重新注入客户机。</td>
+</tr>
+<tr>
+<td>2</td>
+<td>EXIT_REASON_TRIPLE_FAULT</td>
+<td>客户机执行期间发生三重错误：在投递 double fault 时引发异常，或在投递 double fault 期间发生 double fault。</td>
+<td>VMM 将此视为客户机的致命错误。它通常记录该事件，如果已配置则捕获崩溃转储，并终止客户机 VM 或重置客户机的虚拟处理器。某些 VMM 可能将客户机重置为初始状态。</td>
+</tr>
+<tr>
+<td>3</td>
+<td>EXIT_REASON_INIT_SIGNAL</td>
+<td>在 VMX non-root 操作期间，逻辑处理器收到 INIT 信号，且 "INIT exiting" VM-execution control 已设置。</td>
+<td>VMM 将 INIT 信号排队，可能稍后投递给客户机（例如，当客户机处于可接受状态时），或者将客户机虚拟处理器重置为 INIT 状态。VMM 确保 INIT 信号不会丢失。</td>
+</tr>
+<tr>
+<td>4</td>
+<td>EXIT_REASON_SIPI_SIGNAL</td>
+<td>客户机执行期间收到 SIPI，且 "SIPI exiting" VM-execution control 已设置。</td>
+<td>VMM 读取 <code>VM_EXIT_INTR_INFO</code> 以提取 SIPI 向量。当客户机虚拟处理器处于 wait-for-SIPI 状态时，VMM 将 SIPI 排队等待投递给客户机。VMM 与客户机多处理器管理协调，启动额外的 vCPU。</td>
+</tr>
+<tr>
+<td>5</td>
+<td>EXIT_REASON_IO_SMI</td>
+<td>客户机执行期间收到 I/O SMI（系统管理中断）。这是通过 I/O APIC 或专用 SMI 引脚投递的 SMI。</td>
+<td>VMM 通过进入自身的 SMM 处理程序或延迟处理来处理 SMI。客户机不会直接感知到 SMI。如果 VMM 自行处理 SMI，必须确保 SMM 状态正确保存/恢复。</td>
+</tr>
+<tr>
+<td>6</td>
+<td>EXIT_REASON_OTHER_SMI</td>
+<td>客户机执行期间收到非 I/O SMI 的 SMI。这可能是软件生成的 SMI 或其他 SMI 源。</td>
+<td>与 I/O SMI 处理类似。VMM 在自身的 SMM 上下文中处理 SMI 或延迟处理。具体处理方式取决于 VMM 是否支持 SMM 虚拟化。</td>
+</tr>
+<tr>
+<td>7</td>
+<td>EXIT_REASON_INTERRUPT_WINDOW</td>
+<td>"interrupt-window exiting" VM-execution control 已设置，且客户机 RFLAGS.IF=1（中断已启用），并且没有其他条件阻止中断投递。这向 VMM 表明客户机现在可以接受可注入的中断。</td>
+<td>VMM 检查是否有待注入客户机的中断。如果有，通过 VM-entry 事件注入机制注入该中断，并清除 interrupt-window exiting 控制位。如果没有待处理的中断，则禁用 interrupt-window exiting 并恢复客户机执行。</td>
+</tr>
+<tr>
+<td>8</td>
+<td>EXIT_REASON_NMI_WINDOW</td>
+<td>"NMI-window exiting" VM-execution control 已设置，且客户机处于 NMI 未被阻塞的状态（即不在 SMM 中或 NMI 投递之后）。这向 VMM 表明客户机现在可以接受 NMI。</td>
+<td>VMM 检查是否有待注入的 NMI。如果有，通过 VM-entry 事件注入机制注入该 NMI，并清除 NMI-window exiting 控制位。如果没有待处理的 NMI，则禁用 NMI-window exiting 并恢复客户机执行。</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>2. 系统与任务管理（退出码 9-13）</h2>
+<p>这些退出由管理 CPU 状态、标识或任务切换的指令触发。它们通常需要 VMM 介入以实现正确的虚拟化。</p>
+<table>
+<thead>
+<tr>
+<th>退出码</th>
+<th>名称</th>
+<th>触发原因</th>
+<th>VMM 处理方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>9</td>
+<td>EXIT_REASON_TASK_SWITCH</td>
+<td>客户机通过 CALL/JMP 到 TSS 门、NT 标志置位的 IRET 或 IDT 中的任务门尝试任务切换，且 "task switch exiting" VM-execution control 已设置。</td>
+<td>VMM 从 VMCS 字段（<code>VM_EXIT_INSTRUCTION_INFO</code> 等）读取任务切换信息，确定源 TSS 和目标 TSS。它在软件中模拟任务切换，更新客户机的 CR3、段寄存器和 TSS 结构，然后恢复客户机执行。如果有硬件辅助任务切换功能则可使用。</td>
+</tr>
+<tr>
+<td>10</td>
+<td>EXIT_REASON_CPUID</td>
+<td>客户机执行 CPUID 指令，且 "CPUID exiting" VM-execution control 已设置（无条件退出）。</td>
+<td>VMM 读取客户机的 EAX/ECX 输入，模拟 CPUID 返回虚拟化的 CPU 特性信息（隐藏不支持的特性、报告 hypervisor 存在位等），将结果写入客户机 EAX/EBX/ECX/EDX，推进指令指针，并恢复客户机执行。</td>
+</tr>
+<tr>
+<td>11</td>
+<td>EXIT_REASON_GETSEC</td>
+<td>客户机执行 GETSEC 指令（Intel TXT - 可信执行技术的一部分），且 "GETSEC exiting" VM-execution control 已设置。</td>
+<td>VMM 通常根据安全策略阻止或模拟 GETSEC。由于 GETSEC 用于 TXT 启动环境，VMM 可能返回错误或受控响应。大多数 VMM 不支持客户机 TXT 启动，会注入 #UD（未定义操作码）异常。</td>
+</tr>
+<tr>
+<td>12</td>
+<td>EXIT_REASON_HLT</td>
+<td>客户机执行 HLT 指令，且 "HLT exiting" VM-execution control 已设置。</td>
+<td>VMM 将 vCPU 标记为停机/空闲，调度另一个 vCPU 或将物理 CPU 置于低功耗状态。当中断或其他唤醒事件到达时，VMM 恢复停机的 vCPU。VMM 必须确保客户机在停机期间不消耗 CPU 周期。</td>
+</tr>
+<tr>
+<td>13</td>
+<td>EXIT_REASON_INVD</td>
+<td>客户机执行 INVD 指令（不写回地使缓存失效），且 "INVD exiting" VM-execution control 已设置。</td>
+<td>VMM 通常将 INVD 模拟为空操作，如果客户机不允许执行 INVD 则注入 #GP。由于 INVD 可能影响整个系统的缓存状态，VMM 通常不允许客户机直接执行。某些 VMM 可能将其转换为 WBINVD 语义。</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>3. TLB 与缓存管理（退出码 14-16、51、54、56-58、61）</h2>
+<p>这些退出涉及 TLB 刷新、性能计数器访问和时间戳计数器读取，如果不进行虚拟化，都可能影响系统全局状态。</p>
+<table>
+<thead>
+<tr>
+<th>Exit Code</th>
+<th>Name</th>
+<th>Trigger</th>
+<th>VMM Handling</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>14</td>
+<td>EXIT_REASON_INVLPG</td>
+<td>Guest 执行 INVLPG 指令，使 TLB 中特定线性地址的映射失效。当 "INVLPG exiting" VM-execution control 位为 1 时触发。</td>
+<td>VMM 刷新影子页表（Shadow Page Table）中对应虚拟页的 TLB 映射。在使用 EPT 时，该操作可能被透传或仅影响 Guest TLB。VMM 推进 RIP 并恢复 Guest 执行。</td>
+</tr>
+<tr>
+<td>15</td>
+<td>EXIT_REASON_RDPMC</td>
+<td>Guest 执行 RDPMC 指令，读取性能监视计数器（Performance Monitoring Counter）。当 "RDPMC exiting" VM-execution control 位为 1 时触发。</td>
+<td>VMM 检查 Guest 是否有权限读取 PMC。如果允许，VMM 读取对应 PMC 值并写入 Guest 的 EAX/EDX；如果不允许，注入 #GP。VMM 推进 RIP 并恢复执行。</td>
+</tr>
+<tr>
+<td>16</td>
+<td>EXIT_REASON_RDTSC</td>
+<td>Guest 执行 RDTSC 指令，读取时间戳计数器（TSC）。当 "RDTSC exiting" VM-execution control 位为 1 时触发。</td>
+<td>VMM 拦截 TSC 读取以实现 TSC 虚拟化（如 TSC offset、TSC scaling），向 Guest 提供虚拟化的时间戳值。VMM 将处理后的 TSC 值写入 Guest 的 EAX/EDX，推进 RIP 并恢复执行。</td>
+</tr>
+<tr>
+<td>51</td>
+<td>EXIT_REASON_RDTSCP</td>
+<td>Guest 执行 RDTSCP 指令，读取 TSC 和处理器 IA32_TSC_AUX MSR 值。当 "RDTSC exiting" VM-execution control 位为 1 且 "enable RDTSCP" 为 1 时触发。</td>
+<td>VMM 与 RDTSC 类似，拦截并虚拟化 TSC 读取。额外处理 IA32_TSC_AUX MSR 的虚拟化。将处理后的值写入 Guest 的 EAX/EDX/ECX，推进 RIP 并恢复执行。</td>
+</tr>
+<tr>
+<td>54</td>
+<td>EXIT_REASON_WBINVD</td>
+<td>Guest 执行 WBINVD 指令，写回并使所有缓存行失效。当 "WBINVD exiting" VM-execution control 位为 1 时触发。</td>
+<td>VMM 处理该退出以确保缓存一致性。在使用 EPT 时，VMM 可能仅执行 cache flush 操作而不影响其他 Guest。VMM 推进 RIP 并恢复 Guest 执行。</td>
+</tr>
+<tr>
+<td>56</td>
+<td>EXIT_REASON_APIC_WRITE</td>
+<td>Guest 向虚拟 APIC 页面写入数据（通过虚拟化 APIC 寄存器写入），且 "APIC-register virtualization" 或 "virtual-interrupt delivery" VM-execution control 位为 1 时触发。VMM 拦截 Guest 对 APIC 寄存器的写入操作。</td>
+<td>VMM 解析 Guest 写入的 APIC 寄存器号和数据，模拟 APIC 行为（如设置 ICR 发送 IPI、修改 TPR 等）。如果是 ICR 写入，VMM 执行虚拟 IPI 投递。VMM 推进 RIP 并恢复 Guest 执行。</td>
+</tr>
+<tr>
+<td>57</td>
+<td>EXIT_REASON_RDRAND</td>
+<td>Guest 执行 RDRAND 指令，且 "RDRAND exiting" VM-execution control 位为 1 时触发。RDRAND 用于从硬件随机数生成器获取随机数。</td>
+<td>VMM 可以选择模拟 RDRAND 指令（提供软件生成的随机数），或直接将指令透传给硬件执行（如果信任 Guest）。如果 Guest 不支持 RDRAND，VMM 注入 #UD。VMM 推进 RIP 并恢复 Guest 执行。</td>
+</tr>
+<tr>
+<td>58</td>
+<td>EXIT_REASON_INVPCID</td>
+<td>Guest 执行 INVPCID 指令，按 PCID（进程上下文标识符）使 TLB 失效。当 "INVEPT/INVPCID exiting" VM-execution control 位为 1 时触发。</td>
+<td>VMM 模拟 INVPCID 操作，根据 PCID 类型刷新相应的 TLB 条目（Guest TLB 或 VMM 维护的影子 TLB）。VMM 推进 RIP 并恢复 Guest 执行。</td>
+</tr>
+<tr>
+<td>61</td>
+<td>EXIT_REASON_RDSEED</td>
+<td>Guest 执行 RDSEED 指令，且 "RDSEED exiting" VM-execution control 位为 1 时触发。RDSEED 用于从硬件熵源获取种子随机数。</td>
+<td>VMM 可以模拟 RDSEED（提供软件熵源），或将指令透传给硬件。如果 Guest 不支持 RDSEED，VMM 注入 #UD。VMM 推进 RIP 并恢复 Guest 执行。</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>4. VMX 指令（退出码 18-27）</h2>
+<p>这些退出发生在客户机处于 VMX non-root 操作模式下尝试执行 VMX 指令（VMLAUNCH、VMRESUME 等）时。由于客户机无法直接管理 VMCS 结构，VMM 必须拦截并处理这些指令。</p>
+<table>
+<thead>
+<tr>
+<th>退出码</th>
+<th>名称</th>
+<th>触发原因</th>
+<th>VMM 处理方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>18</td>
+<td>EXIT_REASON_VMCALL</td>
+<td>客户机执行 VMCALL 指令（hypercall）。这是 VMX 中客户机到宿主机通信的主要机制。</td>
+<td>VMM 从客户机寄存器读取 hypercall 参数（通常通过 EAX/ECX 传递调用号和参数）。它处理 hypercall（如 MMIO 处理、半虚拟化 I/O、内存 ballooning），并将结果返回到客户机寄存器。VMM 推进 RIP 并恢复执行。</td>
+</tr>
+<tr>
+<td>19</td>
+<td>EXIT_REASON_VMCLEAR</td>
+<td>客户机执行 VMCLEAR 指令，尝试清除 VMCS 区域。由于客户机处于 non-root 操作模式而触发退出。</td>
+<td>如果客户机不支持 VMX 指令，VMM 通常注入 #UD（未定义操作码）；如果支持嵌套虚拟化，则模拟 VMCLEAR（为 L1 hypervisor 维护影子 VMCS 结构）。</td>
+</tr>
+<tr>
+<td>20</td>
+<td>EXIT_REASON_VMLAUNCH</td>
+<td>客户机执行 VMLAUNCH 指令，尝试启动嵌套客户机。由于客户机处于 non-root 操作模式而触发退出。</td>
+<td>如果支持嵌套虚拟化，VMM（L0）拦截并协助 L1 hypervisor，为 L2 创建影子/合并的 VMCS 并进入 L2。如果不支持，VMM 注入 #UD 异常。</td>
+</tr>
+<tr>
+<td>21</td>
+<td>EXIT_REASON_VMPTRLD</td>
+<td>客户机执行 VMPTRLD 指令，尝试加载 VMCS 指针。由于客户机处于 non-root 操作模式而触发退出。</td>
+<td>如果支持嵌套虚拟化，VMM 跟踪 L1 VMCS 指针并相应管理影子 VMCS 结构。如果不支持，注入 #UD。</td>
+</tr>
+<tr>
+<td>22</td>
+<td>EXIT_REASON_VMPTRST</td>
+<td>客户机执行 VMPTRST 指令，尝试存储当前 VMCS 指针。由于客户机处于 non-root 操作模式而触发退出。</td>
+<td>如果支持嵌套虚拟化，VMM 将跟踪的 L1 VMCS 指针存储到客户机指定的内存位置。如果不支持，注入 #UD。</td>
+</tr>
+<tr>
+<td>23</td>
+<td>EXIT_REASON_VMREAD</td>
+<td>客户机执行 VMREAD 指令，尝试读取 VMCS 字段。由于客户机处于 non-root 操作模式而触发退出。</td>
+<td>如果支持嵌套虚拟化，VMM 从影子 VMCS 读取并将值返回给客户机。VMM 必须维护一致的影子 VMCS 以反映 L1 的期望。如果不支持，注入 #UD。</td>
+</tr>
+<tr>
+<td>24</td>
+<td>EXIT_REASON_VMRESUME</td>
+<td>客户机执行 VMRESUME 指令，尝试恢复嵌套客户机。由于客户机处于 non-root 操作模式而触发退出。</td>
+<td>如果支持嵌套虚拟化，VMM（L0）拦截并将 L1 VMCS 与 L0 VMCS 合并，然后进入/恢复 L2 执行。如果不支持，注入 #UD。</td>
+</tr>
+<tr>
+<td>25</td>
+<td>EXIT_REASON_VMWRITE</td>
+<td>客户机执行 VMWRITE 指令，尝试写入 VMCS 字段。由于客户机处于 non-root 操作模式而触发退出。</td>
+<td>如果支持嵌套虚拟化，VMM 写入影子 VMCS。对于 VM-execution control 字段，VMM 可能需要协调 L1 的设置与 L0 的能力（L0 强制使用其子集）。如果不支持，注入 #UD。</td>
+</tr>
+<tr>
+<td>26</td>
+<td>EXIT_REASON_VMXOFF</td>
+<td>客户机执行 VMXOFF 指令，尝试退出 VMX 操作。由于客户机处于 non-root 操作模式而触发退出。</td>
+<td>如果支持嵌套虚拟化，VMM 处理 L1 hypervisor 退出 VMX 操作的请求，清理影子 VMCS 结构并标记客户机不再处于 VMX 操作模式。如果不支持，注入 #UD。</td>
+</tr>
+<tr>
+<td>27</td>
+<td>EXIT_REASON_VMXON</td>
+<td>客户机执行 VMXON 指令，尝试进入 VMX 操作。由于客户机处于 non-root 操作模式而触发退出。</td>
+<td>如果支持嵌套虚拟化，VMM 为 L1 客户机初始化嵌套 VMX 状态，分配影子 VMCS 结构，并启用 VMX 指令模拟。如果不支持，注入 #UD。</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>5. 控制寄存器访问（退出码 28）</h2>
+<p>MOV to/from CR 指令被拦截，以防止客户机修改影响系统全局行为的关键控制寄存器（如分页、保护机制）。</p>
+<table>
+<thead>
+<tr>
+<th>退出码</th>
+<th>名称</th>
+<th>触发原因</th>
+<th>VMM 处理方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>28</td>
+<td>EXIT_REASON_CONTROL_REGISTER_ACCESS</td>
+<td>客户机执行 MOV 指令访问控制寄存器（CR0、CR3、CR4、CR8），且对应的 CR access exiting 控制位已设置（通过 CR-read 和 CR-write VM-execution controls 位图配置）。</td>
+<td>VMM 读取 <code>VM_EXIT_QUALIFICATION</code> 以确定：访问类型（读/写）、CR 编号、涉及的通用寄存器，以及是否由 LMSW 或 CLTS 触发。对于写操作，VMM 验证新的 CR 值（例如，确保分页启用时 CR0.PG 保持置位），更新客户机的虚拟 CR 状态，并可能调整实际 CR 以维持 VMM 控制（如保持 CR0.PE 置位）。对于读操作，VMM 返回虚拟化的 CR 值。VMM 推进 RIP 并恢复执行。</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>6. 调试寄存器访问（退出码 29）</h2>
+<p>MOV to/from DR 指令被拦截，以防止客户机设置硬件断点或修改调试寄存器，从而可能干扰 VMM 自身的调试。</p>
+<table>
+<thead>
+<tr>
+<th>退出码</th>
+<th>名称</th>
+<th>触发原因</th>
+<th>VMM 处理方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>29</td>
+<td>EXIT_REASON_DEBUG_REGISTER_ACCESS</td>
+<td>客户机执行 MOV 指令访问调试寄存器（DR0-DR7），且 "MOV-DR exiting" VM-execution control 已设置。</td>
+<td>VMM 读取 <code>VM_EXIT_QUALIFICATION</code> 以确定：访问类型（读/写）、DR 编号和涉及的通用寄存器。对于写操作，VMM 将值存储到客户机的虚拟 DR 状态中，并可能有选择地应用到物理 DR（例如，用于客户机硬件断点），同时保留 VMM 自身的调试设置。对于读操作，VMM 返回虚拟化的 DR 值。VMM 推进 RIP 并恢复执行。</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>7. I/O 指令（退出码 30）</h2>
+<p>I/O 端口指令（IN、OUT、INS、OUTS）被拦截，用于虚拟化设备 I/O 并对物理端口的访问进行权限控制。</p>
+<table>
+<thead>
+<tr>
+<th>退出码</th>
+<th>名称</th>
+<th>触发原因</th>
+<th>VMM 处理方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>30</td>
+<td>EXIT_REASON_IO_INSTRUCTION</td>
+<td>客户机执行 I/O 指令（IN、OUT、INS、OUTS），I/O 位图指示该端口应触发 VM exit，或启用了无条件 I/O exiting。"unconditional I/O exiting" 控制位或按端口的 I/O 位图 A/B 位决定是否退出。</td>
+<td>VMM 读取 <code>VM_EXIT_QUALIFICATION</code> 以确定：端口号、访问大小（1/2/4 字节）、方向（IN/OUT）、字符串操作（INS/OUTS）和 REP 前缀。它检查 VMM 的 I/O 端口访问策略。对于模拟设备，它读取或写入虚拟设备模型。对于透传设备，它可能代表客户机执行实际 I/O 操作。它更新客户机寄存器（如 IN/OUT 的 RAX、字符串操作的 RSI/RDI、REP 的 RCX），推进 RIP 并恢复执行。</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>8. MSR 访问（退出码 31-32）</h2>
+<p>RDMSR 和 WRMSR 指令被拦截以实现模型特定寄存器的虚拟化，防止客户机读取或修改可能危害系统完整性或暴露宿主机状态的 MSR。</p>
+<table>
+<thead>
+<tr>
+<th>退出码</th>
+<th>名称</th>
+<th>触发原因</th>
+<th>VMM 处理方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>31</td>
+<td>EXIT_REASON_RDMSR</td>
+<td>客户机执行 RDMSR 指令，且该 MSR 在 MSR-read 位图中（对应 MSR 索引的位已设置），表明应触发 VM exit。</td>
+<td>VMM 从客户机 ECX 读取 MSR 索引。它从客户机保存的 MSR 上下文中查找虚拟 MSR 值或动态计算。对于透传 MSR，它可能执行实际的 RDMSR。它将结果写入客户机 EDX:EAX，推进 RIP 并恢复执行。VMM 确保敏感 MSR（如 SYSENTER_CS/ESP/EIP、FS/GS base）被正确虚拟化。</td>
+</tr>
+<tr>
+<td>32</td>
+<td>EXIT_REASON_WRMSR</td>
+<td>客户机执行 WRMSR 指令，且该 MSR 在 MSR-write 位图中（对应 MSR 索引的位已设置），表明应触发 VM exit。</td>
+<td>VMM 从客户机 ECX 读取 MSR 索引，从 EDX:EAX 读取值。它验证该值，存储到客户机的虚拟 MSR 上下文中，并有选择地应用到物理 MSR（例如，更新实际的 FS_BASE）。对于影响 VM-execution controls 的 MSR，VMM 将客户机的请求与自身设置进行协调。VMM 推进 RIP 并恢复执行。</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>9. VM 进入失败（退出码 33-34、41）</h2>
+<p>这些退出在 VM entry 失败时发生。CPU 不会切换到 non-root 操作模式，而是保持在 root 操作模式并记录失败原因。这对于 VMM 的健壮性至关重要。</p>
+<table>
+<thead>
+<tr>
+<th>Exit Code</th>
+<th>Name</th>
+<th>Trigger</th>
+<th>VMM Handling</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>33</td>
+<td>EXIT_REASON_INVALID_GUEST_STATE</td>
+<td>VM-entry 时，VMCS 中的 Guest state area 字段不符合一致性检查要求（如 CR0/CR4 保留位不正确、段选择子不一致、activity state 非法组合等），导致 VM-entry 失败。</td>
+<td>VMM 读取 VM-instruction error 字段获取具体错误原因。由于 Guest state 无效，VMM 无法进入 Guest，需要修复 VMCS 配置或终止 Guest。通常 VMM 记录错误日志并终止对应 vCPU 的执行，或向 Guest 注入错误信息。</td>
+</tr>
+<tr>
+<td>34</td>
+<td>EXIT_REASON_MSR_LOADING</td>
+<td>VM-entry 时，从 VM-entry MSR-load area 加载 MSR 值失败（如尝试写入只读 MSR、MSR 地址无效等），导致 VM-entry 失败。</td>
+<td>VMM 读取 VM-instruction error 字段和 exiting MSR 信息获取具体失败原因。VMM 需要修复 MSR-load 列表中的问题条目，然后重试 VM-entry。如果无法修复，终止对应 vCPU 的执行。</td>
+</tr>
+<tr>
+<td>41</td>
+<td>EXIT_REASON_MCE_DURING_VMENTRY</td>
+<td>在 VM-entry 过程中发生了 Machine Check Exception（MCE），即硬件级别的机器检查异常（如 ECC 错误、总线错误等）在 VM-entry 期间被检测到。</td>
+<td>VMM 将 MCE 视为严重的硬件异常处理。VMM 读取 MCE 相关的 MSRs（如 MCG_STATUS、MCi_STATUS）获取错误详情，根据严重程度决定是否终止 Guest 或尝试恢复。由于 MCE 涉及硬件故障，VMM 通常需要记录详细日志并通知上层管理系统。</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>10. 监控与等待（退出码 36-40、67-68）</h2>
+<p>这些退出涉及 MONITOR/MWAIT 和 PAUSE 指令，用于同步和电源管理。对这些指令的虚拟化对于 Guest 的效率和正确性非常重要。</p>
+<table>
+<thead>
+<tr>
+<th>Exit Code</th>
+<th>Name</th>
+<th>Trigger</th>
+<th>VMM Handling</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>36</td>
+<td>EXIT_REASON_MWAIT_INSTRUCTION</td>
+<td>Guest 执行 MWAIT 指令，且 "MWAIT exiting" VM-execution control 位为 1 时触发。MWAIT 使 CPU 进入优化等待状态，等待事件或中断唤醒。</td>
+<td>VMM 通常将 MWAIT 视为空操作（NOP）处理——跳过指令并推进 RIP，因为虚拟化环境中无法真正让 vCPU 进入低功耗等待。VMM 也可以选择将 MWAIT 转换为等价的 PAUSE 或 HLT 行为。恢复 Guest 执行。</td>
+</tr>
+<tr>
+<td>37</td>
+<td>EXIT_REASON_MONITOR_TRAP_FLAG</td>
+<td>当 "monitor trap flag" VM-execution control 位为 1 时，Guest 在每次指令执行后触发此退出。这是一种单步调试机制，类似调试器的单步执行。</td>
+<td>VMM 用于实现 Guest 单步调试功能。每次退出后 VMM 记录 Guest 状态（如寄存器值），然后推进 RIP 并恢复执行，等待下一次 MTF 退出。VMM 也可根据调试逻辑决定是否暂停 Guest。</td>
+</tr>
+<tr>
+<td>39</td>
+<td>EXIT_REASON_MONITOR_INSTRUCTION</td>
+<td>Guest 执行 MONITOR 指令，且 "MONITOR exiting" VM-execution control 位为 1 时触发。MONITOR 设置一个监控区域，配合 MWAIT 实现"等待写入"的优化机制。</td>
+<td>VMM 通常将 MONITOR 视为空操作（NOP）处理——跳过指令并推进 RIP，因为虚拟化环境中 MONITOR/MWAIT 对的监控功能通常由 VMM 而非硬件直接管理。VMM 也可以选择注入 #UD（如果不支持该特性）。恢复 Guest 执行。</td>
+</tr>
+<tr>
+<td>40</td>
+<td>EXIT_REASON_PAUSE_INSTRUCTION</td>
+<td>Guest 执行 PAUSE 指令（spinlock 优化提示），且 "PAUSE exiting" VM-execution control 位为 1，或 PAUSE 循环超过阈值时触发。PAUSE 指令用于自旋锁等待优化。</td>
+<td>VMM 利用 PAUSE 退出实现"PAUSE-loop exiting"（PLE）功能：当检测到 Guest 处于自旋锁死循环时，VMM 可以调度其他 vCPU 执行，避免浪费 CPU 资源。VMM 推进 RIP 并恢复 Guest 执行，或进行 vCPU 调度切换。</td>
+</tr>
+<tr>
+<td>67</td>
+<td>EXIT_REASON_UMWAIT</td>
+<td>Guest 执行 UMWAIT 指令，且 "enable user wait and pause" 和 "RDTSC exiting" 两个 VM-execution control 位同时为 1 时触发。UMWAIT 是用户态等待指令，允许用户态代码在指定时间范围内低功耗等待（基于 TSC）。</td>
+<td>VMM 通常将 UMWAIT 视为空操作（NOP）处理——跳过指令并推进 RIP，因为该指令主要用于优化功耗，在虚拟化环境中意义有限。VMM 也可以选择注入 #UD（如果不支持该特性）。恢复 Guest 执行。</td>
+</tr>
+<tr>
+<td>68</td>
+<td>EXIT_REASON_TPAUSE</td>
+<td>Guest 执行 TPAUSE 指令，且 "enable user wait and pause" 和 "RDTSC exiting" 两个 VM-execution control 位同时为 1 时触发。TPAUSE 是用户态定时暂停指令，允许用户态代码在指定 TSC 时间之前暂停执行。</td>
+<td>VMM 通常将 TPAUSE 视为空操作（NOP）处理——跳过指令并推进 RIP。与 UMWAIT 类似，该指令在虚拟化环境中主要用于功耗优化，VMM 也可以选择注入 #UD。恢复 Guest 执行。</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>11. APIC 虚拟化（退出码 43-45、52）</h2>
+<p>这些退出与 APIC（高级可编程中断控制器）虚拟化相关。借助 APIC 虚拟化特性（virtual-APIC page、posted interrupts），许多 APIC 访问可以由硬件直接处理，但部分仍需要 VMM 介入。</p>
+<table>
+<thead>
+<tr>
+<th>退出码</th>
+<th>名称</th>
+<th>触发原因</th>
+<th>VMM 处理方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>43</td>
+<td>EXIT_REASON_TPR_BELOW_THRESHOLD</td>
+<td>Guest 的 virtual-APIC TPR（Task Priority Register）被写入低于 TPR 阈值的值，且 "TPR threshold" VM-execution control 位已设置。这表示 Guest 现在可以接受更低优先级的中断。</td>
+<td>VMM 检查是否有之前被 TPR 阈值阻塞的待处理中断。如果有，通过虚拟中断投递或 VM-entry event injection 注入这些中断。如有需要，更新 TPR 阈值并恢复 Guest 执行。</td>
+</tr>
+<tr>
+<td>44</td>
+<td>EXIT_REASON_APIC_ACCESS</td>
+<td>Guest 以 APIC 虚拟化硬件无法完全处理的方式访问 APIC（内存映射的 APIC 页面或通过 MSR 访问）。这可以是对 APIC 页面的内存访问或对 APIC 寄存器的 MSR 访问。</td>
+<td>VMM 读取 VM_EXIT_QUALIFICATION 以确定：访问类型（读/写）、访问方式（线性/Guest 物理地址）以及 APIC 页面内的偏移量。VMM 使用其虚拟 APIC 模型模拟 APIC 寄存器访问，如有需要则更新 virtual-APIC page，并可能触发中断重新评估。推进 RIP 并恢复执行。</td>
+</tr>
+<tr>
+<td>45</td>
+<td>EXIT_REASON_EOI_INDUCED</td>
+<td>Guest 向 virtual-APIC page 的 EOI（End of Interrupt）寄存器写入，且 "virtualize APIC accesses" 和 "EOI-exiting" 控制位的配置使得硬件执行虚拟化 EOI 但仍需触发退出（例如，中断向量在 EOI-exit bitmap 中）。</td>
+<td>VMM 从 virtual-APIC EOI 寄存器读取中断向量。VMM 执行硬件虚拟化未处理的必要 EOI 处理（例如通知直通设备、更新电平触发中断的路由）。VMM 确认虚拟化 EOI 并恢复 Guest 执行。</td>
+</tr>
+<tr>
+<td>52</td>
+<td>EXIT_REASON_VMX_PREEMPTION_TIMER</td>
+<td>VMX-preemption timer 在 Guest 执行期间递减至零，且 "VMX-preemption timer" VM-execution control 位已设置。该定时器为 VMM 提供了限制 Guest 执行时间的机制。</td>
+<td>VMM 利用此机制进行 CPU 时间记账和公平调度。VMM 处理定时器到期的方式包括保存 Guest 的时间片、可能调度其他 vCPU，然后恢复 Guest 执行（可能为下一个时间片重新设置定时器）。VMM 也可将其用于看门狗功能。</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>12. 描述符表访问（退出码 46-47）</h2>
+<p>这些退出由访问描述符表（GDT、IDT、LDT、TSS）的指令触发。VMM 拦截这些指令以维持对 Guest 段系统的控制。</p>
+<table>
+<thead>
+<tr>
+<th>退出码</th>
+<th>名称</th>
+<th>触发原因</th>
+<th>VMM 处理方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>46</td>
+<td>EXIT_REASON_ACCESS_GDTR_OR_IDTR</td>
+<td>Guest 执行访问 GDTR 或 IDTR 的指令（LGDT、SGDT、LIDT、SIDT），且 "descriptor-table exiting" VM-execution control 位已设置。</td>
+<td>VMM 读取 VM_EXIT_QUALIFICATION 和 VM_EXIT_INSTRUCTION_INFO 以确定指令、操作数类型（寄存器/内存）以及访问的表。对于加载指令（LGDT/LIDT），验证新的表基址/限制并更新 Guest 的虚拟描述符表状态。对于存储指令（SGDT/SIDT），返回虚拟化的表基址/限制。推进 RIP 并恢复执行。</td>
+</tr>
+<tr>
+<td>47</td>
+<td>EXIT_REASON_ACCESS_LDTR_OR_TR</td>
+<td>Guest 执行访问 LDTR 或 TR 的指令（LLDT、SLDT、LTR、STR），且 "descriptor-table exiting" VM-execution control 位已设置。</td>
+<td>VMM 读取指令信息以确定操作。对于加载指令（LLDT/LTR），验证新的选择子和描述符，更新 Guest 的虚拟 LDT/TSS 状态，如果 Guest 正在使用则可能更新实际的 LDTR/TR。对于存储指令（SLDT/STR），返回虚拟化的选择子。推进 RIP 并恢复执行。</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>13. EPT 与内存虚拟化（退出码 48-50、55、59、62-64、74-75、77）</h2>
+<p>这些退出与扩展页表（EPT）和内存虚拟化特性相关。EPT 允许 VMM 在不使用影子页表的情况下将 Guest 物理地址映射到宿主物理地址，但 EPT 违规和配置错误仍需要 VMM 处理。</p>
+<table>
+<thead>
+<tr>
+<th>Exit Code</th>
+<th>Name</th>
+<th>Trigger</th>
+<th>VMM Handling</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>48</td>
+<td>EXIT_REASON_EPT_VIOLATION</td>
+<td>Guest 访问的虚拟地址对应 EPT 映射不存在、权限不匹配（如读/写/执行权限违反），或 EPT 页表项的 reserved 位被设置。这是 EPT 内存虚拟化的核心退出原因。</td>
+<td>VMM 解析 GFN（Guest Frame Number）和访问类型（读/写/执行），检查 Guest 物理地址映射。如果是缺页，VMM 分配宿主物理页并建立 EPT 映射；如果是权限问题，VMM 注入 #PF 或处理内存保护策略。VMM 恢复 Guest 执行。</td>
+</tr>
+<tr>
+<td>49</td>
+<td>EXIT_REASON_EPT_MISCONFIG</td>
+<td>EPT 页表项配置错误，如内存类型保留位设置不正确、可缓存性位无效、或违反 EPT 页表项的保留位规则。与 EPT Violation 不同，这是配置错误而非权限缺失。</td>
+<td>VMM 检查 EPT 页表项的配置，修复无效的位组合（如纠正内存类型字段）。如果无法修复，VMM 注入 #GP 或终止 Guest。VMM 推进 RIP（如果是指令访问）或恢复原操作（如果是数据访问）。</td>
+</tr>
+<tr>
+<td>50</td>
+<td>EXIT_REASON_INVEPT</td>
+<td>Guest 执行 INVEPT 指令，使 EPT 相关的 TLB 映射失效。当 "INVEPT/INVPCID exiting" VM-execution control 位为 1 时触发。</td>
+<td>VMM 模拟 INVEPT 操作，根据类型（single-context 或 global）刷新对应的 EPT TLB 条目。VMM 推进 RIP 并恢复 Guest 执行。</td>
+</tr>
+<tr>
+<td>55</td>
+<td>EXIT_REASON_XSETBV</td>
+<td>Guest 执行 XSETBV 指令，设置扩展控制寄存器 XCR0（控制哪些扩展状态由 XSAVE/XRSTOR 管理）。当 "XSETBV exiting" VM-execution control 位为 1 时触发。</td>
+<td>VMM 检查 Guest 是否有权限执行 XSETBV（需要 CPL=0 且 CR4.OSXSAVE=1）。VMM 验证写入 XCR0 的值是否合法（不启用未支持的位），更新 Guest 的虚拟 XCR0。如果非法，注入 #GP。VMM 推进 RIP 并恢复执行。</td>
+</tr>
+<tr>
+<td>59</td>
+<td>EXIT_REASON_VMFUNC</td>
+<td>Guest 执行 VMFUNC 指令（VM Function），该指令允许 Guest 在不触发 VM exit 的情况下执行特定 VM 功能（如 EPTP 切换）。但当 VMFUNC 指令参数无效或 VMFUNC 未启用时触发退出。</td>
+<td>VMM 检查 VMFUNC 的 function 号和参数。如果合法，VMM 执行对应操作（如切换 EPTP 指向不同的 EPT 页表）；如果非法，注入 #UD 或 #GP。VMM 推进 RIP 并恢复 Guest 执行。</td>
+</tr>
+<tr>
+<td>62</td>
+<td>EXIT_REASON_PML_FULL</td>
+<td>Page Modification Logging（PML）缓冲区已满。当 "enable PML" VM-execution control 位为 1 时，硬件自动记录 Guest 对 EPT 页面的写操作。当 PML 缓冲区的 512 个条目全部用完时触发。</td>
+<td>VMM 刷新 PML 缓冲区，将脏页记录转移到软件数据结构中（如 dirty bitmap），然后清空 PML 缓冲区并恢复 Guest 执行。PML 用于实现高效的脏页追踪，常用于实时迁移（live migration）场景。</td>
+</tr>
+<tr>
+<td>63</td>
+<td>EXIT_REASON_XSAVES</td>
+<td>Guest 执行 XSAVES 指令，且该指令在当前 VMX 配置下不被允许时触发。XSAVES 用于将扩展处理器状态保存到内存（与 XRSTORS 配对，支持 supervisor-state 和 user-state 的保存）。</td>
+<td>VMM 检查 Guest 是否有权限执行 XSAVES。如果允许，VMM 模拟该指令（保存 Guest 的扩展处理器状态到 Guest 内存）；如果不允许，注入 #UD。VMM 推进 RIP 并恢复 Guest 执行。</td>
+</tr>
+<tr>
+<td>64</td>
+<td>EXIT_REASON_XRSTORS</td>
+<td>Guest 执行 XRSTORS 指令，且该指令在当前 VMX 配置下不被允许时触发。XRSTORS 用于从内存恢复扩展处理器状态（与 XSAVES 配对）。</td>
+<td>VMM 检查 Guest 是否有权限执行 XRSTORS。如果允许，VMM 模拟该指令（从 Guest 内存读取状态数据并恢复处理器状态）；如果不允许，注入 #UD。VMM 推进 RIP 并恢复 Guest 执行。</td>
+</tr>
+<tr>
+<td>74</td>
+<td>EXIT_REASON_BUS_LOCK</td>
+<td>Guest 在执行过程中获取了总线锁（bus lock，如通过 LOCK 前缀指令跨缓存行操作触发 split lock），且 "bus lock detection" VM-execution control 位为 1 时触发。总线锁会严重影响系统整体性能，因为它会阻塞所有核心对总线的访问。</td>
+<td>VMM 处理总线锁退出主要用于性能隔离和安全防护。常见策略包括：(1) 记录日志并告警；(2) 对 Guest 进行节流（throttling），如延迟恢复 Guest 执行以降低其总线锁频率；(3) 注入 #UD 或 #GP 惩罚恶意 Guest。VMM 推进 RIP 并恢复 Guest 执行。</td>
+</tr>
+<tr>
+<td>75</td>
+<td>EXIT_REASON_NOTIFY</td>
+<td>当 "notify VM exit" VM-execution control 位为 1 时，VM 在满足特定条件时触发此退出。Notify VM Exit 是一种安全机制，当 CPU 内部出现无法正常退出 Guest 的异常情况时，强制触发 VM exit 以防止 Guest 挂起系统。</td>
+<td>VMM 将此退出视为安全保护机制。VMM 检查退出上下文信息，决定是否可以安全恢复 Guest 执行，或需要终止 Guest 以防止系统级影响。通常用于防止恶意 Guest 利用某些 CPU 行为（如无限循环在 microcode 中）导致系统挂起。</td>
+</tr>
+<tr>
+<td>77</td>
+<td>EXIT_REASON_TDCALL</td>
+<td>Guest 执行 TDCALL 指令（Intel Trust Domain Extensions, TDX 相关），请求从 Trust Domain（TD）中退出到 VMM 或 TDX module。TDCALL 是 TDX 虚拟化架构中 Guest 向 TDX module 传递控制权的指令。</td>
+<td>VMM 解析 TDCALL 的 leaf function 和参数。如果 VMM 支持 TDX 虚拟化，它处理对应的 TDX hypercall（如 TD 内存管理、TD 报告生成等）；如果不支持或请求非法，VMM 可能注入 #UD。VMM 推进 RIP 并恢复 Guest 执行。</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>14. INVVPID 指令（退出码 53）</h2>
+<p>INVVPID 用于使特定虚拟处理器 ID（VPID）作用域内的 TLB 条目失效。启用 VPID 后，CPU 可以在 VM exit 之间缓存 Guest 的 TLB 条目，从而提升性能。</p>
+<table>
+<thead>
+<tr>
+<th>退出码</th>
+<th>名称</th>
+<th>触发原因</th>
+<th>VMM 处理方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>53</td>
+<td>EXIT_REASON_INVVPID</td>
+<td>Guest 执行 INVVPID 指令（基于 VPID 使 TLB 条目失效），且 "INVVPID exiting" VM-execution control 位已设置（通常用于支持嵌套虚拟化）。</td>
+<td>如果支持嵌套虚拟化，VMM 代表 L1 Guest 执行 VPID 作用域的 TLB 失效操作，使用 L1 Guest 的虚拟 VPID 映射。VMM 确保失效操作的作用域正确，以避免影响其他 Guest 或宿主。推进 RIP 并恢复执行。如果不支持嵌套虚拟化，则注入 #UD。</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>15. SGX 相关（退出码 60、65）</h2>
+<p>Intel SGX（Software Guard Extensions）提供硬件保护的 enclave。与 enclave 相关的指令（ENCLS、ENCLV）被拦截以控制 Guest 对 SGX 的使用。</p>
+<table>
+<thead>
+<tr>
+<th>退出码</th>
+<th>名称</th>
+<th>触发原因</th>
+<th>VMM 处理方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>60</td>
+<td>EXIT_REASON_ENCLS</td>
+<td>Guest 在 VMX non-root 操作中执行 ENCLS 指令（enclave 系统指令，用于 SGX enclave 管理 - ECREATE、EADD、EINIT 等）。"ENCLS exiting" VM-execution control 位决定是否触发 VM exit。</td>
+<td>VMM 从 Guest EAX 读取 ENCLS leaf function。如果支持 SGX 虚拟化，VMM 模拟或中介 ENCLS 操作（例如验证 enclave 参数、管理 EPC - Enclave Page Cache - 页面、执行 SGX 策略）。如果 Guest 不支持 SGX 或不允许使用，则注入 #UD。推进 RIP 并恢复执行。</td>
+</tr>
+<tr>
+<td>65</td>
+<td>EXIT_REASON_ENCLV</td>
+<td>Guest 在 VMX non-root 操作中执行 ENCLV 指令（enclave 虚拟指令，用于 SGX 虚拟化支持 - ETRACK、EWB、ELDU/ELDB 等）。"ENCLV exiting" VM-execution control 位决定是否触发 VM exit。</td>
+<td>VMM 从 Guest EAX 读取 ENCLV leaf function。如果支持 SGX 虚拟化，VMM 为管理 L2 SGX enclave 的 L1 hypervisor 模拟 ENCLV 操作。包括管理 EPC 页面回收、跟踪和换出操作。如果不支持 SGX 虚拟化，则注入 #UD。推进 RIP 并恢复执行。</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<p><strong>重要说明</strong></p>
+<ul>
+<li>
+<p>退出原因码 5、11、35、42、65-66、69-70、72-73 和 76 要么是保留的、在 Linux 内核中未定义，要么是为未来的 Intel 架构扩展预留的。注意：码 5（IO_SMI）和 11（GETSEC）在 Intel SDM 中有定义，但在 Linux 内核 vmx.h 头文件中未定义。码 65（ENCLV）在 Intel SDM 中为 SGX 虚拟化定义，但尚未在 Linux 内核头文件中定义。码 57（RDRAND）、60（ENCLS）、62（PML_FULL）、63（XSAVES）、64（XRSTORS）、67（UMWAIT）、68（TPAUSE）和 74（BUS_LOCK）是有效的退出原因，已在上文各自章节中记录。</p>
+</li>
+<li>
+<p>VM_EXIT_REASON VMCS 字段（偏移 0x4402）为 32 位宽：位 15:0 包含基本退出原因，位 16 表示 VM-exit 是否由 VM-entry 失败导致（对应退出码 33、34、41），位 31 表示 VM-entry 失败是否由不一致性导致。</p>
+</li>
+<li>
+<p>VM_EXIT_QUALIFICATION 字段为许多退出原因提供附加上下文信息（例如 MOV CR 的 CR 编号、I/O 的端口号、EPT 违规的访问类型）。</p>
+</li>
+<li>
+<p>VM_EXIT_INSTRUCTION_INFO 字段为指令引发的 VM exit 提供指令解码信息（例如操作数大小、寻址模式、段覆盖前缀）。</p>
+</li>
+<li>
+<p>VM_EXIT_INSTRUCTION_LENGTH 字段提供导致 VM exit 的指令长度，VMM 利用该值来推进 Guest 的 RIP。</p>
+</li>
+<li>
+<p>GUEST_LINEAR_ADDRESS 和 GUEST_PHYSICAL_ADDRESS 字段为内存相关退出提供地址上下文信息。</p>
+</li>
+<li>
+<p>启用 VPID（Virtual Processor ID）和 EPT 可以显著降低 VM-exit 频率，通过允许 TLB 条目在 VM exit 之间持久保留以及消除影子页表维护来实现。</p>
+</li>
+<li>
+<p>Posted interrupts 可以减少中断相关的 VM exit，通过 posted-interrupt 描述符允许直接向 Guest 投递中断。</p>
+</li>
+<li>
+<p>VMCS shadowing（退出原因 23/25 上下文）加速嵌套虚拟化，允许 VMREAD/VMWRITE 在影子 VMCS 上操作，大多数字段无需 VMM 介入。</p>
+</li>
+</ul>
+<hr>
+<h2>退出类别汇总</h2>
+<table>
+<thead>
+<tr>
+<th>类别</th>
+<th>退出码</th>
+<th>主要用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>异常与中断</td>
+<td>0-8</td>
+<td>事件投递与中断虚拟化</td>
+</tr>
+<tr>
+<td>系统与任务管理</td>
+<td>9-13</td>
+<td>CPU 状态与任务切换虚拟化</td>
+</tr>
+<tr>
+<td>TLB 与缓存管理</td>
+<td>14-16, 51, 54, 56-58, 61</td>
+<td>TLB 与缓存一致性控制</td>
+</tr>
+<tr>
+<td>VMX 指令</td>
+<td>18-27</td>
+<td>嵌套虚拟化与 hypercall</td>
+</tr>
+<tr>
+<td>控制寄存器访问</td>
+<td>28</td>
+<td>分页与保护控制</td>
+</tr>
+<tr>
+<td>调试寄存器访问</td>
+<td>29</td>
+<td>硬件调试虚拟化</td>
+</tr>
+<tr>
+<td>I/O 指令</td>
+<td>30</td>
+<td>设备 I/O 虚拟化</td>
+</tr>
+<tr>
+<td>MSR 访问</td>
+<td>31-32</td>
+<td>MSR 虚拟化与保护</td>
+</tr>
+<tr>
+<td>VM-Entry 失败</td>
+<td>33-34, 41</td>
+<td>VM-entry 健壮性与错误处理</td>
+</tr>
+<tr>
+<td>监视与等待</td>
+<td>36-40, 67-68</td>
+<td>电源管理与自旋锁优化</td>
+</tr>
+<tr>
+<td>APIC 虚拟化</td>
+<td>43-45, 52</td>
+<td>中断控制器虚拟化</td>
+</tr>
+<tr>
+<td>描述符表访问</td>
+<td>46-47</td>
+<td>段系统虚拟化</td>
+</tr>
+<tr>
+<td>EPT 与内存虚拟化</td>
+<td>48-50, 55, 59, 62-64, 74-75, 77</td>
+<td>内存虚拟化与脏页追踪</td>
+</tr>
+<tr>
+<td>INVVPID</td>
+<td>53</td>
+<td>VPID 作用域的 TLB 失效</td>
+</tr>
+<tr>
+<td>SGX 相关</td>
+<td>60, 65</td>
+<td>SGX enclave 虚拟化</td>
+</tr>
+</tbody>
+</table>
+<h1>二、AMD SVM VM Exit 退出码</h1>
+<p><strong>AMD SVM VM Exit 基础</strong></p>
+<p>AMD 安全虚拟机（SVM）使用 <strong>VMCB（虚拟机控制块）</strong>来控制客户机行为。VMCB 包含两个区域：一个带有拦截位的<strong>控制区域</strong>和一个用于保存客户机状态的<strong>保存区域</strong>。当客户机操作触发拦截时，CPU 执行 <strong>#VMEXIT</strong>：将客户机状态保存到 VMCB 保存区域，加载宿主机状态，并将控制权转移到 VMM。VMM 从 VMCB 控制区域读取 <code>EXITCODE</code> 以确定退出原因并进行相应处理。</p>
+<p>关键概念：</p>
+<ul>
+<li>
+<p><strong>拦截式退出</strong>在指令提交<em>之前</em>触发（类似于陷阱），允许 VMM 进行模拟、跳过或注入事件。</p>
+</li>
+<li>
+<p><strong>NPT（嵌套页表）</strong>为内存虚拟化提供硬件辅助的二维页表转换。</p>
+</li>
+<li>
+<p><strong>AVIC（高级虚拟中断控制器）</strong>虚拟化 APIC，在可能的情况下无需退出即可完成中断投递。</p>
+</li>
+<li>
+<p><strong>SEV-ES/SEV-SNP</strong> 加密虚拟化引入了 <strong>VMGEXIT</strong>（通过 GHCB），改变了加密客户机的退出处理模型。</p>
+</li>
+<li>
+<p>退出码 <code>0x000</code>-<code>0x0A6</code> 为传统/标准 SVM 退出；<code>0x400</code>-<code>0x403</code> 为 NPT 故障退出；<code>0x100+</code> 为 SEV-ES VMGEXIT 事件。</p>
+</li>
+</ul>
+<h2>1. CR 读写拦截（0x000–0x009）</h2>
+<p>控制寄存器（CR）访问拦截通过 VMCB <code>CR_INTERCEPTS</code> 字段中的位来启用。每个 CR 的读或写都可以被独立拦截。VMM 通常模拟寄存器访问，检查客户机可见的副作用（例如 CR0/CR4 写入时的分页模式变更），然后恢复客户机运行。</p>
+<table>
+<thead>
+<tr>
+<th>退出码</th>
+<th>名称</th>
+<th>触发原因</th>
+<th>VMM 处理方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0x000</code></td>
+<td>SVM_EXIT_READ_CR0</td>
+<td>客户机执行读取 CR0 的指令（如 <code>MOV rAX, CR0</code>）且 VMCB 中 CR0 读拦截位已设置。</td>
+<td>VMM 从 VMCB 保存区读取客户机 CR0 值，模拟读取操作（将值放入目标寄存器），推进 RIP 并恢复客户机。</td>
+</tr>
+<tr>
+<td><code>0x001</code></td>
+<td>SVM_EXIT_READ_CR4</td>
+<td>客户机读取 CR4 且 VMCB 中 CR4 读拦截位已设置。</td>
+<td>VMM 返回客户机 CR4 值，推进 RIP 并恢复客户机。</td>
+</tr>
+<tr>
+<td><code>0x002</code></td>
+<td>SVM_EXIT_WRITE_CR0</td>
+<td>客户机写入 CR0（如 <code>MOV CR0, rAX</code>）且 CR0 写拦截位已设置。</td>
+<td>VMM 验证新的 CR0 值，检查分页/PE/PG 模式转换，更新影子/组合 CR0（如使用），推进 RIP 并恢复。可能需要在模式切换时刷新 TLB 或调整 NPT 上下文。</td>
+</tr>
+<tr>
+<td><code>0x003</code></td>
+<td>SVM_EXIT_READ_CR3</td>
+<td>客户机读取 CR3 且 CR3 读拦截位已设置。</td>
+<td>VMM 返回客户机 CR3（物理地址或通过 NPT 转换的地址），推进 RIP 并恢复客户机。</td>
+</tr>
+<tr>
+<td><code>0x004</code></td>
+<td>SVM_EXIT_READ_CR2</td>
+<td>客户机读取 CR2（页错误线性地址）且 CR2 读拦截位已设置。</td>
+<td>VMM 返回客户机 CR2 值（最近出错的地址），推进 RIP 并恢复客户机。</td>
+</tr>
+<tr>
+<td><code>0x005</code></td>
+<td>SVM_EXIT_WRITE_CR2</td>
+<td>客户机写入 CR2 且 CR2 写拦截位已设置。</td>
+<td>VMM 在 VMCB 保存区更新客户机 CR2，推进 RIP 并恢复客户机。</td>
+</tr>
+<tr>
+<td><code>0x006</code></td>
+<td>SVM_EXIT_WRITE_CR3</td>
+<td>客户机写入 CR3（上下文切换 / TLB 刷新）且 CR3 写拦截位已设置。</td>
+<td>VMM 更新客户机 CR3，可能刷新客户机 TLB 条目或更新 NPT 根指针，推进 RIP 并恢复。常用于跟踪客户机地址空间切换。</td>
+</tr>
+<tr>
+<td><code>0x007</code></td>
+<td>SVM_EXIT_WRITE_CR4</td>
+<td>客户机写入 CR4 且 CR4 写拦截位已设置。</td>
+<td>VMM 验证新的 CR4 值（如 PAE、SMEP、SMAP、VMX 位），更新影子/组合 CR4，推进 RIP 并恢复。可能需要重新评估分页模式。</td>
+</tr>
+<tr>
+<td><code>0x008</code></td>
+<td>SVM_EXIT_READ_CR8</td>
+<td>客户机读取 CR8（任务优先级寄存器 / TPR）且 CR8 读拦截位已设置。</td>
+<td>VMM 返回客户机 CR8/TPR 值。如果 AVIC 已启用，可以避免此拦截。VMM 推进 RIP 并恢复客户机。</td>
+</tr>
+<tr>
+<td><code>0x009</code></td>
+<td>SVM_EXIT_WRITE_CR8</td>
+<td>客户机写入 CR8（TPR 更新）且 CR8 写拦截位已设置。</td>
+<td>VMM 更新客户机 TPR，可能重新评估待处理的虚拟中断交付（VINTR），推进 RIP 并恢复。启用 AVIC 时，硬件无需退出即可处理 TPR 更新。</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>2. DR 读写拦截（0x006–0x00F）</h2>
+<p>调试寄存器（DR）访问拦截通过 VMCB <code>DR_INTERCEPTS</code> 字段中的位来启用。这些拦截在读或写 DR0–DR7 的 <code>MOV</code> 指令上触发。退出码空间 0x006–0x00F 与 CR 写入共享（见上文），因此 DR 拦截使用此处所述的相同码。</p>
+<table>
+<thead>
+<tr>
+<th>退出码</th>
+<th>名称</th>
+<th>触发原因</th>
+<th>VMM 处理方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0x006</code></td>
+<td>SVM_EXIT_READ_DR0–DR7</td>
+<td>客户机执行 <code>MOV rAX, DRn</code>（n=0–7）且 VMCB 中 DR 读拦截位已设置。</td>
+<td>VMM 从保存区读取客户机 DR 值或模拟读取（通常返回 0 或安全值以避免泄漏宿主机调试状态），推进 RIP 并恢复客户机。</td>
+</tr>
+<tr>
+<td><code>0x007</code></td>
+<td>SVM_EXIT_WRITE_DR0–DR7</td>
+<td>客户机执行 <code>MOV DRn, rAX</code>（n=0–7）且 VMCB 中 DR 写拦截位已设置。</td>
+<td>VMM 验证 DR 写入（如确保未在宿主机内存上设置断点），保存或丢弃该值，推进 RIP 并恢复。VMM 可选择遵循客户机调试断点以提供调试支持。</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>3. 异常拦截（0x040–0x07F）</h2>
+<p>AMD SVM 允许通过 VMCB 中的 <code>EXCEPTION_INTERCEPTION</code> 位图拦截单个 CPU 异常（向量 0–31）。每个异常向量 <em>n</em> 映射到退出码 <code>0x040 + n</code>。当客户机中发生异常且对应的拦截位被设置时，会在异常交付给客户机处理程序<em>之前</em>触发 #VMEXIT。</p>
+<table>
+<thead>
+<tr>
+<th>退出码</th>
+<th>名称</th>
+<th>触发原因</th>
+<th>VMM 处理方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0x040</code></td>
+<td>SVM_EXIT_EXCP_DE</td>
+<td>客户机触发 #DE（除零错误）。VMCB 异常拦截位图中 DE 拦截位已设置。</td>
+<td>VMM 通常通过 VINTR 机制（设置 <code>VMCB.control.EVENTINJ</code>）将异常反射回客户机，注入 #DE。极少需要特殊 VMM 处理。</td>
+</tr>
+<tr>
+<td><code>0x041</code></td>
+<td>SVM_EXIT_EXCP_DB</td>
+<td>客户机触发 #DB（调试陷阱/错误，如代码/数据断点或单步执行）。DB 拦截位已设置。</td>
+<td>VMM 检查调试条件是否由客户机发起。如果是，向客户机注入 #DB。如果是宿主机断点，则内部处理。必须仔细区分客户机与宿主机调试事件。</td>
+</tr>
+<tr>
+<td><code>0x042</code></td>
+<td>SVM_EXIT_EXCP_NMI</td>
+<td>客户机有一个待处理的 NMI 且 NMI 拦截位已设置。</td>
+<td>VMM 可直接处理 NMI（宿主机 NMI）或通过 VINTR 注入到客户机。如果客户机处于临界区，VMM 可延迟交付。</td>
+</tr>
+<tr>
+<td><code>0x043</code></td>
+<td>SVM_EXIT_EXCP_BP</td>
+<td>客户机执行 <code>INT3</code> 且 BP 拦截位已设置。</td>
+<td>VMM 通常通过注入异常将 #BP 反射到客户机。用于客户机调试支持。</td>
+</tr>
+<tr>
+<td><code>0x044</code></td>
+<td>SVM_EXIT_EXCP_OF</td>
+<td>客户机在 OF=1 时执行 <code>INTO</code> 且 OF 拦截位已设置。</td>
+<td>VMM 通过 VINTR 注入将 #OF 反射到客户机。</td>
+</tr>
+<tr>
+<td><code>0x045</code></td>
+<td>SVM_EXIT_EXCP_BR</td>
+<td>客户机执行 <code>BOUNDS</code> 检查失败且 BR 拦截位已设置。</td>
+<td>VMM 将 #BR 反射到客户机。</td>
+</tr>
+<tr>
+<td><code>0x046</code></td>
+<td>SVM_EXIT_EXCP_UD</td>
+<td>客户机执行未定义/无效操作码且 UD 拦截位已设置。</td>
+<td>VMM 可将 #UD 反射到客户机，或如果该指令属于半虚拟化接口的一部分，则模拟它。常用于不支持的指令模拟。</td>
+</tr>
+<tr>
+<td><code>0x047</code></td>
+<td>SVM_EXIT_EXCP_NM</td>
+<td>客户机在 CR0.TS=1 时访问 x87 FPU 且 NM 拦截位已设置。</td>
+<td>VMM 执行延迟 FPU 保存/恢复：保存宿主机 FPU 状态，恢复客户机 FPU 状态，为客户机清除 CR0.TS，然后恢复客户机。</td>
+</tr>
+<tr>
+<td><code>0x048</code></td>
+<td>SVM_EXIT_EXCP_DF</td>
+<td>客户机在处理另一个异常时遇到异常且 DF 拦截位已设置。</td>
+<td>VMM 反射 #DF 或根据策略重置/终止客户机。双重错误通常表明客户机操作系统不稳定。</td>
+</tr>
+<tr>
+<td><code>0x049</code></td>
+<td>SVM_EXIT_EXCP_TS</td>
+<td>客户机任务切换引用了无效 TSS 且 TS 拦截位已设置。</td>
+<td>VMM 将 #TS 反射到客户机。在不使用硬件任务切换的现代 64 位客户机中很少见。</td>
+</tr>
+<tr>
+<td><code>0x04A</code></td>
+<td>SVM_EXIT_EXCP_NP</td>
+<td>客户机访问 P=0 的段描述符且 NP 拦截位已设置。</td>
+<td>VMM 将 #NP 反射到客户机。</td>
+</tr>
+<tr>
+<td><code>0x04B</code></td>
+<td>SVM_EXIT_EXCP_SS</td>
+<td>客户机栈段访问失败（如 SS 限长违规）且 SS 拦截位已设置。</td>
+<td>VMM 将 #SS 反射到客户机。</td>
+</tr>
+<tr>
+<td><code>0x04C</code></td>
+<td>SVM_EXIT_EXCP_GP</td>
+<td>客户机触发 #GP（如在 CPL&gt;0 时执行特权指令、段限长违规）且 GP 拦截位已设置。</td>
+<td>VMM 将 #GP 反射到客户机。也可用于半虚拟化（客户机尝试本应通过超调用完成的特权操作）。</td>
+</tr>
+<tr>
+<td><code>0x04D</code></td>
+<td>SVM_EXIT_EXCP_PF</td>
+<td>客户机触发 #PF（页不存在、保护违规）且 PF 拦截位已设置。</td>
+<td>VMM 遍历客户机页表以确定错误是客户机真实的还是需要影子/NPT 介入。如果合法，向客户机注入 #PF 并设置相应的 CR2 和错误码。启用 NPT 时，许多页错误由硬件处理而无需退出。</td>
+</tr>
+<tr>
+<td><code>0x04E</code></td>
+<td>SVM_EXIT_EXCP_MF</td>
+<td>客户机 x87 FPU 通过 FERR# 发出未屏蔽异常信号且 MF 拦截位已设置。</td>
+<td>VMM 将 #MF 反射到客户机。在使用现代基于 SSE 的浮点时很少见。</td>
+</tr>
+<tr>
+<td><code>0x04F</code></td>
+<td>SVM_EXIT_EXCP_AC</td>
+<td>客户机在 CR0.AM=1 且 EFLAGS.AC=1 时触发对齐检查（#AC）且 AC 拦截位已设置。</td>
+<td>VMM 将 #AC 反射到客户机。</td>
+</tr>
+<tr>
+<td><code>0x050</code></td>
+<td>SVM_EXIT_EXCP_MC</td>
+<td>客户机触发机器检查异常且 MC 拦截位已设置。</td>
+<td>VMM 谨慎处理 #MC — 可反射到客户机、记录错误或终止 VM。机器检查表明硬件错误。</td>
+</tr>
+<tr>
+<td><code>0x051</code></td>
+<td>SVM_EXIT_EXCP_XM</td>
+<td>客户机 SSE/AVX 指令触发未屏蔽的 SIMD 浮点异常且 XM 拦截位已设置。</td>
+<td>VMM 将 #XM（#XF）反射到客户机。</td>
+</tr>
+<tr>
+<td><code>0x052</code></td>
+<td>SVM_EXIT_EXCP_VE</td>
+<td>客户机因 EPT 违规（Intel）或等效机制遇到 #VE。在 AMD 上较少见，但可能用于某些虚拟化配置。</td>
+<td>VMM 在客户机有 #VE 处理程序时将 #VE 反射到客户机。在 AMD 上，NPT 错误通常通过退出码 0x400–0x403 以不同方式处理。</td>
+</tr>
+<tr>
+<td><code>0x053–0x05F</code></td>
+<td>SVM_EXIT_EXCP_RESERVED</td>
+<td>保留的异常向量 19–31。这些向量要么架构未定义，要么用于平台特定目的。</td>
+<td>VMM 处理方式因平台而异。通常反射到客户机，如果未定义则视为致命错误。</td>
+</tr>
+</tbody>
+</table>
+<p><strong>注意：</strong>异常向量 0x060–0x07F 对应向量 32–63，这些<em>不是</em> CPU 异常，而是 IRQ 向量。在 AMD SVM 中，中断注入通过 <code>VINTR</code> 拦截（退出码 <code>0x084</code>）处理，而非按向量的异常拦截。</p>
+<hr>
+<h2>4. 系统指令与事件（0x080–0x091）</h2>
+<p>这些拦截涵盖 VMM 需要虚拟化的系统级事件和指令，包括中断投递、描述符表访问以及时间戳/性能计数器读取。它们通过 VMCB <code>INTERCEPTS</code> 字段中的位来启用。</p>
+<table>
+<thead>
+<tr>
+<th>退出码</th>
+<th>名称</th>
+<th>触发原因</th>
+<th>VMM 处理方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0x080</code></td>
+<td>SVM_EXIT_INTR</td>
+<td>客户机运行期间收到外部中断且 VMCB 中 INTR 拦截位已设置。</td>
+<td>VMM 读取中断向量，如果是宿主机中断则处理它，或通过 VINTR 注入到客户机。VMM 可对客户机屏蔽某些中断并在宿主机层面处理。</td>
+</tr>
+<tr>
+<td><code>0x081</code></td>
+<td>SVM_EXIT_NMI</td>
+<td>客户机运行期间收到 NMI 且 NMI 拦截位已设置。</td>
+<td>VMM 确定该 NMI 是给宿主机还是客户机的。宿主机 NMI 直接处理。客户机 NMI 在宿主机 NMI 处理程序完成后通过 VINTR 注入。</td>
+</tr>
+<tr>
+<td><code>0x082</code></td>
+<td>SVM_EXIT_SMI</td>
+<td>客户机运行期间收到 SMI 信号且 SMI 拦截位已设置。</td>
+<td>VMM 退出到宿主机 SMM 处理程序。客户机被挂起，在 SMM 返回后恢复。SMI 通常对客户机不可见。</td>
+</tr>
+<tr>
+<td><code>0x083</code></td>
+<td>SVM_EXIT_INIT</td>
+<td>客户机运行期间收到 INIT 信号且 INIT 拦截位已设置。</td>
+<td>VMM 可对客户机执行软重置或延迟 INIT。通常用于客户机重置/重启逻辑。VMM 决定是重置客户机还是忽略 INIT 信号。</td>
+</tr>
+<tr>
+<td><code>0x084</code></td>
+<td>SVM_EXIT_VINTR</td>
+<td>客户机有一个待处理的虚拟中断（由 VMM 通过 VINTR 机制注入）已准备好交付，且客户机的中断可交付条件已满足。VINTR 拦截位已设置。</td>
+<td>VMM 检查虚拟中断是否可以交付给客户机。如果可以，通过 <code>VMCB.control.EVENTINJ</code> 注入并清除虚拟中断源。这是 AMD 中断虚拟化的核心。启用 AVIC 时，许多中断交付可完全避免此退出。</td>
+</tr>
+<tr>
+<td><code>0x085</code></td>
+<td>SVM_EXIT_CR0_SEL_WRITE</td>
+<td>客户机写入 CR0 且新值改变了影响分页或保护模式的位（PE、PG、CD、NW）。CR0 选择性写拦截位已设置。这是一种<em>选择性</em>拦截 — 仅在特定位改变时触发，不同于无条件 CR0 写拦截（0x002）。</td>
+<td>VMM 处理分页模式转换，根据需要更新影子页表或 NPT 配置，在需要时刷新 TLB，然后恢复客户机。对于管理客户机在实模式、保护模式和长模式之间的转换至关重要。</td>
+</tr>
+<tr>
+<td><code>0x086</code></td>
+<td>SVM_EXIT_IDTR_READ</td>
+<td>客户机执行 <code>SIDT</code>（存储 IDTR）且 IDTR 读拦截位已设置。</td>
+<td>VMM 返回影子 IDTR 值（以避免泄漏宿主机 IDT 位置），推进 RIP 并恢复客户机。</td>
+</tr>
+<tr>
+<td><code>0x087</code></td>
+<td>SVM_EXIT_IDTR_WRITE</td>
+<td>客户机执行 <code>LIDT</code>（加载 IDTR）且 IDTR 写拦截位已设置。</td>
+<td>VMM 保存客户机 IDTR 值，验证它，更新影子 IDTR（如使用），推进 RIP 并恢复。VMM 跟踪客户机 IDT 基地址用于异常注入。</td>
+</tr>
+<tr>
+<td><code>0x088</code></td>
+<td>SVM_EXIT_GDTR_READ</td>
+<td>客户机执行 <code>SGDT</code>（存储 GDTR）且 GDTR 读拦截位已设置。</td>
+<td>VMM 返回影子 GDTR 值，推进 RIP 并恢复客户机。</td>
+</tr>
+<tr>
+<td><code>0x089</code></td>
+<td>SVM_EXIT_GDTR_WRITE</td>
+<td>客户机执行 <code>LGDT</code>（加载 GDTR）且 GDTR 写拦截位已设置。</td>
+<td>VMM 保存客户机 GDTR 值，更新影子 GDT（如使用），推进 RIP 并恢复客户机。</td>
+</tr>
+<tr>
+<td><code>0x08A</code></td>
+<td>SVM_EXIT_LDTR_READ</td>
+<td>客户机执行 <code>SLDT</code>（存储 LDTR）且 LDTR 读拦截位已设置。</td>
+<td>VMM 返回客户机 LDTR 选择子值，推进 RIP 并恢复客户机。</td>
+</tr>
+<tr>
+<td><code>0x08B</code></td>
+<td>SVM_EXIT_LDTR_WRITE</td>
+<td>客户机执行 <code>LLDT</code>（加载 LDTR）且 LDTR 写拦截位已设置。</td>
+<td>VMM 验证并保存客户机 LDTR 选择子，更新影子 LDT（如使用），推进 RIP 并恢复客户机。</td>
+</tr>
+<tr>
+<td><code>0x08C</code></td>
+<td>SVM_EXIT_TR_READ</td>
+<td>客户机执行 <code>STR</code>（存储 TR）且 TR 读拦截位已设置。</td>
+<td>VMM 返回客户机 TR 选择子值，推进 RIP 并恢复客户机。</td>
+</tr>
+<tr>
+<td><code>0x08D</code></td>
+<td>SVM_EXIT_TR_WRITE</td>
+<td>客户机执行 <code>LTR</code>（加载 TR）且 TR 写拦截位已设置。</td>
+<td>VMM 验证并保存客户机 TR 选择子，更新影子 TSS（如使用），推进 RIP 并恢复。在 64 位客户机中很少见。</td>
+</tr>
+<tr>
+<td><code>0x08E</code></td>
+<td>SVM_EXIT_RDTSC</td>
+<td>客户机执行 <code>RDTSC</code> 且 RDTSC 拦截位已设置。</td>
+<td>VMM 返回经过偏移调整的 TSC 值（用于虚拟化客户机时间），推进 RIP 并恢复。VMM 可应用 TSC 偏移以在迁移后提供一致的客户机时间。</td>
+</tr>
+<tr>
+<td><code>0x08F</code></td>
+<td>SVM_EXIT_RDPMC</td>
+<td>客户机执行 <code>RDPMC</code> 且 RDPMC 拦截位已设置。</td>
+<td>VMM 模拟性能计数器读取，返回虚拟化的 PMC 值。VMM 必须确保客户机无法访问宿主机性能计数器。推进 RIP 并恢复。</td>
+</tr>
+<tr>
+<td><code>0x090</code></td>
+<td>SVM_EXIT_PUSHF</td>
+<td>客户机执行 <code>PUSHF</code>（压入 EFLAGS/RFLAGS）且 PUSHF 拦截位已设置。</td>
+<td>VMM 模拟 PUSHF 指令，返回经过清理的标志值（在需要时清除宿主机敏感标志如 IF），推进 RIP 并恢复。用于控制客户机对中断标志状态的可见性。</td>
+</tr>
+<tr>
+<td><code>0x091</code></td>
+<td>SVM_EXIT_POPF</td>
+<td>客户机执行 <code>POPF</code>（弹出 EFLAGS/RFLAGS）且 POPF 拦截位已设置。</td>
+<td>VMM 验证新的标志值，阻止客户机修改宿主机敏感标志（如 IOPL、VIP），应用允许的标志变更，推进 RIP 并恢复。对于虚拟化客户机中断使能（IF）标志至关重要。</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>5. SVM 指令（0x092–0x09C）</h2>
+<p>这些拦截涵盖 SVM 特有指令或常见的需虚拟化特权指令。它们由 VMCB <code>INTERCEPTS</code> 字段中的位控制。</p>
+<table>
+<thead>
+<tr>
+<th>退出码</th>
+<th>名称</th>
+<th>触发原因</th>
+<th>VMM 处理方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0x092</code></td>
+<td>SVM_EXIT_CPUID</td>
+<td>客户机执行 <code>CPUID</code> 且 VMCB 中 CPUID 拦截位已设置。</td>
+<td>VMM 读取客户机 EAX/ECX 输入，返回虚拟化的 CPUID 结果（隐藏宿主机特性，通过 leaf 0x40000000 告知 hypervisor 存在，模拟特性标志），推进 RIP 并恢复。这是最常被拦截的指令之一。</td>
+</tr>
+<tr>
+<td><code>0x093</code></td>
+<td>SVM_EXIT_RSM</td>
+<td>客户机在 SMM 之外执行 <code>RSM</code> 且 RSM 拦截位已设置。</td>
+<td>VMM 向客户机注入 #UD（无效操作码），因为 <code>RSM</code> 仅在 SMM 中有效。推进 RIP 并恢复。</td>
+</tr>
+<tr>
+<td><code>0x094</code></td>
+<td>SVM_EXIT_IRET</td>
+<td>客户机执行 <code>IRET</code> 且 IRET 拦截位已设置。</td>
+<td>VMM 模拟 IRET，从客户机栈更新客户机 RIP、CS、RFLAGS 和 RSP。对于跟踪客户机中断状态变化（IF 标志、中断影子）至关重要。VMM 可在 IRET 后重新评估待处理的 VINTR 交付。推进 RIP 并恢复。</td>
+</tr>
+<tr>
+<td><code>0x095</code></td>
+<td>SVM_EXIT_SWINT</td>
+<td>客户机执行软件中断指令（<code>INT n</code>）且 SWINT 拦截位已设置。</td>
+<td>VMM 检查向量 <em>n</em> 对应的客户机 IDT 表项，验证权限（门类型、DPL），然后向客户机注入中断或在访问无效时注入 #GP。推进 RIP 并恢复。</td>
+</tr>
+<tr>
+<td><code>0x096</code></td>
+<td>SVM_EXIT_INVD</td>
+<td>客户机执行 <code>INVD</code>（不回写地使内部缓存失效）且 INVD 拦截位已设置。</td>
+<td>VMM 通常将 <code>INVD</code> 模拟为空操作（或 <code>WBINVD</code>）以防止客户机破坏宿主机缓存状态。推进 RIP 并恢复。</td>
+</tr>
+<tr>
+<td><code>0x097</code></td>
+<td>SVM_EXIT_PAUSE</td>
+<td>客户机执行 <code>PAUSE</code>（自旋等待提示）且 PAUSE 拦截位已设置。也可能基于 PAUSE 过滤阈值（自旋循环计数超过限制）触发。</td>
+<td>VMM 可使用此退出进行自旋锁检测 — 如果客户机 vCPU 正在自旋，VMM 可以调度另一个 vCPU（定向让步）。推进 RIP 并恢复。AMD 支持 PAUSE 过滤器，仅在连续 N 条 PAUSE 指令后才退出。</td>
+</tr>
+<tr>
+<td><code>0x098</code></td>
+<td>SVM_EXIT_HLT</td>
+<td>客户机执行 <code>HLT</code> 且 HLT 拦截位已设置。</td>
+<td>VMM 将 vCPU 标记为暂停，调度另一个 vCPU 或进入宿主机空闲状态，并安排在下一个待处理中断（INTR 或 VINTR）到来时唤醒该 vCPU。当中断到达时，VMM 恢复客户机。客户机在中断唤醒前不会推进 RIP 越过 HLT。</td>
+</tr>
+<tr>
+<td><code>0x099</code></td>
+<td>SVM_EXIT_INVLPG</td>
+<td>客户机执行 <code>INVLPG</code>（使指定线性地址的 TLB 表项失效）且 INVLPG 拦截位已设置。</td>
+<td>VMM 使指定客户机线性地址对应的影子页表项或 NPT TLB 表项失效，推进 RIP 并恢复。启用 NPT 时，CPU 可根据配置在不退出的情况下处理此操作。</td>
+</tr>
+<tr>
+<td><code>0x09A</code></td>
+<td>SVM_EXIT_INVLPGA</td>
+<td>客户机执行 <code>INVLPGA</code>（AMD 专有指令，用于使当前 ASID 的 TLB 表项失效）且 INVLPGA 拦截位已设置。</td>
+<td>VMM 使指定地址和客户机 ASID 对应的 TLB 表项失效，推进 RIP 并恢复。这是 AMD 专有指令，用于半虚拟化客户机。</td>
+</tr>
+<tr>
+<td><code>0x09B</code></td>
+<td>SVM_EXIT_IOIO</td>
+<td>客户机执行 I/O 指令（<code>IN</code>、<code>OUT</code>、<code>INS</code>、<code>OUTS</code>）且 VMCB 中 IOIO 拦截已配置（通过 IOIO 拦截位图或端口范围）。</td>
+<td>VMM 从 VMCB 的 <code>EXITINFO1</code>/<code>EXITINFO2</code> 字段读取端口号和数据，模拟 I/O 访问（分发给虚拟设备模型），推进 RIP 并恢复。VMM 也可将 I/O 委托给用户空间设备模拟器。</td>
+</tr>
+<tr>
+<td><code>0x09C</code></td>
+<td>SVM_EXIT_MSR</td>
+<td>客户机执行 <code>RDMSR</code> 或 <code>WRMSR</code> 且 VMCB 中 MSR 拦截位已设置。具体 MSR 和访问类型（读/写）记录在 <code>EXITINFO1</code> 中。</td>
+<td>VMM 从 ECX 读取 MSR 索引，通过返回虚拟化值或验证写入来模拟读或写操作，推进 RIP 并恢复。VMM 维护一组虚拟化的 MSR（如 SYSENTER_CS/EIP/ESP、STAR、LSTAR 等），并且必须防止客户机访问宿主机敏感的 MSR。</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>6. 任务切换与停机（0x09D–0x09F）</h2>
+<p>这些拦截涵盖硬件任务切换和系统关机/冻结条件。</p>
+<table>
+<thead>
+<tr>
+<th>退出码</th>
+<th>名称</th>
+<th>触发原因</th>
+<th>VMM 处理方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0x09D</code></td>
+<td>SVM_EXIT_TASK_SWITCH</td>
+<td>客户机触发硬件任务切换（通过 TSS 门、CALL/RET 到任务门、或 IRET 时 NT 标志置位）且任务切换拦截位已设置。</td>
+<td>VMM 模拟任务切换：保存旧 TSS 状态，加载新 TSS，更新 TR，并处理段验证。出错时可注入 #TS 或 #GP。在现代 64 位操作系统中任务切换很少见。推进 RIP 并恢复客户机。</td>
+</tr>
+<tr>
+<td><code>0x09E</code></td>
+<td>SVM_EXIT_FERR_FREEZE</td>
+<td>客户机触发 FERR#（浮点错误）冻结条件 — CPU 冻结指令传递以声明 FERR#，用于外部 FPU 错误报告机制。FERR_FREEZE 拦截位已设置。</td>
+<td>VMM 处理 FERR# 冻结，通常向客户机注入 #MF（数学错误）并清除冻结条件。推进 RIP 并恢复客户机。在使用现代基于 SSE 的浮点时很少见。</td>
+</tr>
+<tr>
+<td><code>0x09F</code></td>
+<td>SVM_EXIT_SHUTDOWN</td>
+<td>客户机进入三重错误条件（双重错误处理程序交付期间发生异常）或关闭条件。SHUTDOWN 拦截位已设置。</td>
+<td>VMM 处理客户机关闭：通常重置客户机 vCPU（重新初始化状态）或完全终止 VM。VMM 可记录关闭事件用于调试。这是客户机的终止条件。</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>7. VMRUN/VMMCALL 相关（0x0A0–0x0A2）</h2>
+<p>这些拦截涵盖管理嵌套虚拟化和客户机到宿主机通信的核心 SVM 指令。</p>
+<table>
+<thead>
+<tr>
+<th>退出码</th>
+<th>名称</th>
+<th>触发原因</th>
+<th>VMM 处理方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0x0A0</code></td>
+<td>SVM_EXIT_VMRUN</td>
+<td>客户机执行 <code>VMRUN</code>（启动嵌套客户机）且 VMRUN 拦截位已设置。这发生在嵌套虚拟化场景中，L1 虚拟机管理程序尝试启动 L2 客户机。</td>
+<td>VMM（L0）处理嵌套虚拟化：验证嵌套 VMCB，通过嵌套 SVM 支持（合并 VMCB 控制字段、ASID 管理）模拟或加速嵌套 VMRUN，并管理 L2 客户机执行。L2 退出时，控制权返回 L1 并携带相应的退出码。</td>
+</tr>
+<tr>
+<td><code>0x0A1</code></td>
+<td>SVM_EXIT_VMMCALL</td>
+<td>客户机执行 <code>VMMCALL</code>（AMD 的超调用指令，等效于 Intel 的 <code>VMCALL</code>）且 VMMCALL 拦截位已设置。</td>
+<td>VMM 从客户机 EAX（或按调用约定的其他寄存器）读取超调用号，分派到相应的超调用处理程序，将结果放入客户机寄存器，推进 RIP 并恢复客户机。这是 AMD SVM 客户机的主要半虚拟化接口。</td>
+</tr>
+<tr>
+<td><code>0x0A2</code></td>
+<td>SVM_EXIT_VMLOAD</td>
+<td>客户机执行 <code>VMLOAD</code>（从 VMCB 加载额外的客户机状态）且 VMLOAD 拦截位已设置。发生在嵌套虚拟化中。</td>
+<td>VMM 处理嵌套 VMLOAD：验证源 VMCB，将额外状态（FS、GS、内核 GS 基地址、STAR、LSTAR、CSTAR、SFMASK、SYSENTER MSR）加载到相应寄存器，推进 RIP 并恢复客户机。对于嵌套 SVM，L0 虚拟机管理程序将 L1 VMLOAD 与自身的状态管理合并。</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>8. VMSAVE 与客户机管理（0x0A3–0x0A6）</h2>
+<p>这些拦截涵盖状态保存/恢复以及 AMD SVM 特有的全局中断标志管理指令。</p>
+<table>
+<thead>
+<tr>
+<th>退出码</th>
+<th>名称</th>
+<th>触发原因</th>
+<th>VMM 处理方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0x0A3</code></td>
+<td>SVM_EXIT_VMSAVE</td>
+<td>客户机执行 <code>VMSAVE</code>（将额外的客户机状态保存到 VMCB）且 VMSAVE 拦截位已设置。发生在嵌套虚拟化中。</td>
+<td>VMM 处理嵌套 VMSAVE：将额外状态（FS、GS、内核 GS 基地址、STAR、LSTAR、CSTAR、SFMASK、SYSENTER MSR）保存到指定的 VMCB 保存区，推进 RIP 并恢复客户机。与 VMLOAD 互补。</td>
+</tr>
+<tr>
+<td><code>0x0A4</code></td>
+<td>SVM_EXIT_STGI</td>
+<td>客户机执行 <code>STGI</code>（设置 GIF=1，启用中断）且 STGI 拦截位已设置。</td>
+<td>VMM 为客户机启用中断交付（类似于在更高层级设置客户机 IF 标志），可能重新评估待处理中断，推进 RIP 并恢复客户机。VMM 使用 GIF 来控制客户机何时可以接收物理中断和虚拟中断。</td>
+</tr>
+<tr>
+<td><code>0x0A5</code></td>
+<td>SVM_EXIT_CLGI</td>
+<td>客户机执行 <code>CLGI</code>（设置 GIF=0，禁用中断）且 CLGI 拦截位已设置。</td>
+<td>VMM 为客户机禁用中断交付，阻止物理中断和虚拟中断的交付。客户机使用此指令保护临界区。VMM 推进 RIP 并恢复客户机。待处理中断将延迟到执行 STGI 后再交付。</td>
+</tr>
+<tr>
+<td><code>0x0A6</code></td>
+<td>SVM_EXIT_SKINIT</td>
+<td>客户机执行 <code>SKINIT</code>（安全初始化，用于 DRTM — 动态信任度量根）且 SKINIT 拦截位已设置。</td>
+<td>VMM 处理 SKINIT 请求：验证安全启动参数，度量目标镜像（扩展 TPM PCR 寄存器），并模拟安全启动或拒绝该请求。用于在受度量环境中启动可信代码。VMM 必须仔细验证所有参数。</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>9. NPT 与宿主机相关（0x400–0x403）</h2>
+<p>NPT（嵌套页表）故障退出发生在客户机的二维页表转换（客户机虚拟地址 → 客户机物理地址 → 宿主机物理地址）在第二级（NPT）转换失败时。当 NPT（嵌套分页）处于活动状态时启用。退出码区分导致故障的访问类型。</p>
+<table>
+<thead>
+<tr>
+<th>退出码</th>
+<th>名称</th>
+<th>触发原因</th>
+<th>VMM 处理方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0x400</code></td>
+<td>SVM_EXIT_NPF</td>
+<td>客户机执行内存<strong>读</strong>操作导致 NPT 页错误 — 客户机物理地址没有有效的 NPT 映射，或 NPT 页表条目不允许读访问。</td>
+<td>VMM 遍历 NPT 结构，识别导致错误的客户机物理地址（从 <code>EXITINFO2</code> 获取），检查访问权限，然后映射该页（例如通过按需分页、内存映射 I/O 模拟或页面迁移），或在客户机物理地址本身无效时向客户机反射 #PF。VMM 还可通过检查出错地址是否在 MMIO 区域来处理 MMIO 模拟。</td>
+</tr>
+<tr>
+<td><code>0x401</code></td>
+<td>SVM_EXIT_NPF</td>
+<td>客户机执行内存<strong>写</strong>操作导致 NPT 页错误 — NPT 页表条目不允许写访问，或客户机物理地址没有有效的 NPT 映射。</td>
+<td>VMM 处理方式类似于 NPT_FAULT_READ：遍历 NPT，检查写权限，映射页面或模拟 MMIO 写入，或向客户机反射 #PF。写保护的 NPT 页面常用于脏页跟踪（实时迁移）、写保护客户机页表（影子分页优化）或 MMIO 模拟。</td>
+</tr>
+<tr>
+<td><code>0x402</code></td>
+<td>SVM_EXIT_NPF</td>
+<td>客户机执行<strong>指令取指</strong>导致 NPT 页错误 — NPT 页表条目不允许执行访问（NPT 中 NX 位置位），或代码页没有有效的 NPT 映射。</td>
+<td>VMM 检查是否应授予执行权限，在适当时将页面映射为可执行，或向客户机反射 #PF。NPT 执行权限错误用于代码完整性强制执行、宿主机级别的 NX 强制执行，以及影子代码页管理。</td>
+</tr>
+<tr>
+<td><code>0x403</code></td>
+<td>SVM_EXIT_NPF</td>
+<td>客户机在<strong>用户模式</strong>（CPL=3）下执行指令取指导致 NPT 页错误。这是一种更细粒度的执行错误，区分用户模式代码执行和管理模式执行。在支持 NPT 用户/管理区分的较新 AMD 处理器上可用。</td>
+<td>VMM 处理方式类似于 NPT_FAULT_EXECUTE，但需感知错误发生在用户模式下。用于实现更细粒度的代码执行策略（如 W^X 强制执行、用户空间代码完整性）。VMM 可以允许管理模式在同一页面上执行，同时阻止用户模式执行。</td>
+</tr>
+</tbody>
+</table>
+<p><strong>NPT 故障详情：</strong>在 NPT 故障退出时，<code>EXITINFO1</code> 包含故障错误码（位 0 = P 存在，位 1 = 写入，位 2 = 用户，位 3 = RSVD，位 4 = I/D 取指，位 5 = PK），<code>EXITINFO2</code> 包含导致故障的<em>客户机物理地址</em>。NPT 故障发生在第二级转换；客户机自身的页表（第一级）可能有效也可能无效。如果客户机自身的转换也发生故障，CPU 会优先处理 NPT 故障，VMM 必须先处理 NPT 故障，然后重新进入客户机，客户机将在那里遇到自身的 #PF。</p>
+<hr>
+<h2>10. SEV-ES VMGEXIT 事件（0x100+）</h2>
+<p>SEV-ES（安全加密虚拟化 – 加密状态）改变了 VM 退出处理模型。由于客户机的寄存器状态是加密的，VMM 无法通过 VMCB 保存区域直接读取或修改客户机寄存器。相反，SEV-ES 客户机使用 <strong>VMGEXIT</strong>（VM 客户机消息退出）通过 <strong>GHCB（客户机-宿主机通信块）</strong>与 VMM 通信。客户机执行 <code>VMMCALL</code> 并使用特定的 GHCB 协议，VMM 通过 GHCB 处理请求。</p>
+<p><strong>SEV-ES/SEV-SNP 安全说明：</strong>在 SEV-ES 中，VMM 无法访问加密的客户机寄存器状态。所有寄存器状态交换必须通过 GHCB 进行，客户机在退出前显式填充 GHCB。这防止了 VMM 篡改客户机状态。SEV-SNP 增加了额外的完整性保护和反向映射表（RMP）检查。</p>
+<table>
+<thead>
+<tr>
+<th>退出码</th>
+<th>名称</th>
+<th>触发原因</th>
+<th>VMM 处理方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0x100</code></td>
+<td>SVM_VMGEXIT</td>
+<td>SEV-ES 客户机执行 <code>VMMCALL</code>（重新定义为 VMGEXIT）且已配置 GHCB。GHCB 的 <code>SW_EXIT_CODE</code> 字段指定了详细的请求类型。</td>
+<td>VMM 读取 GHCB 以确定具体请求（SW_EXIT_CODE），按照 GHCB 协议处理，将结果写回 GHCB，然后恢复客户机。VMM 必须验证所有 GHCB 字段，不能信任客户机寄存器状态（已加密）。</td>
+</tr>
+<tr>
+<td><code>0x100</code> (GHCB: 0x001)</td>
+<td>SVM_VMGEXIT_MMIO_READ</td>
+<td>SEV-ES 客户机通过 GHCB 请求内存映射 I/O 读取。客户机在 GHCB 中放置 MMIO 物理地址和大小。</td>
+<td>VMM 从 GHCB 读取 MMIO 地址和大小，代表客户机执行 MMIO 读取，将结果数据写回 GHCB，然后恢复客户机。VMM 必须验证 MMIO 地址位于合法的 MMIO 区域内。</td>
+</tr>
+<tr>
+<td><code>0x100</code> (GHCB: 0x002)</td>
+<td>SVM_VMGEXIT_MMIO_WRITE</td>
+<td>SEV-ES 客户机通过 GHCB 请求内存映射 I/O 写入。客户机在 GHCB 中放置 MMIO 物理地址、大小和数据。</td>
+<td>VMM 从 GHCB 读取 MMIO 地址、大小和数据，执行 MMIO 写入，然后恢复客户机。VMM 在执行写入前验证 MMIO 区域。</td>
+</tr>
+<tr>
+<td><code>0x100</code> (GHCB: 0x003)</td>
+<td>SVM_VMGEXIT_NMI_COMPLETE</td>
+<td>SEV-ES 客户机通知它已完成 NMI 处理。客户机在 GHCB 中设置此项以告知 VMM NMI 已完全处理。</td>
+<td>VMM 清除客户机的待处理 NMI 状态并恢复。这是必要的，因为在 SEV-ES 中，VMM 无法直接观察客户机的中断标志状态。</td>
+</tr>
+<tr>
+<td><code>0x100</code> (GHCB: 0x004)</td>
+<td>SVM_VMGEXIT_AP_CREATE</td>
+<td>SEV-ES 客户机请求 VMM 创建/启动一个 AP（应用处理器）vCPU。客户机在 GHCB 中提供 AP 的 vCPU ID、初始 RIP 和其他状态。</td>
+<td>VMM 创建或初始化指定的 AP vCPU，从 GHCB 提供的值设置其初始状态，并使其可运行。用于加密虚拟机中的客户机 SMP 启动，此时 VMM 无法直接操控 AP 寄存器状态。</td>
+</tr>
+<tr>
+<td><code>0x100</code> (GHCB: 0x005)</td>
+<td>SVM_VMGEXIT_AP_DESTROY</td>
+<td>SEV-ES 客户机请求 VMM 销毁/停止一个 AP vCPU。客户机在 GHCB 中提供 AP 的 vCPU ID。</td>
+<td>VMM 停止指定的 AP vCPU，释放相关资源，然后恢复调用的 vCPU。用于加密虚拟机中的客户机 CPU 热插拔或关机。</td>
+</tr>
+<tr>
+<td><code>0x100</code> (GHCB: 0x006)</td>
+<td>SVM_VMGEXIT_SNP_PAGE_STATE_CHANGE</td>
+<td>SEV-SNP 客户机请求页面状态转换（例如将页面从私有变为共享，或从共享变为私有）。客户机在 GHCB 中提供页面范围和目标状态。</td>
+<td>VMM 处理页面状态变更请求，更新 RMP（反向映射页）表项以反映新的页面状态（私有/共享），并在需要时刷新 TLB 表项。对于私有到共享的转换，VMM 可能需要与 hypervisor 的内存管理协调。处理完成后恢复客户机。</td>
+</tr>
+<tr>
+<td><code>0x100</code> (GHCB: 0x007)</td>
+<td>SVM_VMGEXIT_SNP_GUEST_REQUEST</td>
+<td>SEV-SNP 客户机通过 VMM 向 SNP 固件（PSP - 平台安全处理器）发送请求。客户机在 GHCB 中提供请求数据和响应缓冲区。</td>
+<td>VMM 将客户机请求转发给 PSP 固件，等待响应，然后通过 GHCB 将结果返回给客户机。用于认证、密钥推导和其他固件服务。VMM 充当中继，但无法检查加密的请求/响应载荷。</td>
+</tr>
+<tr>
+<td><code>0x100</code> (GHCB: 0x008)</td>
+<td>SVM_VMGEXIT_SNP_EXT_GUEST_REQUEST</td>
+<td>SEV-SNP 客户机向 SNP 固件发送扩展请求，包括标准 GHCB 之外的额外数据页。用于更大的认证报告。</td>
+<td>VMM 将扩展请求转发给 PSP，处理额外的数据页（可能跨越多页），并将结果返回给客户机。VMM 必须处理更大的缓冲区大小并确保正确的页对齐。</td>
+</tr>
+<tr>
+<td><code>0x100</code> (GHCB: 0x009)</td>
+<td>SVM_VMGEXIT_REGISTER_GHCB_GPA</td>
+<td>SEV-ES 客户机向 VMM 注册其 GHCB 的客户机物理地址（GPA）。这通常是客户机发出的第一个 VMGEXIT，用于建立通信通道。</td>
+<td>VMM 记录客户机的 GHCB GPA，验证它指向一个有效的共享（未加密）页面，然后恢复客户机。后续的 VMGEXIT 事件将使用此注册的 GHCB 进行通信。</td>
+</tr>
+<tr>
+<td><code>0x100</code> (GHCB: 0x00A)</td>
+<td>SVM_VMGEXIT_GHCB_MSR</td>
+<td>SEV-ES 客户机使用简化的 GHCB MSR 协议（用于 GHCB 建立之前的早期启动阶段）。客户机写入 <code>MSR_AMD64_SEV_ES_GHCB</code> 并执行 <code>VMMCALL</code>。请求和响应编码在 MSR 值中。</td>
+<td>VMM 解码 MSR 值以确定请求类型，处理它（如 MMIO 读/写、寄存器交换），将响应写入 GHCB MSR，然后恢复。用于客户机建立完整内存中 GHCB 之前。</td>
+</tr>
+<tr>
+<td><code>0x100</code> (GHCB: 0x00B)</td>
+<td>SVM_VMGEXIT_SNP_RUN_VMPL</td>
+<td>SEV-SNP 客户机请求转换到不同的 VMPL（虚拟机特权级）。VMPL 在加密客户机内提供分层特权隔离。</td>
+<td>VMM 验证 VMPL 转换请求，如果允许则更新客户机的 VMPL 上下文，然后恢复客户机。VMPL 转换受 SNP 固件验证和客户机当前 VMPL 的约束。</td>
+</tr>
+<tr>
+<td><code>0x100</code> (GHCB: 0x100+)</td>
+<td>SVM_VMGEXIT_HYPERVISOR_FEATURES</td>
+<td>SEV-ES 客户机通过 GHCB 向 VMM 查询支持的 hypervisor 特性。客户机提供特性查询掩码。</td>
+<td>VMM 通过 GHCB 返回支持特性的位掩码（如 AP 创建、页面状态变更、扩展客户机请求），然后恢复客户机。允许客户机在运行时发现 VMM 能力。</td>
+</tr>
+</tbody>
+</table>
+<p><strong>SEV-ES 退出处理差异：</strong></p>
+<p>在 SEV-ES 中，标准 VM 退出（如 <code>#VC</code> — SEV-ES VMM 通信异常）作为异常向量 29（#VC）交付给客户机。客户机的 #VC 处理程序然后使用 VMGEXIT 通过 GHCB 与 VMM 通信。这意味着：</p>
+<ol>
+<li>
+<p>VMM 无法直接注入中断或异常 — 必须使用 GHCB 协议。</p>
+</li>
+<li>
+<p>寄存器状态交换是显式的 — 客户机通过 GHCB 选择共享哪些内容。</p>
+</li>
+<li>
+<p>客户机中的 <code>#VC</code> 处理程序必须谨慎编写，以避免重入并处理所有必需的 VMGEXIT 事件。</p>
+</li>
+<li>
+<p>SEV-SNP 增加了 RMP（反向映射页）强制执行 — VMM 无法将客户机声明为共享的页面映射为私有，反之亦然。</p>
+</li>
+</ol>
+<hr>
+<h2>退出码范围参考汇总</h2>
+<table>
+<thead>
+<tr>
+<th>退出码范围</th>
+<th>类别</th>
+<th>数量</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0x000–0x009</code></td>
+<td>CR 读/写拦截</td>
+<td>10</td>
+</tr>
+<tr>
+<td><code>0x006–0x00F</code></td>
+<td>DR 读/写拦截（与 CR 共享）</td>
+<td>2 个独立</td>
+</tr>
+<tr>
+<td><code>0x040–0x05F</code></td>
+<td>异常拦截（向量 0–31）</td>
+<td>32</td>
+</tr>
+<tr>
+<td><code>0x080–0x091</code></td>
+<td>系统指令/事件</td>
+<td>18</td>
+</tr>
+<tr>
+<td><code>0x092–0x09C</code></td>
+<td>SVM 指令</td>
+<td>11</td>
+</tr>
+<tr>
+<td><code>0x09D–0x09F</code></td>
+<td>任务切换与关闭</td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>0x0A0–0x0A2</code></td>
+<td>VMRUN/VMMCALL 相关</td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>0x0A3–0x0A6</code></td>
+<td>VMSAVE 与客户机管理</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>0x400–0x403</code></td>
+<td>NPT 错误</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>0x100+</code></td>
+<td>SEV-ES VMGEXIT 事件（通过 GHCB）</td>
+<td>可变</td>
+</tr>
+</tbody>
+</table>
+<p><strong>参考文献：</strong>AMD64 架构程序员手册（APM）第 2 卷：系统编程，第 15 章 — 安全虚拟机。有关 SEV-ES/SEV-SNP，请参阅 GHCB 规范和 AMD SEV-SNP 固件 ABI 规范。</p>
+<h1>三、Intel 与 AMD 退出机制对比</h1>
+<p>Intel VMX 和 AMD SVM 虽然都实现了 x86 硬件虚拟化，但在退出机制的设计哲学、控制结构和处理流程上存在显著差异。本节从控制结构、退出码编码、触发方式、内存虚拟化、中断虚拟化等维度进行系统对比。</p>
+<table>
+<thead>
+<tr>
+<th>对比维度</th>
+<th>Intel VMX</th>
+<th>AMD SVM</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>控制结构</strong></td>
+<td>VMCS (Virtual Machine Control Structure)，每个 vCPU 一个，包含执行控制、退出控制、入口控制、Guest 状态、Host 状态</td>
+<td>VMCB (Virtual Machine Control Block)，包含控制区（拦截位、TLB 控制）和保存区（Guest 寄存器状态）</td>
+</tr>
+<tr>
+<td><strong>退出码存储</strong></td>
+<td>VMCS 字段 <code>VM_EXIT_REASON</code> (offset 0x4402)，16-bit 基本原因码 + 状态位（bit 27 enclave, bit 31 entry failure）</td>
+<td>VMCB 控制区 <code>EXITCODE</code> 字段，64-bit，直接存储退出码</td>
+</tr>
+<tr>
+<td><strong>退出指令</strong></td>
+<td><code>VMLAUNCH</code> / <code>VMRESUME</code> 进入 Guest；VMExit 自动切换</td>
+<td><code>VMRUN</code> 进入 Guest；VMExit 自动切换回 Host</td>
+</tr>
+<tr>
+<td><strong>状态保存</strong></td>
+<td>CPU 自动将 Guest 状态保存到 VMCS Guest-State Area，加载 Host 状态从 VMCS Host-State Area</td>
+<td>CPU 自动将 Guest 状态保存到 VMCB Save Area；Host 状态从指定 MSR / VMCB Host State 加载</td>
+</tr>
+<tr>
+<td><strong>退出原因数量</strong></td>
+<td>\~75+ 定义的基本退出原因码（0-75+），部分保留</td>
+<td>\~90+ 定义退出码（0x000-0x0A6, 0x400-0x403, SEV-ES VMGEXIT）</td>
+</tr>
+<tr>
+<td><strong>拦截方式</strong></td>
+<td>基于 VMCS Execution Controls（Primary/Secondary/Tertiary），精细控制每类指令/事件</td>
+<td>基于 VMCB 拦截位（Intercept Bits），按指令/事件类型设置位图</td>
+</tr>
+<tr>
+<td><strong>内存虚拟化</strong></td>
+<td>EPT (Extended Page Tables)，EPT violation/misconfiguration 触发 VMExit（码 48/49）</td>
+<td>NPT (Nested Page Tables)，NPT fault 按读/写/执行分别退出（码 0x400-0x403）</td>
+</tr>
+<tr>
+<td><strong>中断虚拟化</strong></td>
+<td>Posted Interrupts、APIC Virtualization（APIC-access、virtual EOI、TPR threshold）</td>
+<td>AVIC (Advanced Virtual Interrupt Controller)、Virtual Interrupt (VINTR) 注入</td>
+</tr>
+<tr>
+<td><strong>TLB 管理</strong></td>
+<td><code>INVEPT</code> (EPT 上下文)、<code>INVVPID</code> (VPID 上下文) 指令刷新 TLB</td>
+<td>VMCB TLB Control 字段、<code>INVLPGA</code> 指令刷新 Guest TLB 条目</td>
+</tr>
+<tr>
+<td><strong>Hypercall 机制</strong></td>
+<td><code>VMCALL</code> 指令（退出码 18）</td>
+<td><code>VMMCALL</code> 指令（退出码 0x0A1）</td>
+</tr>
+<tr>
+<td><strong>Guest 状态恢复</strong></td>
+<td>VMCS Guest-State Area 自动恢复，含自然宽度字段</td>
+<td>VMCB Save Area 恢复；<code>VMLOAD</code>/<code>VMSAVE</code> 指令辅助加载/保存额外状态</td>
+</tr>
+<tr>
+<td><strong>加密虚拟化</strong></td>
+<td>TDX (Trust Domain Extensions)，SEAMCALL/TDCALL 机制</td>
+<td>SEV / SEV-ES / SEV-SNP，VMGEXIT + GHCB (Guest-Hypervisor Communication Block)</td>
+</tr>
+<tr>
+<td><strong>嵌套虚拟化</strong></td>
+<td>VMCS Shadowing、Virtualize VMX（VMCS 12 → VMCS 02 映射）</td>
+<td>Nested SVM（VMCB 嵌套，Host VMCB → Guest VMCB 链式）</td>
+</tr>
+<tr>
+<td><strong>I/O 虚拟化</strong></td>
+<td>I/O Bitmap（A/B）、I/O Instruction 退出（码 30），可按端口范围拦截</td>
+<td>I/O Permission Bitmap、IOIO 退出（码 0x09B），按端口范围拦截</td>
+</tr>
+<tr>
+<td><strong>MSR 虚拟化</strong></td>
+<td>MSR Bitmap（read/write 低/高位图），RDMSR（码 31）/ WRMSR（码 32）</td>
+<td>MSR Permission Bitmap，MSR 退出（码 0x09C）统一处理读写</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>关键设计差异详解</h2>
+<p><strong>Intel VMX 设计哲学</strong></p>
+<p>Intel 采用 <strong>VMCS 字段驱动</strong> 的设计，通过 Primary/Secondary/Tertiary Execution Controls 实现精细化的退出控制。每个控制位对应一类行为，VMM 可按需开启/关闭。EPT violation 退出不区分访问类型，VMM 需从 EXIT_QUALIFICATION 字段解析具体是读/写/执行。</p>
+<p>VMCS 的优势在于灵活性：VMM 可以非常精确地控制哪些操作触发 VMExit，哪些不触发。但 VMCS 的读写开销较大，因为需要使用 <code>VMREAD</code>/<code>VMWRITE</code> 指令逐个字段访问。</p>
+<p><strong>AMD SVM 设计哲学</strong></p>
+<p>AMD 采用 <strong>VMCB 位图驱动</strong> 的设计，通过控制区的 Intercept Bits 控制退出行为。NPT fault 按读/写/执行分别使用不同的退出码（0x400-0x403），VMM 无需额外解析即可知道访问类型。</p>
+<p>SVM 的优势在于简洁性：退出码直接编码了更多信息（如 NPT fault 的访问类型），减少了 VMM 的解析开销。VMCB 的整体读取比逐个 VMREAD 更高效，但灵活性略低。</p>
+<hr>
+<h2>VMExit 处理流程对比</h2>
+<hr>
+<h2>退出码编码方式对比</h2>
+<table>
+<thead>
+<tr>
+<th>特性</th>
+<th>Intel VMX</th>
+<th>AMD SVM</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>基本退出码宽度</strong></td>
+<td>16-bit（bits 15:0）</td>
+<td>64-bit</td>
+</tr>
+<tr>
+<td><strong>状态位</strong></td>
+<td>Bit 27: enclave mode；Bit 31: VM-entry failure</td>
+<td>无独立状态位，退出码本身包含全部信息</td>
+</tr>
+<tr>
+<td><strong>辅助信息字段</strong></td>
+<td><code>EXIT_QUALIFICATION</code>、<code>IDT_VECTORING_INFO</code>、<code>GUEST_LINEAR_ADDRESS</code> 等 VMCS 字段</td>
+<td><code>EXITINFO1</code>、<code>EXITINFO2</code>、<code>EXITINTINFO</code> 等 VMCB 控制区字段</td>
+</tr>
+<tr>
+<td><strong>NPT/EPT 退出区分</strong></td>
+<td>统一码 48（EPT violation），需从 <code>EXIT_QUALIFICATION</code> 解析读/写/执行</td>
+<td>分别使用 0x400(读)、0x401(写)、0x402(执行)、0x403(用户态执行)</td>
+</tr>
+<tr>
+<td><strong>CR 访问退出</strong></td>
+<td>统一码 28（MOV to/from CR），需从 <code>EXIT_QUALIFICATION</code> 解析 CR 编号和读/写</td>
+<td>每个 CR 独立退出码（0x000-0x009），直接编码 CR 编号和读/写</td>
+</tr>
+<tr>
+<td><strong>MSR 访问退出</strong></td>
+<td>分两个退出码：31（RDMSR）、32（WRMSR）</td>
+<td>统一码 0x09C，需从 <code>EXITINFO1</code> 判断读/写</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>高级虚拟化特性对比</h2>
+<table>
+<thead>
+<tr>
+<th>特性</th>
+<th>Intel VMX</th>
+<th>AMD SVM</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>中断虚拟化</strong></td>
+<td>Posted Interrupts（将中断直接 posted 到 Guest，无需 VMExit）；APIC Virtualization（virtual EOI、TPR threshold、APIC-access page）</td>
+<td>AVIC（硬件虚拟化本地 APIC，直接交付虚拟中断，无需 VMExit）；VINTR 注入机制</td>
+</tr>
+<tr>
+<td><strong>页表虚拟化</strong></td>
+<td>EPT + VPID（Virtual Processor ID，避免 TLB flush）；EPT violation/misconfiguration 退出</td>
+<td>NPT + ASID（Address Space ID，类似 VPID）；NPT fault 按类型分别退出</td>
+</tr>
+<tr>
+<td><strong>嵌套虚拟化</strong></td>
+<td>VMCS Shadowing（减少 nested VMExit 开销）；VMFUNC（Guest 可自主切换 EPTP）</td>
+<td>Nested SVM（VMCB 嵌套链）；支持 L1 hypervisor 管理 L2 Guest</td>
+</tr>
+<tr>
+<td><strong>加密虚拟化</strong></td>
+<td>TDX (Trust Domain Extensions)：SEAM (Secure Arbitration Mode)、SEAMCALL/TDCALL、Secure EPT</td>
+<td>SEV / SEV-ES / SEV-SNP：内存加密、VMGEXIT + GHCB 通信、Reverse Map Table (RMP)</td>
+</tr>
+<tr>
+<td><strong>Preemption Timer</strong></td>
+<td>VMX Preemption Timer（码 52），倒计时触发 VMExit，用于 Guest 时间片管理</td>
+<td>无专用 Preemption Timer 退出码；使用 Host 计时器 + VINTR/INTR 实现类似功能</td>
+</tr>
+<tr>
+<td><strong>I/O 虚拟化</strong></td>
+<td>I/O Bitmap A/B（按端口范围拦截）；支持 APIC-access page 虚拟化</td>
+<td>I/O Permission Bitmap；支持 AVIC 对 LAPIC 的虚拟化</td>
+</tr>
+<tr>
+<td><strong>VMFUNC</strong></td>
+<td>VM Functions（码 59），允许 Guest 在不触发 VMExit 的情况下执行特定操作（如 EPTP 切换）</td>
+<td>无直接等价物；可通过 VMMCALL 实现类似功能但需 VMExit</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<p><strong>总结</strong></p>
+<p>Intel VMX 和 AMD SVM 在 VMExit 机制上的核心差异在于设计哲学：</p>
+<ul>
+<li>
+<p><strong>Intel</strong> 采用 VMCS 字段驱动 + 统一退出码 + EXIT_QUALIFICATION 解析的模式，灵活性强但解析开销略高</p>
+</li>
+<li>
+<p><strong>AMD</strong> 采用 VMCB 位图驱动 + 细分退出码 + EXITINFO 直接编码的模式，解析开销低但灵活性略低</p>
+</li>
+<li>
+<p>两者在内存虚拟化（EPT vs NPT）、中断虚拟化（Posted Interrupt vs AVIC）、加密虚拟化（TDX vs SEV-SNP）上各有特色，但都遵循 x86 虚拟化的核心原则：trap-and-emulate + 硬件加速</p>
+</li>
+<li>
+<p>随着虚拟化技术演进，两者都在不断减少 mandatory VMExit 的数量，通过硬件辅助（如 APIC virtualization、EPT/NPT、VPID/ASID）将更多操作从 trap-and-emulate 转变为 passthrough</p>
+</li>
+</ul>
+<hr>
+<h2>参考文档</h2>
+<ul>
+<li>
+<p>Intel SDM Vol. 3D, Appendix C — VMX 基本退出原因</p>
+</li>
+<li>
+<p>Intel SDM Vol. 3C, Chapter 23-34 — VMX 架构</p>
+</li>
+<li>
+<p>AMD APM Vol. 2, Chapter 15 — 安全虚拟机（SVM）</p>
+</li>
+<li>
+<p>Linux 内核：arch/x86/include/uapi/asm/vmx.h</p>
+</li>
+<li>
+<p>Linux 内核：arch/x86/include/uapi/asm/svm.h</p>
+</li>
+<li>
+<p>Intel TDX 架构规范</p>
+</li>
+<li>
+<p>AMD SEV-SNP 固件规范</p>
+</li>
+</ul>
+<blockquote>
+<p>（注：部分内容可能由 AI 生成）</p>
+</blockquote>
+
+
+             
+ 
+                <p id="post-share-links">
+    Share on:
+      <a href="https://twitter.com/intent/tweet?text=x86%20%E6%9E%B6%E6%9E%84%20VMExit%20%E7%B1%BB%E5%9E%8B%E5%85%A8%E8%A7%88%EF%BC%88Intel%20VMX%20%26%20AMD%20SVM%EF%BC%89&url=https%3A//blog.kernel.love/x86-vmexit.html&hashtags=virtualization,kvm,vmx,svm,vmexit" target="_blank" rel="nofollow noopener noreferrer" title="Share on Twitter">Twitter</a>
+ ❄       <a href="https://www.facebook.com/sharer/sharer.php?u=https%3A//blog.kernel.love/x86-vmexit.html" target="_blank" rel="nofollow noopener noreferrer" title="Share on Facebook">Facebook</a>
+ ❄       <a href="mailto:?subject=x86%20%E6%9E%B6%E6%9E%84%20VMExit%20%E7%B1%BB%E5%9E%8B%E5%85%A8%E8%A7%88%EF%BC%88Intel%20VMX%20%26%20AMD%20SVM%EF%BC%89&amp;body=https%3A//blog.kernel.love/x86-vmexit.html" target="_blank" rel="nofollow noopener noreferrer" title="Share via Email">Email</a>
+
+            
+            
+
+
+
+
+
+
+
+            <hr/>
+<section>
+    <h2>Related Posts</h2>
+<ul class="related-posts-list">
+<li><a href="https://blog.kernel.love/vmx-vmcs-shadowing.html" title="VMCS Shadowing 技术详解">VMCS Shadowing 技术详解</a></li>
+<li><a href="https://blog.kernel.love/x86-nested-virt-performance.html" title="x86 嵌套虚拟化性能优化项总结">x86 嵌套虚拟化性能优化项总结</a></li>
+<li><a href="https://blog.kernel.love/kvm-pv-steal-time.html" title="KVM PV Steal Time 机制分析">KVM PV Steal Time 机制分析</a></li>
+<li><a href="https://blog.kernel.love/mediated-vpmu.html" title="Mediated vPMU 特性分析">Mediated vPMU 特性分析</a></li>
+<li><a href="https://blog.kernel.love/vcpu-enter-guest.html" title="Linux 5.15 KVM vcpu_enter_guest 函数行级注释">Linux 5.15 KVM vcpu_enter_guest 函数行级注释</a></li>
+</ul>
+<hr />
+</section>
+            <aside>
+            <nav>
+            <ul class="articles-timeline">
+                <li class="previous-article">« <a href="https://blog.kernel.love/vcpu-enter-guest.html" title="Previous: Linux 5.15 KVM vcpu_enter_guest 函数行级注释">Linux 5.15 KVM vcpu_enter_guest 函数行级注释</a></li>
+            </ul>
+            </nav>
+            </aside>
+        </div>
+        <section id="article-sidebar" class="span2">
+            <h4>Published</h4>
+            <time itemprop="dateCreated" datetime="2026-07-16T14:00:00+08:00">Thu 16 July 2026</time>
+
+            <h4>Category</h4>
+            <a class="category-link" href="https://blog.kernel.love/categories.html#virt-ref">virt</a>
+            <h4>Tags</h4>
+            <ul class="list-of-tags tags-in-article">
+                <li><a href="https://blog.kernel.love/tags.html#kvm-ref">kvm
+                    <span class="superscript">4</span>
+</a></li>
+                <li><a href="https://blog.kernel.love/tags.html#svm-ref">svm
+                    <span class="superscript">1</span>
+</a></li>
+                <li><a href="https://blog.kernel.love/tags.html#virtualization-ref">virtualization
+                    <span class="superscript">20</span>
+</a></li>
+                <li><a href="https://blog.kernel.love/tags.html#vmexit-ref">vmexit
+                    <span class="superscript">1</span>
+</a></li>
+                <li><a href="https://blog.kernel.love/tags.html#vmx-ref">vmx
+                    <span class="superscript">1</span>
+</a></li>
+            </ul>
+<h4>Contact</h4>
+<div id="sidebar-social-link">
+    <a href="https://github.com/fangying" title="" target="_blank" rel="nofollow noopener noreferrer">
+        <svg xmlns="http://www.w3.org/2000/svg" aria-label="GitHub" role="img" viewBox="0 0 512 512"><rect width="512" height="512" rx="15%" fill="#1B1817"/><path fill="#fff" d="M335 499c14 0 12 17 12 17H165s-2-17 12-17c13 0 16-6 16-12l-1-50c-71 16-86-28-86-28-12-30-28-37-28-37-24-16 1-16 1-16 26 2 40 26 40 26 22 39 59 28 74 22 2-17 9-28 16-35-57-6-116-28-116-126 0-28 10-51 26-69-3-6-11-32 3-67 0 0 21-7 70 26 42-12 86-12 128 0 49-33 70-26 70-26 14 35 6 61 3 67 16 18 26 41 26 69 0 98-60 120-117 126 10 8 18 24 18 48l-1 70c0 6 3 12 16 12z"/></svg>
+    </a>
+</div>
+            
+
+
+
+
+
+            
+
+
+
+
+
+        </section>
+</div>
+</article>
+<!-- Root element of PhotoSwipe. Must have class pswp. -->
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    <!-- Background of PhotoSwipe.
+         It's a separate element as animating opacity is faster than rgba(). -->
+    <div class="pswp__bg"></div>
+
+    <!-- Slides wrapper with overflow:hidden. -->
+    <div class="pswp__scroll-wrap">
+
+        <!-- Container that holds slides.
+            PhotoSwipe keeps only 3 of them in the DOM to save memory.
+            Don't modify these 3 pswp__item elements, data is added later on. -->
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        <!-- Default (PhotoSwipeUI_Default) interface on top of sliding area. Can be changed. -->
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                <!--  Controls are self-explanatory. Order can be changed. -->
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                <!-- Preloader demo https://codepen.io/dimsemenov/pen/yyBWoR -->
+                <!-- element will get class pswp__preloader--active when preloader is running -->
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                      <div class="pswp__preloader__cut">
+                        <div class="pswp__preloader__donut"></div>
+                      </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>                    </div>
+                    <div class="span1"></div>
+                </div>
+            </div>
+        </div>
+<footer>
+    <div>
+        <span xmlns:dct="http://purl.org/dc/terms/" property="dct:title"> blog.kernel.love"</span> by <a xmlns:cc="http://creativecommons.org/ns#" href="https://blog.kernel.love" property="cc:attributionName" rel="cc:attributionURL">Yori Fang</a> is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/3.0/deed.en_US">Creative Commons Attribution-ShareAlike 3.0 Unported License</a>.
+    </div>
+
+
+
+
+    <div id="fpowered">
+        Powered by: <a href="http://getpelican.com/" title="Pelican Home Page" target="_blank" rel="nofollow noopener noreferrer">Pelican</a>
+        Theme: <a href="https://elegant.oncrashreboot.com/" title="Theme Elegant Home Page" target="_blank" rel="nofollow noopener noreferrer">Elegant</a>
+    </div>
+</footer>            <script src="//code.jquery.com/jquery.min.js"></script>
+        <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/js/bootstrap.min.js"></script>
+        <script src="https://blog.kernel.love/theme/js/elegant.prod.9e9d5ce754.js"></script>
+        <script>
+            function validateForm(query)
+            {
+                return (query.length > 0);
+            }
+        </script>
+
+    <script>
+    (function () {
+        if (window.location.hash.match(/^#comment-\d+$/)) {
+            $('#comment_thread').collapse('show');
+        }
+    })();
+    window.onhashchange=function(){
+        if (window.location.hash.match(/^#comment-\d+$/))
+            window.location.reload(true);
+    }
+    $('#comment_thread').on('shown', function () {
+        var link = document.getElementById('comment-accordion-toggle');
+        var old_innerHTML = link.innerHTML;
+        $(link).fadeOut(200, function() {
+            $(this).text('Click here to hide comments').fadeIn(200);
+        });
+        $('#comment_thread').on('hidden', function () {
+            $(link).fadeOut(200, function() {
+                $(this).text(old_innerHTML).fadeIn(200);
+            });
+        })
+    })
+</script>
+
+    </body>
+    <!-- Theme: Elegant built for Pelican
+        License : MIT -->
+</html>
