@@ -1,4 +1,4 @@
-Title: Linux 5.15 KVM vcpu_enter_guest 函数行级注释
+Title: vcpu_enter_guest
 Date: 2026-7-13 08:00
 Modified: 2026-7-13 17:20
 Tags: virtualization, kvm, kernel
@@ -7,7 +7,9 @@ Status: published
 Authors: Yori Fang
 Summary: 对 Linux 5.15 KVM x86 核心函数 vcpu_enter_guest 的行级注释，覆盖 VM Entry 前的请求处理、事件注入、状态同步与 VM Exit 后的清理派发流程。
 
-# Linux 5\.15\.120 KVM vcpu\_enter\_guest 函数行级注释
+# vcpu\_enter\_guest
+
+linux 5.15 kvm vcpu\_enter\_guest函数行级注释
 
 **函数位置**：`arch/x86/kvm/x86.c`，第 9697 \- 10045 行\(共约 348 行\)
 
