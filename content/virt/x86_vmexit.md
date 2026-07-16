@@ -1,4 +1,4 @@
-Title: x86 架构 VMExit 类型全览（Intel VMX & AMD SVM）
+Title: x86 vmexit
 Date: 2026-7-16 14:00
 Modified: 2026-7-16 14:00
 Tags: virtualization, kvm, vmx, svm, vmexit
@@ -7,7 +7,7 @@ Status: published
 Authors: Yori Fang
 Summary: 系统梳理 x86 虚拟化架构下 Intel VMX 与 AMD SVM 两个平台的所有 VMExit 类型，涵盖退出码、触发原因及 VMM 典型处理方式。
 
-# x86 架构 VMExit 类型全览（Intel VMX \& AMD SVM）
+# x86 VMExit
 
 本文档系统梳理了 x86 虚拟化架构下 **Intel VMX** 和 **AMD SVM** 两个平台的所有 VMExit（虚拟机退出）类型，涵盖每种退出的退出码、触发原因、以及 VMM（虚拟机监控器）的典型处理方式。
 
