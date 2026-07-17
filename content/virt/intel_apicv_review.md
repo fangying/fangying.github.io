@@ -1,4 +1,13 @@
-# Intel APICv 的设计和实现分析
+Title: Intel APICv Review
+Date: 2026-7-17 17:00
+Modified: 2026-7-17 17:00
+Tags: virtualization, kvm, apicv, intel, posted-interrupt
+Slug: intel-apicv-analysis
+Status: published
+Authors: Yori Fang
+Summary: 深入分析 Intel APICv 的硬件机制与 Linux KVM 实现，涵盖 TPR shadow、APIC-access page、virtual-APIC page、APIC-register virtualization、posted interrupts 等逐层减少 VM Exit 的虚拟化技术。
+
+# Intel APICv Review
 
 > 文档类型：体系结构与 Linux KVM 实现分析  
 > Intel 架构基线：Intel® 64 and IA-32 SDM Vol. 3A/3B/3C/3D，版本 092，2026-06  
