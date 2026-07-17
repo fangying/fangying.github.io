@@ -1,0 +1,1633 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://blog.kernel.love/theme/css/style.min.css?2fcac227">
+
+        <link rel="dns-prefetch" href="//fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin>
+
+        <meta name="author" content="Yori Fang" />
+
+        <meta name="description" content="深入分析 Intel APICv 的硬件机制与 Linux KVM 实现，涵盖 TPR shadow、APIC-access page、virtual-APIC page、APIC-register virtualization、posted interrupts 等逐层减少 VM Exit 的虚拟化技术。
+" />
+        <meta property="og:type" content="article" />
+        <meta name="twitter:card" content="summary">
+
+<meta name="keywords" content="virtualization, kvm, apicv, intel, posted-interrupt, virt, " />
+
+<meta property="og:title" content="Intel APICv 的设计和实现分析 "/>
+<meta property="og:url" content="https://blog.kernel.love/intel-apicv-analysis.html" />
+<meta property="og:description" content="深入分析 Intel APICv 的硬件机制与 Linux KVM 实现，涵盖 TPR shadow、APIC-access page、virtual-APIC page、APIC-register virtualization、posted interrupts 等逐层减少 VM Exit 的虚拟化技术。" />
+<meta property="og:site_name" content="blog.kernel.love" />
+<meta property="og:article:author" content="Yori Fang" />
+<meta property="og:article:published_time" content="2026-07-17T17:00:00+08:00" />
+<meta property="og:article:modified_time" content="2026-07-17T17:00:00+08:00" />
+<meta name="twitter:title" content="Intel APICv 的设计和实现分析 ">
+<meta name="twitter:description" content="深入分析 Intel APICv 的硬件机制与 Linux KVM 实现，涵盖 TPR shadow、APIC-access page、virtual-APIC page、APIC-register virtualization、posted interrupts 等逐层减少 VM Exit 的虚拟化技术。">
+
+        <title>Intel APICv 的设计和实现分析  · blog.kernel.love
+</title>
+
+<script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+     (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+     m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+     })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+    ga('create', 'UA-107392039-2', 'auto');
+    ga('send', 'pageview');
+</script>
+
+
+    </head>
+    <body>
+        <div id="content">
+            <div class="navbar navbar-static-top">
+                <div class="navbar-inner">
+                    <div class="container-fluid">
+                        <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                        </a>
+                        <a class="brand" href="https://blog.kernel.love/"><span class=site-name>blog.kernel.love</span></a>
+                        <div class="nav-collapse collapse">
+                            <ul class="nav pull-right top-menu">
+                                <li >
+                                    <a href=
+                                       https://blog.kernel.love
+                                    >Home</a>
+                                </li>
+                                <li ><a href="https://blog.kernel.love/pages/about.html">About</a></li>
+                                <li ><a href="https://blog.kernel.love/categories.html">Categories</a></li>
+                                <li ><a href="https://blog.kernel.love/tags.html">Tags</a></li>
+                                <li ><a href="https://blog.kernel.love/archives.html">Archives</a></li>
+                                <li><form class="navbar-search" action="https://blog.kernel.love/search.html" onsubmit="return validateForm(this.elements['q'].value);"> <input type="text" class="search-query" placeholder="Search" name="q" id="tipue_search_input"></form></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="container-fluid">
+                <div class="row-fluid">
+                    <div class="span1"></div>
+                    <div class="span10">
+<article itemscope>
+<div class="row-fluid">
+    <header class="page-header span10 offset2">
+        <h1>
+            <a href="https://blog.kernel.love/intel-apicv-analysis.html">
+                Intel APICv 的设计和实现分析
+            </a>
+        </h1>
+    </header>
+</div>
+
+<div class="row-fluid">
+        <div class="span8 offset2 article-content">
+            
+            <h1>Intel APICv 的设计和实现分析</h1>
+<blockquote>
+<p>文档类型：体系结构与 Linux KVM 实现分析<br>
+Intel 架构基线：Intel® 64 and IA-32 SDM Vol. 3A/3B/3C/3D，版本 092，2026-06<br>
+VT-d 基线：Intel® VT-d Architecture Specification，Intel 页面版本 5.2 / PDF Revision 5.10，2025-11<br>
+KVM 代码基线：Linux 主线提交 <a href="https://github.com/torvalds/linux/commit/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f"><code>481ed5dd3ed7</code></a>（7.2-rc3）<br>
+说明：文中的 Intel SDM 插图均截取自版本 092，仅用于技术分析；章节号会随 SDM 修订发生变化。</p>
+</blockquote>
+<h2>摘要</h2>
+<p>APICv（APIC Virtualization）不是单一开关，而是一组逐层减少 VM Exit 的硬件机制：</p>
+<ol>
+<li>用 <strong>TPR shadow</strong> 消除 Guest 通过 CR8/TPR 修改中断优先级时的部分 VM Exit；</li>
+<li>用 <strong>APIC-access page + virtual-APIC page</strong> 加速 xAPIC 的 MMIO 寄存器访问；</li>
+<li>用 <strong>x2APIC virtualization + APIC-register virtualization</strong> 加速 x2APIC 的 MSR 访问；</li>
+<li>用 <strong>Virtual-interrupt delivery</strong> 在 VMX non-root 中完成待处理中断的优先级判断和投递；</li>
+<li>用 <strong>Posted Interrupt（PI）</strong> 把软件或设备产生的虚拟中断先记录到每 vCPU 的 PID，再通过一个物理通知中断让 CPU 将其合入 virtual-APIC page，目标 vCPU 正在运行时可不退出到 KVM；</li>
+<li>用较新的 <strong>IPI virtualization</strong> 让 Guest 的普通定向 IPI 也可以由硬件通过 PID-pointer table 直接投递，而不再总是 VM Exit 到 KVM。</li>
+</ol>
+<p>APICv 的核心思想可以概括为：</p>
+<blockquote>
+<p>把“访问虚拟 APIC 寄存器”“维护虚拟 LAPIC 状态”“选择可投递的虚拟中断”“通知正在运行的目标 vCPU”这几条高频路径，从 KVM 软件慢路径下沉到处理器和中断重映射硬件。</p>
+</blockquote>
+<p>但 APICv 并没有删除 KVM 的软件 LAPIC。KVM 仍负责建立和恢复 LAPIC 状态、处理硬件无法虚拟化的寄存器副作用、维护 EOI 语义、处理 vCPU 调度迁移、配置 VT-d IRTE、支持嵌套虚拟化，并在约束不满足时动态关闭 APICv、回退到软件注入。</p>
+<hr>
+<h2>1. 为什么需要 APIC 虚拟化</h2>
+<h3>1.1 Local APIC 在中断路径中的位置</h3>
+<p>每个逻辑 CPU 都有一个 Local APIC。它至少承担以下职责：</p>
+<ul>
+<li>接收来自 I/O APIC、MSI/MSI-X、其他 CPU 的 IPI 和本地中断源；</li>
+<li>通过 IRR（Interrupt Request Register）保存尚未服务的中断；</li>
+<li>通过 ISR（In-Service Register）保存正在服务的中断；</li>
+<li>通过 TPR/PPR 和中断向量的高 4 位进行优先级仲裁；</li>
+<li>通过 EOI 完成当前中断并允许后续中断进入；</li>
+<li>通过 ICR 发送 IPI；</li>
+<li>维护 Local APIC Timer 和 LVT。</li>
+</ul>
+<p><img alt="Intel SDM Figure 13-4：Local APIC Structure" src="images/sdm-local-apic-structure.png"></p>
+<p>上图来自 Intel SDM Figure 13-4。理解 APICv 时最重要的是右侧的 <code>IRR → Prioritizer → ISR → EOI</code> 状态机。APICv 的 virtual-APIC page 基本沿用了这套寄存器布局，Virtual-interrupt delivery 则在硬件中实现了这条状态机的关键部分。</p>
+<h3>1.2 纯软件虚拟化的成本</h3>
+<p>没有 APICv 时，Guest 的 LAPIC 一般由 KVM 的 in-kernel LAPIC 模拟：</p>
+<div class="highlight"><pre><span></span><code>Guest 访问 LAPIC MMIO/MSR
+        ↓
+VM Exit
+        ↓
+KVM 解码指令或 MSR，模拟寄存器语义
+        ↓
+更新软件 IRR/ISR/TPR/PPR
+        ↓
+必要时配置 VM-entry interruption-information 字段
+        ↓
+VM Entry 返回 Guest
+</code></pre></div>
+
+<p>中断密集型负载会频繁执行 TPR、EOI、ICR、x2APIC MSR 操作；设备中断和 vCPU 间 IPI 也会频繁唤醒目标 vCPU。每次 VM Exit/Entry 不仅有固定切换成本，还会扰动流水线、缓存和分支预测状态。APICv 的性能价值主要来自减少这些高频退出，而不是改变 Guest 看到的 APIC 编程模型。</p>
+<h3>1.3 三种需要分开理解的“中断虚拟化”</h3>
+<p>容易混淆的三条路径是：</p>
+<table>
+<thead>
+<tr>
+<th>路径</th>
+<th>典型动作</th>
+<th>APICv 负责的部分</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Guest 访问 LAPIC</td>
+<td>读写 TPR、EOI、ICR、IRR/ISR 等</td>
+<td>寄存器访问虚拟化、部分写副作用模拟</td>
+</tr>
+<tr>
+<td>KVM 向 vCPU 注入中断</td>
+<td>虚拟 IOAPIC、定时器、其他 vCPU 产生中断</td>
+<td>PIR/IRR、RVI、Virtual-interrupt delivery</td>
+</tr>
+<tr>
+<td>直通设备产生中断</td>
+<td>VFIO 设备发 MSI/MSI-X</td>
+<td>VT-d Interrupt Posting + CPU Posted-Interrupt processing</td>
+</tr>
+</tbody>
+</table>
+<p>第一条是“寄存器访问加速”，第二条是“虚拟中断注入加速”，第三条是“设备中断直投”。三者共享 virtual-APIC/PID 等状态，但触发者和硬件路径不同。</p>
+<hr>
+<h2>2. APICv 能力栈与依赖关系</h2>
+<p>当前 SDM Chapter 32 列出七项相关控制。原始笔记列出了六项，缺少后来加入的 IPI virtualization。</p>
+<h3>2.1 VM-execution controls</h3>
+<table>
+<thead>
+<tr>
+<th>控制</th>
+<th>VMCS 控制类别</th>
+<th>解决的问题</th>
+<th>典型依赖</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Use TPR shadow</td>
+<td>Primary processor-based bit 21</td>
+<td>CR8/TPR 读写无需总是退出</td>
+<td>in-kernel LAPIC、virtual-APIC page</td>
+</tr>
+<tr>
+<td>Virtualize APIC accesses</td>
+<td>Secondary bit 0</td>
+<td>识别 xAPIC MMIO 对 APIC-access page 的访问</td>
+<td>TPR shadow、APIC-access address</td>
+</tr>
+<tr>
+<td>Virtualize x2APIC mode</td>
+<td>Secondary bit 4</td>
+<td>特殊处理 <code>0x800–0x8ff</code> APIC MSR</td>
+<td>TPR shadow、MSR bitmap</td>
+</tr>
+<tr>
+<td>APIC-register virtualization</td>
+<td>Secondary bit 8</td>
+<td>从 virtual-APIC page 直接满足多数 APIC 读取；转发部分写</td>
+<td>TPR shadow</td>
+</tr>
+<tr>
+<td>Virtual-interrupt delivery</td>
+<td>Secondary bit 9</td>
+<td>评估并在 non-root 中投递虚拟中断</td>
+<td>TPR shadow、Guest interrupt status</td>
+</tr>
+<tr>
+<td>Process posted interrupts</td>
+<td>Pin-based bit 7</td>
+<td>识别通知向量，将 PID.PIR 合并到 VIRR</td>
+<td>Virtual-interrupt delivery、External-interrupt exiting</td>
+</tr>
+<tr>
+<td>IPI virtualization</td>
+<td>Tertiary bit 4</td>
+<td>Guest 定向 IPI 通过 PID-pointer table 直投</td>
+<td>APICv、tertiary controls、PID table</td>
+</tr>
+</tbody>
+</table>
+<p><img alt="Intel SDM：Primary controls 中的 TPR shadow" src="images/sdm-primary-controls-tpr-shadow.png"></p>
+<p><img alt="Intel SDM Table 27-7：xAPIC/x2APIC 访问虚拟化" src="images/sdm-secondary-apicv-access-controls.png"></p>
+<p><img alt="Intel SDM Table 27-7：APIC-register virtualization 与 Virtual-interrupt delivery" src="images/sdm-secondary-apicv-register-delivery-controls.png"></p>
+<p><img alt="Intel SDM Table 27-8：IPI virtualization" src="images/sdm-tertiary-ipi-virtualization.png"></p>
+<p>这些控制不是任意组合。Intel 规定：</p>
+<ul>
+<li><code>APIC-register virtualization</code>、<code>Virtualize x2APIC mode</code> 和 <code>Virtual-interrupt delivery</code> 依赖 <code>Use TPR shadow</code>；</li>
+<li><code>Process posted interrupts</code> 依赖 <code>Virtual-interrupt delivery</code>；</li>
+<li>VM Entry 只允许在 <code>External-interrupt exiting=1</code> 时启用 <code>Process posted interrupts</code>；</li>
+<li>Secondary controls 只有在 Primary 的 <code>Activate secondary controls=1</code> 时有效；</li>
+<li>IPI virtualization 只有在 Primary 的 <code>Activate tertiary controls=1</code> 时有效。</li>
+</ul>
+<p>KVM 在 <a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx/vmx.c#L2731"><code>setup_vmcs_config()</code></a> 中按照这些依赖过滤硬件能力。例如硬件没有 <code>TPR shadow</code> 时，KVM 会同时清除 APIC-register virtualization、x2APIC virtualization 和 Virtual-interrupt delivery；没有 Virtual-interrupt delivery 时也不会启用 Posted Interrupt。</p>
+<h3>2.2 能力代际</h3>
+<p>APICv 在工程语境中有时被宽泛地用来指所有 APIC 加速，但可以按能力分层：</p>
+<div class="highlight"><pre><span></span><code>FlexPriority / TPR shadow
+        ↓
+xAPIC-access virtualization + x2APIC virtualization
+        ↓
+APIC-register virtualization + Virtual-interrupt delivery
+        ↓
+Posted Interrupt（软件/设备向目标 vCPU 投递）
+        ↓
+IPI virtualization（Guest 发送普通定向 IPI 的硬件化）
+</code></pre></div>
+
+<p>Linux KVM 当前用 <a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx/capabilities.h#L287"><code>cpu_has_vmx_apicv()</code></a> 将 <code>APIC-register virtualization + Virtual-interrupt delivery + Posted Interrupt</code> 作为完整 VMX APICv 的基本条件；xAPIC MMIO 和 x2APIC MSR 的访问虚拟化能力则分别判断。</p>
+<hr>
+<h2>3. 核心数据结构</h2>
+<h3>3.1 总览</h3>
+<table>
+<thead>
+<tr>
+<th>数据结构/字段</th>
+<th style="text-align: right;">粒度</th>
+<th>主要内容</th>
+<th>KVM 中的对应物</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>APIC-access page</td>
+<td style="text-align: right;">通常每 VM 一个 4 KiB 页面</td>
+<td>xAPIC MMIO 访问的识别入口，不是 vCPU 的 LAPIC 状态</td>
+<td>KVM 私有 memslot，GPA 通常为 <code>0xfee00000</code></td>
+</tr>
+<tr>
+<td>virtual-APIC page</td>
+<td style="text-align: right;">每 vCPU 一个 4 KiB 页面</td>
+<td>VTPR、VPPR、VISR、VIRR、VEOI、VICR 等</td>
+<td><code>vcpu-&gt;arch.apic-&gt;regs</code></td>
+</tr>
+<tr>
+<td>Guest interrupt status</td>
+<td style="text-align: right;">每 vCPU VMCS 的 16 位字段</td>
+<td>低 8 位 RVI，高 8 位 SVI</td>
+<td><code>GUEST_INTR_STATUS</code></td>
+</tr>
+<tr>
+<td>EOI-exit bitmap</td>
+<td style="text-align: right;">每 vCPU VMCS，4×64 位</td>
+<td>指定哪些向量的 EOI 需要 VM Exit</td>
+<td><code>EOI_EXIT_BITMAP0..3</code></td>
+</tr>
+<tr>
+<td>Posted-Interrupt Descriptor</td>
+<td style="text-align: right;">每 vCPU 一个 64 字节结构</td>
+<td>PIR、ON、SN、NV、NDST</td>
+<td><code>struct pi_desc</code> / <code>vcpu_vt.pi_desc</code></td>
+</tr>
+<tr>
+<td>PID-pointer table</td>
+<td style="text-align: right;">每 VM 一个表</td>
+<td>virtual APIC ID → PID 物理地址</td>
+<td><code>kvm_vmx-&gt;pid_table</code></td>
+</tr>
+</tbody>
+</table>
+<h3>3.2 APIC-access page 与 virtual-APIC page</h3>
+<p>这两个页面名字相近，但作用完全不同：</p>
+<div class="highlight"><pre><span></span><code>Guest xAPIC MMIO 地址（通常 GPA 0xfee00000）
+                    │
+                    ▼
+             APIC-access page
+        （每 VM 共享的访问识别入口）
+                    │ CPU 按 VMCS 控制判断
+          ┌─────────┴──────────┐
+          ▼                    ▼
+   APIC-access VM Exit    重定向/读取/写入
+                               │
+                               ▼
+                       virtual-APIC page
+                      （每 vCPU 的 LAPIC 状态）
+</code></pre></div>
+
+<p>为什么需要两个页面：Guest 的页表/EPT 映射可以在所有 vCPU 间共享同一个 APIC MMIO 入口，但每个 vCPU 必须看到自己的 Local APIC 状态。因而各 vCPU VMCS 可以使用相同的 APIC-access address，却必须使用不同的 virtual-APIC address。</p>
+<p>KVM 通过 <a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/lapic.c#L2901"><code>kvm_alloc_apic_access_page()</code></a> 建立内部 memslot；<a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx/vmx.c#L6946"><code>vmx_set_apic_access_page_addr()</code></a> 取得 PFN 并写入 <code>APIC_ACCESS_ADDR</code>。KVM 不长期 pin 这个页面，页面迁移或失效后通过 <code>KVM_REQ_APIC_PAGE_RELOAD</code> 重新装载。</p>
+<p>virtual-APIC page 直接复用 KVM 的 LAPIC 寄存器页。vCPU 初始化时，<a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx/vmx.c#L4977"><code>vmx.c</code></a> 把 <code>__pa(vcpu-&gt;arch.apic-&gt;regs)</code> 写入 <code>VIRTUAL_APIC_PAGE_ADDR</code>。因此它既是 KVM 的软件 LAPIC 状态，也是硬件 APICv 的共享状态页。</p>
+<h3>3.3 virtual-APIC page 中的关键寄存器</h3>
+<table>
+<thead>
+<tr>
+<th>名称</th>
+<th>偏移/组成</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>VTPR</td>
+<td><code>0x080</code></td>
+<td>虚拟 Task Priority Register</td>
+</tr>
+<tr>
+<td>VPPR</td>
+<td><code>0x0a0</code></td>
+<td>虚拟 Processor Priority Register</td>
+</tr>
+<tr>
+<td>VEOI</td>
+<td><code>0x0b0</code></td>
+<td>虚拟 EOI</td>
+</tr>
+<tr>
+<td>VISR</td>
+<td><code>0x100..0x170</code>，8×32 位</td>
+<td>正在服务的虚拟中断位图</td>
+</tr>
+<tr>
+<td>VIRR</td>
+<td><code>0x200..0x270</code>，8×32 位</td>
+<td>待服务的虚拟中断位图</td>
+</tr>
+<tr>
+<td>VICR_LO/HI</td>
+<td><code>0x300/0x310</code></td>
+<td>虚拟 ICR，用于 self-IPI/IPI virtualization</td>
+</tr>
+</tbody>
+</table>
+<p>这些偏移与 xAPIC 的 4 KiB 寄存器布局一致，所以硬件可以把合法的 APIC-access page 操作映射到同偏移的 virtual-APIC page。</p>
+<h3>3.4 RVI 与 SVI</h3>
+<p><code>GUEST_INTR_STATUS</code> 不对应真实 APIC 寄存器，而是 VMCS 中的 APICv 元数据：</p>
+<ul>
+<li><strong>RVI（Requesting Virtual Interrupt）</strong>：低 8 位，当前最高优先级待处理虚拟中断向量；</li>
+<li><strong>SVI（Servicing Virtual Interrupt）</strong>：高 8 位，当前最高优先级正在服务的虚拟中断向量。</li>
+</ul>
+<p><img alt="Intel SDM：Guest interrupt status 中的 RVI/SVI" src="images/sdm-guest-interrupt-status.png"></p>
+<p>VIRR/VISR 是 256 位集合；RVI/SVI 是各自集合的最高向量缓存。KVM 的 <a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx/vmx.c#L7014"><code>vmx_set_rvi()</code> 与 <code>vmx_hwapic_isr_update()</code></a> 分别更新它们。</p>
+<h3>3.5 Posted-Interrupt Descriptor</h3>
+<p>PID 是 64 字节、64 字节对齐的数据结构，通常每个 vCPU 一个：</p>
+<p><img alt="Intel SDM Table 32-1：Posted-Interrupt Descriptor" src="images/sdm-posted-interrupt-descriptor.png"></p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PIR[255:0]</td>
+<td>每个虚拟中断向量一个 bit；置 1 表示该向量已 posted</td>
+</tr>
+<tr>
+<td>ON</td>
+<td>Outstanding Notification；1 表示已有通知在途，防止重复通知风暴</td>
+</tr>
+<tr>
+<td>SN</td>
+<td>Suppress Notification；1 表示暂时不发送普通通知</td>
+</tr>
+<tr>
+<td>NV</td>
+<td>Notification Vector；发送给物理 CPU 的通知向量</td>
+</tr>
+<tr>
+<td>NDST</td>
+<td>Notification Destination；目标物理 CPU 的 APIC ID</td>
+</tr>
+</tbody>
+</table>
+<p>KVM 的 <a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/include/asm/posted_intr.h#L20"><code>struct pi_desc</code></a> 与硬件布局一致，并以 64 字节对齐。PIR、ON 和控制字必须用原子操作更新，因为目标 CPU、其他 vCPU 和 IOMMU 可能同时访问该 cache line。</p>
+<h3>3.6 PID-pointer table</h3>
+<p>IPI virtualization 需要从 Guest 提供的目标 virtual APIC ID 找到目标 PID。VMCS 因此新增：</p>
+<ul>
+<li><code>PID_POINTER_TABLE</code>：表的物理地址；</li>
+<li><code>LAST_PID_POINTER_INDEX</code>：最后一个有效索引；</li>
+<li>每个 64 位表项的 bit 0 是 valid，bits 63:6 是 PID 地址。</li>
+</ul>
+<p>KVM 在 <a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx/vmx.c#L4840"><code>vmx_alloc_ipiv_pid_table()</code></a> 为 VM 分配表，在 vCPU 创建时写入 <code>PID physical address | valid</code>，再由 <code>init_vmcs()</code> 将表地址与最大 vCPU ID 写入 VMCS。</p>
+<div class="highlight"><pre><span></span><code>硬件架构硬限制（Intel SDM 规定）
+PID-pointer table 是4KB 对齐的单页表，每个表项是 8 字节（64bit），存放对应 APIC ID 的 PID 物理地址：
+单页 4096B / 8B per entry = 512 个表项
+VMCS 中 LAST_PID_POINTER_INDEX 是16bit 无符号值，理论上限 65535，但硬件强制要求 PID-pointer table 只能是单个 4K 页，因此硬件原生上限：
+单 VM IPIv 原生硬件最大支持：512 个 vCPU（APIC ID 0~511）
+索引范围 0 ~ LAST_PID_POINTER_INDEX，最大值固定 511，对应 512 个 vCPU。
+因此，超过512个vCPU无法享受IPIv加速功能！！！
+</code></pre></div>
+
+<hr>
+<h2>4. 虚拟中断优先级状态机</h2>
+<h3>4.1 TPR、PPR 与向量优先级</h3>
+<p>x86 APIC 使用向量高 4 位作为 priority class。简化关系为：</p>
+<div class="highlight"><pre><span></span><code>VTPR.class = VTPR[7:4]
+SVI.class  = SVI[7:4]
+
+如果 VTPR.class &gt;= SVI.class：VPPR = VTPR &amp; 0xff
+否则：                       VPPR = SVI &amp; 0xf0
+</code></pre></div>
+
+<p>Virtual-interrupt delivery 评估待处理中断时，核心条件是：</p>
+<div class="highlight"><pre><span></span><code>RVI[7:4] &gt; VPPR[7:4]
+</code></pre></div>
+
+<p>也就是说，只有最高待处理中断的优先级类严格高于当前处理器优先级时才会被识别。</p>
+<h3>4.2 TPR virtualization</h3>
+<p>启用 <code>Use TPR shadow</code> 后：</p>
+<ul>
+<li><code>MOV from CR8</code> 从 VTPR[7:4] 返回优先级；</li>
+<li><code>MOV to CR8</code> 写入 VTPR[7:4]；</li>
+<li>xAPIC 的 <code>0x80</code> MMIO 和 x2APIC 的 <code>MSR 0x808</code> 也可以走同一虚拟状态；</li>
+<li>如果没有 Virtual-interrupt delivery，VTPR 低于 VMCS 的 TPR threshold 时产生 trap-like <code>TPR below threshold</code> VM Exit；</li>
+<li>如果启用了 Virtual-interrupt delivery，则硬件重算 VPPR 并重新评估待处理中断。</li>
+</ul>
+<p>KVM 的 <code>vmx_exec_control()</code> 在能够使用 TPR shadow 时清除 CR8 load/store exiting，否则重新打开 CR8 退出。这体现了“硬件快路径不可用就回到拦截”的基本策略。</p>
+<h3>4.3 EOI virtualization</h3>
+<p>Guest 写 EOI 时，硬件大致执行：</p>
+<div class="highlight"><pre><span></span><code>vector = SVI
+VISR[vector] = 0
+SVI = highest_set_bit(VISR)，没有则为 0
+重算 VPPR
+
+如果 EOI_EXIT_BITMAP[vector] == 1：
+    产生 EOI-induced VM Exit
+否则：
+    重新评估待处理中断
+</code></pre></div>
+
+<p>EOI-exit bitmap 的意义是：多数普通 EOI 可以由硬件完成，但某些向量仍必须通知 KVM。例如来自虚拟 IOAPIC 的 level-triggered 中断需要 KVM 完成远端 IRR/解除电平状态等软件语义。</p>
+<p>KVM 用 <a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx/vmx.c#L7124"><code>vmx_load_eoi_exitmap()</code></a> 装载 256 位 bitmap；<code>handle_apic_eoi_induced()</code> 处理硬件要求退出的向量。</p>
+<h3>4.4 待处理中断的识别与投递</h3>
+<p>硬件只在以下事件后重新评估 pending virtual interrupt：</p>
+<ul>
+<li>VM Entry；</li>
+<li>TPR virtualization；</li>
+<li>EOI virtualization；</li>
+<li>self-IPI virtualization；</li>
+<li>posted-interrupt processing。</li>
+</ul>
+<p>识别条件除了 <code>RVI.class &gt; VPPR.class</code>，还要求 <code>Interrupt-window exiting=0</code>。真正投递发生在指令边界，并要求：</p>
+<ul>
+<li><code>RFLAGS.IF=1</code>；</li>
+<li>没有 STI blocking；</li>
+<li>没有 MOV SS/POP SS blocking；</li>
+<li><code>Interrupt-window exiting=0</code>。</li>
+</ul>
+<p>投递时硬件执行的核心状态迁移为：</p>
+<div class="highlight"><pre><span></span><code>vector = RVI
+VISR[vector] = 1
+SVI = vector
+VPPR = vector &amp; 0xf0
+VIRR[vector] = 0
+RVI = highest_set_bit(VIRR)，没有则为 0
+向 Guest IDT 投递 vector
+</code></pre></div>
+
+<p>整个过程发生在 VMX non-root，不需要先退出到 KVM，也通常不需要 KVM 在下一次 VM Entry 中填写 interruption-information 字段。</p>
+<hr>
+<h2>5. xAPIC MMIO 访问虚拟化</h2>
+<h3>5.1 三种处理结果</h3>
+<p>Guest 在 xAPIC 模式访问通常位于 <code>0xfee00000</code> 的 MMIO 页面时，可能出现三种结果：</p>
+<table>
+<thead>
+<tr>
+<th>结果</th>
+<th>原因</th>
+<th>KVM 处理</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>硬件直接完成</td>
+<td>寄存器/访问宽度受支持，相关 APICv 控制已启用</td>
+<td>无 VM Exit</td>
+</tr>
+<tr>
+<td>APIC-access VM Exit</td>
+<td>访问无法硬件虚拟化，或控制未启用</td>
+<td><code>handle_apic_access()</code>，必要时完整指令模拟</td>
+</tr>
+<tr>
+<td>APIC-write VM Exit</td>
+<td>写已转发到 virtual-APIC page，但副作用需软件补全</td>
+<td><code>handle_apic_write()</code>，trap-like，不再前移 RIP</td>
+</tr>
+</tbody>
+</table>
+<p>这与普通 EPT 异常是不同路径：</p>
+<ul>
+<li><strong>EPT violation</strong>：二阶段页表权限或映射导致的通用内存退出；</li>
+<li><strong>EPT misconfiguration</strong>：EPT 表项组合非法，通常不应作为正常 MMIO 截获的泛称；</li>
+<li><strong>APIC-access VM Exit</strong>：处理器识别到对 VMCS 指定 APIC-access page 的特殊访问；</li>
+<li><strong>APIC-write VM Exit</strong>：硬件已完成写入和必要别名转换，但要求 VMM 模拟寄存器副作用。</li>
+</ul>
+<h3>5.2 读路径</h3>
+<p>在访问宽度、对齐、目标寄存器等条件满足时：</p>
+<ul>
+<li>TPR 可由 TPR shadow 读取；</li>
+<li>启用 Virtual-interrupt delivery 后可读取 EOI/ICR-low 的虚拟值；</li>
+<li>启用 APIC-register virtualization 后，多数 APIC 寄存器从 virtual-APIC page 同偏移读取。</li>
+</ul>
+<p>指令取值、超过 32 位、不合适的对齐/寄存器操作数、特殊指令等仍可能触发 APIC-access VM Exit。</p>
+<h3>5.3 写路径及副作用</h3>
+<p>硬件通常先把数据写入 virtual-APIC page，再根据偏移执行：</p>
+<ul>
+<li><code>0x080 TPR</code>：清理保留字节并执行 TPR virtualization；</li>
+<li><code>0x0b0 EOI</code>：执行 EOI virtualization，或产生 APIC-write VM Exit；</li>
+<li><code>0x300 ICR-low</code>：匹配 self-IPI 或 IPI virtualization 条件，否则退出；</li>
+<li><code>0x310 ICR-high</code>：规范化 VICR_HI；</li>
+<li>其他带复杂副作用的寄存器：产生 APIC-write VM Exit，由 KVM 完成。</li>
+</ul>
+<p><a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx/vmx.c#L5876"><code>handle_apic_write()</code></a> 不需要重新解码 Guest 指令：硬件已经把正确值写到 virtual-APIC page，KVM 只需根据 exit qualification 的寄存器偏移调用 <code>kvm_apic_write_nodecode()</code>。</p>
+<hr>
+<h2>6. x2APIC MSR 访问虚拟化</h2>
+<p>x2APIC 把寄存器访问从 MMIO 改成 <code>RDMSR/WRMSR</code>，APIC MSR 范围为 <code>0x800–0x8ff</code>，寄存器偏移换算关系为：</p>
+<div class="highlight"><pre><span></span><code>virtual-APIC page offset = (MSR index &amp; 0xff) &lt;&lt; 4
+</code></pre></div>
+
+<p>启用 <code>Virtualize x2APIC mode</code> 后：</p>
+<ul>
+<li><code>RDMSR</code> 可以从 virtual-APIC page 读取；</li>
+<li>TPR、EOI、self-IPI 和满足条件的 ICR 写可以由硬件执行特殊处理；</li>
+<li>不支持的寄存器或写入形式仍按 MSR bitmap 退出到 KVM。</li>
+</ul>
+<p>KVM 在 <a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx/vmx.c#L4131"><code>vmx_update_msr_bitmap_x2apic()</code></a> 中动态调整 MSR bitmap：</p>
+<ul>
+<li>APICv 活跃时放行大多数有效 x2APIC 读；</li>
+<li>当前计数等必须由软件按需计算的寄存器仍拦截；</li>
+<li>放行 EOI 与 self-IPI 写；</li>
+<li>IPI virtualization 可用时进一步放行 ICR 读写。</li>
+</ul>
+<p>因此，“Virtualize x2APIC mode=1”并不等于所有 APIC MSR 都无退出；真正行为由 VMCS 控制、MSR bitmap、寄存器类型和写入格式共同决定。</p>
+<hr>
+<h2>7. Posted Interrupt 原理</h2>
+<h3>7.1 软件投递算法</h3>
+<p>KVM 或其他软件向目标 vCPU 投递向量 <code>V</code> 时执行：</p>
+<div class="highlight"><pre><span></span><code>原子置位 PID.PIR[V]
+如果该位原本已为 1：结束（请求已经存在）
+
+原子 test-and-set PID.ON
+如果 ON 原本已为 1：结束（已有通知在途）
+
+根据目标 vCPU 状态：
+    IN_GUEST_MODE → 向目标 pCPU 发送 NV 通知 IPI
+    不在 Guest   → 唤醒 vCPU；下次 VM Entry 前软件同步 PIR
+</code></pre></div>
+
+<p>对应代码是 <a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx/common.h#L167"><code>__vmx_deliver_posted_interrupt()</code></a> 和 <a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx/common.h#L119"><code>kvm_vcpu_trigger_posted_interrupt()</code></a>。</p>
+<p>ON 位实现通知合并：多个不同向量可以同时累积在 PIR 中，但只需一个物理通知。目标 CPU 处理通知时会一次性收割 PIR。</p>
+<h3>7.2 CPU 收到通知后的硬件处理</h3>
+<p>当目标 vCPU 正在 VMX non-root，物理 CPU 收到的向量等于 VMCS 的 Posted-Interrupt Notification Vector 时，CPU 不按普通 external-interrupt VM Exit 处理，而是不可中断地：</p>
+<div class="highlight"><pre><span></span><code>确认物理 Local APIC 上的通知中断
+原子清 PID.ON
+对通知向量执行物理 EOI
+VIRR |= PID.PIR
+清 PID.PIR
+RVI = max(旧 RVI, PIR 中最高向量)
+评估并可能立即投递虚拟中断
+</code></pre></div>
+
+<p>这正是“posted”一词的含义：发起者只把请求记录到 PID，真正把它并入虚拟 LAPIC 并投递给 Guest 的工作由目标 CPU 完成。</p>
+<h3>7.3 vCPU 正在运行、不运行和阻塞时的区别</h3>
+<table>
+<thead>
+<tr>
+<th>vCPU 状态</th>
+<th>PID 配置/动作</th>
+<th>结果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>正在 Guest 中运行</td>
+<td><code>SN=0</code>，<code>NV=POSTED_INTR_VECTOR</code>，<code>NDST=当前 pCPU</code></td>
+<td>通知 IPI 被 CPU 硬件直接消费，通常无 VM Exit</td>
+</tr>
+<tr>
+<td>已退出但仍 runnable</td>
+<td>PIR 保留；通知可能成为无害的空通知</td>
+<td>下一次进入前 <code>sync_pir_to_irr()</code> 收割</td>
+</tr>
+<tr>
+<td>被抢占、暂不需要唤醒</td>
+<td>设置 <code>SN=1</code></td>
+<td>只累积 PIR，避免干扰运行其他任务的 pCPU</td>
+</tr>
+<tr>
+<td>因 HLT 等阻塞，需要中断唤醒</td>
+<td><code>NV=POSTED_INTR_WAKEUP_VECTOR</code> 并加入每 CPU wakeup list</td>
+<td>Host handler 唤醒 vCPU</td>
+</tr>
+<tr>
+<td>vCPU 迁移到另一 pCPU</td>
+<td>原子更新 <code>NDST</code>，恢复 active NV，清 SN</td>
+<td>后续通知路由到新 pCPU</td>
+</tr>
+</tbody>
+</table>
+<p>KVM 在 <a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx/posted_intr.c#L223"><code>vmx_vcpu_pi_put()</code></a> 和 <a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx/posted_intr.c#L57"><code>vmx_vcpu_pi_load()</code></a> 中实现这套调度状态机；<a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx/posted_intr.c#L253"><code>pi_wakeup_handler()</code></a> 扫描对应 pCPU 的阻塞 vCPU 列表。</p>
+<h3>7.4 PIR 到 IRR 的软件回退</h3>
+<p>并非所有通知都能在 non-root 中由硬件消费。例如目标 vCPU 已退出、APICv 被动态 inhibit、或正在运行嵌套 Guest。KVM 的 <a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx/vmx.c#L7055"><code>vmx_sync_pir_to_irr()</code></a> 会：</p>
+<ol>
+<li>清 ON；</li>
+<li>用原子交换把 PIR 合入 KVM LAPIC 的 IRR；</li>
+<li>找到最高优先级 IRR；</li>
+<li>APICv 仍可使用时更新 VMCS.RVI；</li>
+<li>否则发出 <code>KVM_REQ_EVENT</code>，走传统事件注入路径。</li>
+</ol>
+<p>这说明 PID 既服务于硬件快路径，也是软件回退路径的可靠请求队列。</p>
+<hr>
+<h2>8. 直通设备中断：VT-d Interrupt Posting</h2>
+<h3>8.1 CPU Posted Interrupt 与 VT-d Interrupt Posting 的分工</h3>
+<p>这两个名称相近，但位于中断链路的不同位置：</p>
+<table>
+<thead>
+<tr>
+<th>机制</th>
+<th>所在硬件</th>
+<th>输入</th>
+<th>输出</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>VT-d Interrupt Posting</td>
+<td>IOMMU/Interrupt Remapping 单元</td>
+<td>设备的 remappable MSI/MSI-X 或 IOAPIC 中断</td>
+<td>原子置位内存中的 <code>PID.PIR[vector]</code>，必要时产生通知中断</td>
+</tr>
+<tr>
+<td>CPU Posted-Interrupt processing</td>
+<td>目标逻辑处理器</td>
+<td>notification interrupt</td>
+<td>清 PID.ON，把 PIR 合入 virtual-APIC IRR，更新 RVI</td>
+</tr>
+<tr>
+<td>Virtual-interrupt delivery</td>
+<td>目标逻辑处理器 VMX non-root 执行环境</td>
+<td>virtual-APIC IRR、RVI、SVI、TPR/PPR</td>
+<td>在优先级和屏蔽条件允许时直接进入 Guest IDT handler</td>
+</tr>
+</tbody>
+</table>
+<p>因此，VT-d PI 不是独立的 Guest 中断控制器。它是 <strong>设备侧的 PID 生产者</strong>；CPU APICv 是 <strong>PID 消费者和最终投递者</strong>。只有两侧能力和 KVM 配置都满足时，直通设备中断才能形成完整的无 Host handler 快路径。</p>
+<h3>8.2 posted-format IRTE</h3>
+<p>普通 Interrupt Remapping 使用 remapped-format IRTE，将设备中断变成送往某个 Host APIC ID、Host vector 的物理中断。IRTE 的 <code>IM</code>（IRTE Mode）为 1 时，硬件把同一个 128-bit 表项解释为 posted format：</p>
+<p><img alt="Intel VT-d Figure 9-10：posted-format IRTE" src="images/vtd-posted-irte-format.png"></p>
+<p>关键字段如下：</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PDAH/PDAL</code></td>
+<td>64-byte 对齐的 Posted-Interrupt Descriptor 地址</td>
+</tr>
+<tr>
+<td><code>VV</code></td>
+<td>Virtual Vector；设备中断到达时要置位的 <code>PIR[VV]</code>，这是 Guest vector</td>
+</tr>
+<tr>
+<td><code>IM</code></td>
+<td>1 表示 posting，0 表示普通 interrupt remapping</td>
+</tr>
+<tr>
+<td><code>URG</code></td>
+<td>1 表示紧急请求；即使 PID.SN=1，也允许触发通知</td>
+</tr>
+<tr>
+<td><code>SID/SQ/SVT</code></td>
+<td>校验请求源，约束哪些 PCI requester 可以使用该 IRTE</td>
+</tr>
+<tr>
+<td><code>P/FPD</code></td>
+<td>表项有效性和 fault reporting 控制</td>
+</tr>
+</tbody>
+</table>
+<p>这里最容易混淆的是 <strong>IRTE.VV 与 PID.NV</strong>：</p>
+<ul>
+<li><code>IRTE.VV</code> 是最终给 Guest 的虚拟中断向量，用来选择 PIR 中的 bit；</li>
+<li><code>PID.NV</code> 是通知目标物理 CPU 的 Host vector，只负责让 CPU 启动 posted-interrupt processing；</li>
+<li><code>PID.NDST</code> 是通知要送到的物理 APIC ID；</li>
+<li>所以 posted-format IRTE 不需要为每次 vCPU 调度迁移改写目标 pCPU，它稳定地指向“每 vCPU PID”，调度器只需更新 PID.NDST。</li>
+</ul>
+<p>Linux Intel IOMMU 驱动在 <a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/drivers/iommu/intel/irq_remapping.c#L1242"><code>intel_ir_set_vcpu_affinity()</code></a> 中保留原 IRTE 的 source-validation 等共享字段，然后设置 <code>p_pst</code>、<code>p_vector</code>、<code>pda_l/pda_h</code>。这样切换到 posted mode 不会丢失设备来源校验。</p>
+<h3>8.3 IOMMU 的原子 posting 算法</h3>
+<p>根据 VT-d 规范 5.2.3，IOMMU 读取 posted-format IRTE 后，对 PID 所在 cache line 取得 exclusive ownership，并以 coherent atomic read-modify-write 完成：</p>
+<div class="highlight"><pre><span></span><code>PIR[IRTE.VV] = 1
+X = (ON == 0) &amp;&amp; (IRTE.URG == 1 || SN == 0)
+if X:
+    ON = 1
+    向 NDST 发送向量 NV 的 edge-triggered physical interrupt
+</code></pre></div>
+
+<p>三个控制位共同解决了高并发下的通知风暴：</p>
+<ul>
+<li><code>PIR</code> 允许 256 个向量独立积累，重复置同一 bit 自然合并；</li>
+<li><code>ON=1</code> 表示已有通知在途或尚未消费，后续请求只置 PIR，不再重复通知；</li>
+<li><code>SN=1</code> 抑制非 urgent 通知，适合 vCPU 被抢占但仍为 runnable 的状态；<code>URG=1</code> 可以越过 SN。</li>
+</ul>
+<p>硬件在 PID reserved bit 非零、地址/表项不合法或来源校验失败时阻断请求，并按 interrupt-remapping fault 处理。PID 必须位于 coherent、write-back 内存，而且软件需要阻止设备通过普通 DMA 修改 PID；否则 IOMMU 的原子更新无法与设备的任意写保持一致。</p>
+<h3>8.4 内存与中断顺序</h3>
+<p>设备驱动常依赖“看见完成中断时，此前 DMA 数据已经可见”。把中断改成内存置位不能破坏这个契约。VT-d 规范因此要求：</p>
+<ol>
+<li>在 PIR 更新对软件可见前，设备此前的 inbound DMA 写必须已经提交；</li>
+<li>PID 的修改必须先全局可见，IOMMU 才能发送 notification interrupt；</li>
+<li>上行 read completion 也必须等待此前的 posted interrupt 完成；这里的“完成”包括 PID 原子更新和必要的通知；</li>
+<li>不同 interrupt request 之间不承诺额外的全序，Guest 驱动仍应使用设备协议规定的 barrier/doorbell 语义。</li>
+</ol>
+<p>这解释了为什么 <code>PIR</code> 不能被当成普通、无序的软件 bitmap：它是设备 DMA 完成语义的一部分。</p>
+<h3>8.5 KVM、IRQ bypass 与 Intel IOMMU 的连接点</h3>
+<p>直通设备通常通过 VFIO、irqfd 和 IRQ bypass 建立“Host IRQ → Guest vCPU/vector”的映射。关键调用链是：</p>
+<div class="highlight"><pre><span></span><code>VFIO/irqfd route 确定 target vCPU 与 Guest vector
+        ↓
+KVM vmx_pi_update_irte(host_irq, vcpu, vector)
+        ↓
+构造 intel_iommu_pi_data {
+    pi_desc_addr = physical address of vcpu_vt.pi_desc
+    vector       = Guest vector
+}
+        ↓
+irq_set_vcpu_affinity(host_irq, &amp;pi_data)
+        ↓
+Intel IOMMU intel_ir_set_vcpu_affinity()
+        ↓
+posted-format IRTE + Interrupt Entry Cache invalidation
+</code></pre></div>
+
+<p>KVM 的连接点是 <a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx/posted_intr.c#L305"><code>vmx_pi_update_irte()</code></a>。绑定时传入 PID 物理地址和 Guest vector；解绑时传 <code>NULL</code>，IOMMU 驱动用缓存的 remapped-format 表项恢复 Host interrupt 路径。</p>
+<p>Intel IOMMU 的 <a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/drivers/iommu/intel/irq_remapping.c#L156"><code>modify_irte()</code></a> 在旧表项或新表项为 posted format 时使用 <code>cmpxchg16b</code> 原子更新完整 128-bit IRTE。原因是 PDA 横跨 64-bit 边界；分两次写可能让硬件短暂看到由新旧两半拼出的错误 PID 地址。更新内存表项后，驱动还会 flush cache 并使 IOMMU Interrupt Entry Cache 中对应项失效。</p>
+<p>Linux 只有在以下基本条件满足时才向上层报告 IRQ posting capability：</p>
+<ul>
+<li>CPU 支持 <code>CMPXCHG16B</code>，能够安全更新跨 64-bit 边界的 IRTE；</li>
+<li>平台上参与 interrupt remapping 的 Intel IOMMU 都报告 PI capability；</li>
+<li>未通过内核参数禁用 interrupt posting；</li>
+<li>KVM 使用 in-kernel irqchip，且存在可建立 bypass 的 IRQ route。</li>
+</ul>
+<p>另外，Intel IOMMU 驱动中的 <code>posted_msi</code> 与 <code>posted_vcpu</code> 不能混为一谈：前者还可用于 Host 自身的 MSI 聚合/分发，后者才表示这条 IRQ 被直接 post 到 KVM vCPU 的 PID。</p>
+<h3>8.6 vCPU 运行、抢占、阻塞和迁移</h3>
+<p>IRTE 指向的 <code>vcpu_vt.pi_desc</code> 在 vCPU 生命周期内保持稳定；变化的是 PID 控制区。KVM <a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx/posted_intr.c"><code>posted_intr.c</code></a> 按调度状态维护它：</p>
+<table>
+<thead>
+<tr>
+<th>vCPU 状态</th>
+<th>PID.NV</th>
+<th style="text-align: right;">PID.SN</th>
+<th>PID.NDST</th>
+<th>效果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>正在运行/即将 VM-entry</td>
+<td><code>POSTED_INTR_VECTOR</code></td>
+<td style="text-align: right;">0</td>
+<td>当前 pCPU APIC ID</td>
+<td>通知可由 VMX non-root 硬件直接消费</td>
+</tr>
+<tr>
+<td>被抢占但仍 runnable</td>
+<td>通常保持 active vector</td>
+<td style="text-align: right;">1</td>
+<td>最近所在 pCPU</td>
+<td>只积累非 urgent PIR，避免无意义打断别的任务</td>
+</tr>
+<tr>
+<td>因 HLT 等阻塞，且当前允许中断唤醒</td>
+<td><code>POSTED_INTR_WAKEUP_VECTOR</code></td>
+<td style="text-align: right;">0</td>
+<td>等待队列所属 pCPU</td>
+<td>Host wakeup handler 唤醒 vCPU task</td>
+</tr>
+<tr>
+<td>迁移到新 pCPU 并 sched-in</td>
+<td>恢复 active vector</td>
+<td style="text-align: right;">0</td>
+<td>新 pCPU APIC ID</td>
+<td>新通知路由到迁移后的 CPU</td>
+</tr>
+</tbody>
+</table>
+<p><a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx/posted_intr.c#L57"><code>vmx_vcpu_pi_load()</code></a> 用 64-bit compare-exchange 同时更新 <code>NDST/NV/SN</code>。必须原子更新是因为 IOMMU 随时可能把同一 control word 中的 ON 从 0 改为 1。清 SN 后，KVM 再检查 PIR；若已有 pending bit，则补设 ON，覆盖“中断恰好在 suppressed 状态到 active 状态切换期间到达”的竞态。</p>
+<p><a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx/posted_intr.c#L223"><code>vmx_vcpu_pi_put()</code></a> 区分“只是被抢占”和“真正阻塞”：前者设置 SN 即可，后者把 vCPU 加入 per-CPU wakeup list，并切换到 wakeup vector。绑定第一条 bypass IRQ 时，<a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx/posted_intr.c#L297"><code>vmx_pi_start_bypass()</code></a> 会请求所有 vCPU 重新评估阻塞状态，避免 vCPU 在设备绑定前已经睡眠、PID 仍保留无 handler 的 active vector。</p>
+<h3>8.7 完整设备直投路径与回退</h3>
+<div class="highlight"><pre><span></span><code>直通设备产生 MSI/MSI-X
+        ↓
+Interrupt Remapping 根据 handle/subhandle 查 IRTE
+        ↓
+验证 P、SID/SQ/SVT；IM=1，按 posted format 解码
+        ↓
+IOMMU 原子设置 PID.PIR[IRTE.VV]
+        ↓
+若 !ON &amp;&amp; (URG || !SN)：设置 ON，向 PID.NDST 发送 PID.NV
+        ↓
+目标 CPU：PID.PIR → virtual-APIC IRR，更新 RVI
+        ↓
+Virtual-interrupt delivery → Guest handler
+</code></pre></div>
+
+<p>目标 vCPU 正在运行时，这条路径同时绕过 Host 设备 IRQ handler 和 KVM 软件注入。如果 vCPU 不在 VMX non-root、APICv 被 inhibit，或者通知在状态切换竞态中没有被硬件消费，PID 仍保存请求；KVM 随后的 <a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx/vmx.c#L7055"><code>vmx_sync_pir_to_irr()</code></a> 会把 PIR 合入软件 IRR，再选择 RVI 或传统事件注入。也就是说，快路径失效不会让设备中断凭空丢失。</p>
+<h3>8.8 level-triggered 中断与 EOI</h3>
+<p>VT-d posted processing 把所有请求都作为 edge-triggered request 记录，即使源头是 IOAPIC level-triggered pin。PIR bit 只表示“这个向量 pending”，不保存物理线路电平，也不会替源 IOAPIC 清 remote IRR。</p>
+<p>因此 VMM 必须让相关 L2/Guest EOI 触发必要的软件处理，并对源 IOAPIC 执行 Directed EOI。KVM 的 EOI-exit bitmap 正是按向量选择哪些 EOI 必须退出；它不能因为启用了 PI 就永久清零。若 EOI 没有正确回传，典型表现不是“第一次中断没来”，而是第一次可以处理、此后 level line 不再重新触发或形成中断风暴。</p>
+<hr>
+<h2>9. IPI virtualization</h2>
+<h3>9.1 解决的问题</h3>
+<p>早期 APICv 可以硬件虚拟化 self-IPI，但 Guest 向其他 vCPU 写 ICR 通常仍需 VM Exit，由 KVM 解析目标 APIC ID、找到目标 vCPU，再设置其 IRR/PIR。</p>
+<p>IPI virtualization 增加 PID-pointer table 后，硬件可直接执行：</p>
+<div class="highlight"><pre><span></span><code>Guest 写 VICR，给出 vector V 与目标 virtual APIC ID T
+        ↓
+检查 V、delivery mode、trigger mode、destination mode 等是否合法
+        ↓
+PID = PID_POINTER_TABLE[T]
+        ↓
+原子置 PID.PIR[V]
+        ↓
+如果 ON=0 且 SN=0，设置 ON 并向 PID.NDST 发送 PID.NV
+</code></pre></div>
+
+<p>当前硬件快路径只覆盖规范允许的固定、边沿、物理目标、无 shorthand 等形式；最低 16 个非法向量、逻辑目标、复杂 delivery mode、无效 PID 表项等仍产生 APIC-write VM Exit。</p>
+<h3>9.2 KVM 实现</h3>
+<p>KVM 默认把 <code>enable_ipiv</code> 初始化为 true，但只有硬件和 APICv 都支持时才保留。关键实现点是：</p>
+<ul>
+<li><a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx/vmx.c#L4666"><code>vmx_tertiary_exec_control()</code></a>：APICv 被 inhibit 时关闭 IPI virtualization；</li>
+<li><a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx/vmx.c#L4840"><code>vmx_alloc_ipiv_pid_table()</code></a>：分配每 VM PID-pointer table；</li>
+<li><a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx/vmx.c#L4867"><code>init_vmcs()</code></a>：写入表地址和最后索引；</li>
+<li><a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx/vmx.c#L4131"><code>vmx_update_msr_bitmap_x2apic()</code></a>：允许满足条件的 x2APIC ICR 访问直接进入硬件。</li>
+</ul>
+<p>IPI virtualization 复用了 Posted Interrupt 的 PID、通知和调度状态机，因此阻塞 vCPU 也需要 wakeup vector 处理。</p>
+<hr>
+<h2>10. Linux KVM/VMX 实现路径</h2>
+<h3>10.1 能力探测与全局开关</h3>
+<p>KVM 的软件默认值是：</p>
+<ul>
+<li><code>enable_apicv = true</code>；</li>
+<li><code>enable_ipiv = true</code>；</li>
+<li><code>enable_device_posted_irqs = true</code>。</li>
+</ul>
+<p>定义位于 <a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/x86.c#L229"><code>arch/x86/kvm/x86.c</code></a>，由 <code>kvm_intel</code> 模块参数暴露。硬件初始化时：</p>
+<div class="highlight"><pre><span></span><code>hardware_setup / vmx_init
+        ↓
+setup_vmcs_config
+        ↓
+读取 IA32_VMX_* capability MSRs
+        ↓
+按依赖过滤 primary / secondary / tertiary / pin controls
+        ↓
+cpu_has_vmx_apicv() 不满足 → enable_apicv = false
+        ↓
+APICv 或 IPIV capability 不满足 → enable_ipiv = false
+</code></pre></div>
+
+<p>必须强调：不存在一个简单的 Guest CPUID <code>APICv</code> 位能完整表达 Host 是否可用。VMM 主要通过 <code>IA32_VMX_PINBASED_CTLS</code>、<code>IA32_VMX_PROCBASED_CTLS{,2,3}</code> 等 VMX capability MSR 判断各控制位是否允许为 1。</p>
+<h3>10.2 vCPU 与 VMCS 初始化</h3>
+<p><code>kvm_create_lapic()</code> 为每个 vCPU 分配 4 KiB <code>apic-&gt;regs</code>，并在 APICv 默认启用时先把 <code>apicv_active</code> 设为 true、请求后续重新评估。VMX 侧随后：</p>
+<ol>
+<li>把 <code>apic-&gt;regs</code> 的物理地址写入 <code>VIRTUAL_APIC_PAGE_ADDR</code>；</li>
+<li>清零四个 EOI-exit bitmap；</li>
+<li>清零 <code>GUEST_INTR_STATUS</code>；</li>
+<li>写入 Posted Interrupt notification vector；</li>
+<li>写入当前 vCPU 的 PID 地址；</li>
+<li>如果支持 IPIV，写入 PID-pointer table 地址和最后索引。</li>
+</ol>
+<p>相关代码集中在 <a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx/vmx.c#L4867"><code>init_vmcs()</code></a> 和 vCPU reset 路径。</p>
+<h3>10.3 xAPIC/x2APIC 模式切换</h3>
+<p><a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx/vmx.c#L6887"><code>vmx_set_virtual_apic_mode()</code></a> 根据 LAPIC 当前模式切换：</p>
+<ul>
+<li>xAPIC：打开 <code>Virtualize APIC accesses</code>；</li>
+<li>x2APIC：在硬件支持时打开 <code>Virtualize x2APIC mode</code>；</li>
+<li>同时更新 MSR bitmap。</li>
+</ul>
+<p>APIC-register virtualization 和 Virtual-interrupt delivery 则由 <a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx/vmx.c#L4603"><code>vmx_refresh_apicv_exec_ctrl()</code></a> 根据 <code>apicv_active</code> 动态设置。</p>
+<h3>10.4 软件产生的中断注入快路径</h3>
+<p>虚拟设备、虚拟 IOAPIC、其他 vCPU 或本地定时器最终向目标 LAPIC 交付中断时，VMX 路径可概括为：</p>
+<div class="highlight"><pre><span></span><code>vmx_deliver_interrupt(apic, delivery_mode, trig_mode, vector)
+        ↓
+vmx_deliver_posted_interrupt(vcpu, vector)
+        ├─ APICv inactive → 返回失败
+        └─ APICv active
+             ↓
+       __vmx_deliver_posted_interrupt
+             ↓
+       设置 PIR / ON / 触发通知
+
+失败回退：
+kvm_lapic_set_irr → KVM_REQ_EVENT → kvm_vcpu_kick
+</code></pre></div>
+
+<p>入口可从 <a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx/vmx.c#L4414"><code>vmx_deliver_interrupt()</code></a> 开始追踪。</p>
+<h3>10.5 APICv VM Exit 处理</h3>
+<p>VMX exit handler 表将几类退出分别映射到：</p>
+<ul>
+<li><code>EXIT_REASON_APIC_ACCESS</code> → <code>handle_apic_access()</code>；</li>
+<li><code>EXIT_REASON_APIC_WRITE</code> → <code>handle_apic_write()</code>；</li>
+<li><code>EXIT_REASON_EOI_INDUCED</code> → <code>handle_apic_eoi_induced()</code>；</li>
+<li><code>EXIT_REASON_TPR_BELOW_THRESHOLD</code> → <code>handle_tpr_below_threshold()</code>。</li>
+</ul>
+<p>其中 APIC-access 仍可能需要完整指令模拟；KVM 对普通 <code>MOV</code> 写 EOI 有 <code>fasteoi</code> 短路优化。APIC-write 和 EOI-induced 都是 trap-like，硬件已经完成引发退出的 Guest 操作，KVM 不应再次前移 RIP。</p>
+<h3>10.6 动态 inhibit 与回退</h3>
+<p>APICv 不是 VM 创建后永久开启。KVM 为不适合硬件加速的状态维护 inhibit reason。VMX 当前要求关注的原因包括：</p>
+<ul>
+<li>模块参数或硬件关闭；</li>
+<li>userspace 尚未建立 in-kernel/split irqchip；</li>
+<li>Hyper-V AutoEOI 等不兼容语义；</li>
+<li>Guest 调试要求阻断中断；</li>
+<li>APIC ID 冲突/别名；</li>
+<li>Guest 修改 APIC ID；</li>
+<li>Guest 修改 APIC base。</li>
+</ul>
+<p>定义可见 <a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx/main.c#L871"><code>VMX_REQUIRED_APICV_INHIBITS</code></a>。</p>
+<p><a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/x86.c#L10954"><code>__kvm_set_or_clear_apicv_inhibit()</code></a> 在总状态从启用变为禁用或反向切换时：</p>
+<ol>
+<li>请求所有 vCPU 更新 APICv；</li>
+<li>必要时 kick 正在运行的 vCPU；</li>
+<li>更新 inhibit bitmap；</li>
+<li>关闭时 zap APIC GPA 的映射；</li>
+<li>各 vCPU 更新 VMCS controls、RVI/SVI 和软件 LAPIC 缓存。</li>
+</ol>
+<p>这套机制保证硬件快路径与软件状态不会在切换时同时对同一中断作不一致处理。</p>
+<h3>10.7 嵌套虚拟化</h3>
+<h4>10.7.1 L0、L1、L2 与三份 VMCS</h4>
+<p>假设 Host KVM 是 L0，运行在 KVM 中的 Hypervisor 是 L1，L1 创建的 Guest 是 L2：</p>
+<table>
+<thead>
+<tr>
+<th>名称</th>
+<th>谁创建/维护</th>
+<th>表示的执行边界</th>
+<th>是否直接装载到硬件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>vmcs01</code></td>
+<td>L0 KVM</td>
+<td>L0 → L1</td>
+<td>是，L1 运行时使用</td>
+</tr>
+<tr>
+<td><code>vmcs12</code></td>
+<td>L1 编程、L0 模拟</td>
+<td>L1 → L2</td>
+<td>否；它位于 L1 Guest 内存，是 L1 看到的虚拟 VMCS</td>
+</tr>
+<tr>
+<td><code>vmcs02</code></td>
+<td>L0 KVM</td>
+<td>L0 → L2</td>
+<td>是；由 L0 策略与 vmcs12 合成</td>
+</tr>
+</tbody>
+</table>
+<p><a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx/vmcs12.h#L27"><code>struct vmcs12</code></a> 保存 APICv 相关字段，包括 <code>virtual_apic_page_addr</code>、<code>apic_access_addr</code>、<code>posted_intr_desc_addr</code>、四组 EOI-exit bitmap、<code>guest_intr_status</code> 和 <code>posted_intr_nv</code>。L1 写这些字段时使用的是 L1 的 Guest Physical Address（L1 GPA）和 L1 视角下的 notification vector，L0 不能把它们未经转换直接交给真实 CPU。</p>
+<p>可以把嵌套 APICv 理解为两次虚拟化叠加：</p>
+<div class="highlight"><pre><span></span><code>L1 以为自己在配置“物理 VMX”给 L2
+        ↓  vmcs12（L1 的期望）
+L0 校验能力、地址和控制依赖
+        ↓  合成与地址翻译
+vmcs02（真实 CPU 执行 L2 时使用）
+        ↓
+L2 的 APIC access / interrupt / EOI
+        ↓  hardware VM Exit 或状态变化
+L0 决定：自己处理，还是构造 nested VM Exit 交给 L1
+</code></pre></div>
+
+<h4>10.7.2 L1 能看到哪些 APICv capability</h4>
+<p>L0 通过虚拟的 <code>IA32_VMX_*_CTLS</code> MSR 告诉 L1 哪些 control 可以设为 1。<a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx/nested.c#L7106"><code>nested_vmx_setup_pinbased_ctls()</code></a> 只有在 L0 <code>enable_apicv</code> 时才向 L1 暴露 <code>PIN_BASED_POSTED_INTR</code>；secondary controls 也只暴露 L0 能安全支持的 x2APIC virtualization、APIC-register virtualization 和 Virtual-interrupt delivery 等能力。</p>
+<p>在 nested VM-entry 前，<a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx/nested.c#L905"><code>nested_vmx_check_apicv_controls()</code></a> 再检查架构依赖：</p>
+<ul>
+<li>x2APIC virtualization 与 <code>virtualize APIC accesses</code> 不能同时启用；</li>
+<li>Virtual-interrupt delivery 要求 L1 同时请求 external-interrupt exiting；</li>
+<li>Posted Interrupt 要求 Virtual-interrupt delivery；</li>
+<li>Posted Interrupt 要求 <code>acknowledge interrupt on exit</code>；</li>
+<li><code>posted_intr_nv[15:8]</code> 必须为 0；</li>
+<li><code>posted_intr_desc_addr</code> 必须 64-byte 对齐；</li>
+<li>只要启用上述任一 APICv 功能，就必须启用 TPR shadow。</li>
+</ul>
+<p>非法组合会导致 nested VM-entry 检查失败，而不是“尽量运行再回退”。这与真实硬件对 VM-entry control dependency 的检查保持一致。</p>
+<h4>10.7.3 vmcs12 如何合成 vmcs02</h4>
+<p>KVM 的 <a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx/nested.c#L2424"><code>prepare_vmcs02_early()</code></a> 对不同 control 使用不同合并策略：</p>
+<ol>
+<li>Host 安全和资源管理相关 control 以 L0 的 <code>vmcs01</code> 为底座；</li>
+<li>与 L2 可见语义直接相关的 APICv control——<code>virtualize APIC accesses</code>、x2APIC virtualization、APIC-register virtualization、VID——先从 L0 control 中清掉，再只按 vmcs12 的请求写入；</li>
+<li>Posted Interrupt pin control 也以 vmcs12 是否启用为准；未启用时，KVM 从 vmcs02 清除此 bit；</li>
+<li>如果 vmcs12 启用 VID，<code>vmcs12.guest_intr_status</code> 被装入 <code>vmcs02.GUEST_INTR_STATUS</code>；</li>
+<li>vmcs12 的四组 EOI-exit bitmap 被写入 vmcs02，让 L2 EOI 按 L1 的策略产生 EOI-induced VM Exit。</li>
+</ol>
+<p>“只按 vmcs12 请求”很重要。例如 L0 为 L1 启用了 APICv，不代表 L2 也自动获得 APIC-register virtualization；L1 仍有权要求 L2 的相应 APIC 访问退出给自己。</p>
+<p>地址字段在 <a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx/nested.c#L3435"><code>nested_get_vmcs12_pages()</code></a> 中转换：</p>
+<table>
+<thead>
+<tr>
+<th>vmcs12 字段</th>
+<th>L0 的处理</th>
+<th>vmcs02 字段</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>apic_access_addr</code></td>
+<td>将 L1 GPA 映射为 Host page/PFN</td>
+<td><code>APIC_ACCESS_ADDR = HPA</code></td>
+</tr>
+<tr>
+<td><code>virtual_apic_page_addr</code></td>
+<td>映射 L1 的 L2 virtual-APIC page</td>
+<td><code>VIRTUAL_APIC_PAGE_ADDR = HPA</code></td>
+</tr>
+<tr>
+<td><code>posted_intr_desc_addr</code></td>
+<td>映射 L1 分配的 L2 PID，并保留页内偏移</td>
+<td><code>POSTED_INTR_DESC_ADDR = HPA + offset</code></td>
+</tr>
+</tbody>
+</table>
+<p>因此真实 CPU 访问的是 Host Physical Address，但修改的内容仍落在 L1 为 L2 分配的 Guest 内存页中。KVM 在软件修改 PIR、virtual APIC page 后还会把映射标记 dirty，保证迁移和脏页跟踪可见。</p>
+<h4>10.7.4 两个 PID 与两个 notification vector 域</h4>
+<p>Nested PI 最容易误解的地方是系统中同时存在两套 descriptor：</p>
+<table>
+<thead>
+<tr>
+<th>对象</th>
+<th>所有者/位置</th>
+<th>服务对象</th>
+<th>真实 VMCS 中的用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>L0 PID：<code>vcpu_vt.pi_desc</code></td>
+<td>L0 Host 内存</td>
+<td>KVM vCPU 容器；L1 的普通中断和 Host 直通设备路径</td>
+<td>vmcs01 的 PID；其地址也交给 Host VT-d IRTE</td>
+</tr>
+<tr>
+<td>Nested PID：<code>vmx-&gt;nested.pi_desc</code></td>
+<td>L1 Guest 内存，由 L0 映射</td>
+<td>L1 为 L2 记录的 posted interrupts</td>
+<td>L2 运行时写入 vmcs02.PID address</td>
+</tr>
+</tbody>
+</table>
+<p>同样有两个向量域：</p>
+<ul>
+<li><code>vmcs12.posted_intr_nv</code> 是 L1 选择的 <strong>虚拟通知向量</strong>。L0 缓存在 <code>vmx-&gt;nested.posted_intr_nv</code> 中，用来识别“这个送给 L1 vCPU 的中断其实是 L2 的 PI notification”；</li>
+<li><code>vmcs02.POSTED_INTR_NV</code> 并不使用该值，而是在 <a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx/nested.c#L2343"><code>prepare_vmcs02_constant_state()</code></a> 中固定写成 L0 保留的物理向量 <code>POSTED_INTR_NESTED_VECTOR</code>。</li>
+</ul>
+<p>这样做建立了安全边界：L1 可以选择自己的 notification vector 语义，但不能让真实 CPU 把任意 Host vector 当成 posted-interrupt notification。L0 专用向量只负责驱动真实硬件处理 vmcs02 指向的 nested PID。</p>
+<h4>10.7.5 L1 向正在运行的 L2 发送 Nested Posted Interrupt</h4>
+<p>典型路径如下：</p>
+<div class="highlight"><pre><span></span><code>L1 选择 L2 vector V
+        ↓
+L1 原子设置 Nested PID.PIR[V] 和 ON
+        ↓
+L1 发送 vmcs12.posted_intr_nv（在 L1 看来是 notification interrupt）
+        ↓
+L0 vmx_deliver_nested_posted_interrupt() 识别该虚拟向量
+        ↓
+设置 nested.pi_pending，提出 KVM_REQ_EVENT
+        ↓
+若 vCPU 正在 L2：向其 pCPU 发送物理 POSTED_INTR_NESTED_VECTOR
+        ↓
+CPU 按 vmcs02.PID address 处理 Nested PID
+        ↓
+Nested PID.PIR → L2 virtual-APIC IRR，更新 vmcs02.RVI
+        ↓
+Virtual-interrupt delivery → L2 handler
+</code></pre></div>
+
+<p>识别入口是 <a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx/vmx.c#L4351"><code>vmx_deliver_nested_posted_interrupt()</code></a>。它只在 <code>is_guest_mode(vcpu)</code> 且注入向量等于缓存的 <code>nested.posted_intr_nv</code> 时匹配。L1 已经负责设置 nested PID 的 PIR/ON；L0 不重复写 PIR，只把 L1 的虚拟通知转换成 L0 保留的物理 notification vector。</p>
+<p>这条路径的本质是 <strong>notification vector 的二次虚拟化</strong>，不是把 L1 的 PID 复制到 L0 PID。</p>
+<h4>10.7.6 硬件没有消费通知时的软件补完</h4>
+<p>通知可能发生在 L2 已退出、vCPU 尚未进入 guest mode，或者 VM-entry/调度切换的竞态窗口中。KVM 通过 <code>nested.pi_pending</code> 记住“需要完成一次 nested PI processing”，然后由 <a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx/nested.c#L4014"><code>vmx_complete_nested_posted_interrupt()</code></a> 模拟硬件动作：</p>
+<ol>
+<li>检查 nested PID 映射是否存在；</li>
+<li>原子测试并清 PID.ON；</li>
+<li>扫描 PIR 的最高向量；</li>
+<li>把整组 PIR 原子合入 L2 virtual-APIC page 的 IRR；</li>
+<li>如果新最高向量高于当前 RVI，更新 <code>vmcs02.GUEST_INTR_STATUS.RVI</code>；</li>
+<li>将 nested PID page 和 virtual-APIC page 标记为 dirty。</li>
+</ol>
+<p>如果 nested PID 或 virtual-APIC page 无法访问，KVM 不能假装成功，而是通过 memory-failure/MMIO-needed 路径退出。<code>nested_get_vmcs12_pages()</code> 对 PID 映射失败还会先清 vmcs02 的 PI control，避免真实硬件访问无效 Host 地址。</p>
+<p>另一个入口发生在 KVM 准备向 L1 交付外部中断时：如果 L1 LAPIC 中最高优先级 IRQ 恰好等于 <code>nested.posted_intr_nv</code>，KVM 不把它当成普通外部中断构造 nested VM Exit，而是清除该通知向量的 L1 IRR、设置 <code>pi_pending</code>，再完成 L2 posted interrupt。因为从架构角度看，notification vector 应被“morph”为 PIR 中的 L2 virtual interrupts，而不是让 L1 的普通 IDT handler 看见。</p>
+<h4>10.7.7 L1 普通中断与 L2 中断不能串台</h4>
+<p>L2 正在运行时，Host/KVM 还可能有一个真正要送给 L1 的中断。此时不能直接更新 vmcs02.RVI，否则中断会错误进入 L2。当前 <a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx/vmx.c#L7055"><code>vmx_sync_pir_to_irr()</code></a> 的规则是：</p>
+<ul>
+<li>L2 未运行且 L1 APICv active：把 L0 PID 合入 L1 IRR，并更新 vmcs01.RVI；</li>
+<li>L2 正在运行：只把 L0 PID 合入 L1 软件 IRR；若此次出现新的最高优先级 IRQ，则提出 <code>KVM_REQ_EVENT</code>；</li>
+<li>随后的事件检查根据 vmcs12 的 external-interrupt exiting 等策略，选择合成 nested VM Exit 给 L1，或在允许的情况下安排其他注入路径；</li>
+<li>对等于 L1 nested notification vector 的特殊 IRQ，按上一节将它 morph 成 L2 PI，而不是普通 nested VM Exit。</li>
+</ul>
+<p>这就是为什么嵌套环境中“L0 PID.PIR 已置位但 vmcs02.RVI 没变化”通常是正确行为：L0 PID 表示的是 L1 域的 pending interrupt，不能越权投给 L2。</p>
+<h4>10.7.8 L2 VM Exit 时的状态回写</h4>
+<p>硬件运行 L2 时更新的是 vmcs02。L1 随后执行 VMREAD 看到的却是 vmcs12，因此 L0 必须在 nested VM Exit 时同步架构可见状态。<a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx/nested.c#L4636"><code>sync_vmcs02_to_vmcs12()</code></a> 在 L1 启用 VID 时，把 <code>vmcs02.GUEST_INTR_STATUS</code> 回写到 <code>vmcs12.guest_intr_status</code>，包括 L2 当前的 RVI/SVI。</p>
+<p>EOI 路径也必须分层：</p>
+<ul>
+<li>vmcs02 加载 L1 提供的 EOI-exit bitmap；</li>
+<li>L2 对 bitmap 命中的向量执行 EOI 时产生 EOI-induced VM Exit 到 L0；</li>
+<li>L0 根据 nested exit reflection 规则把 L1 应看到的退出原因和 qualification 写入 vmcs12，再恢复 L1；</li>
+<li>不需要 L1 参与的 EOI 由 L0/KVM 与硬件 APICv 状态机自己完成。</li>
+</ul>
+<p>因此 vmcs12 不只是 VM-entry 的配置模板，也是 L1 可观察的 L2 运行结果。遗漏 <code>GUEST_INTR_STATUS</code>、EOI qualification 或 virtual-APIC page 的同步都会造成 L1 对 L2 中断状态的错误判断。</p>
+<h4>10.7.9 回退矩阵与调试抓手</h4>
+<table>
+<thead>
+<tr>
+<th>条件</th>
+<th>L2 路径</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>L0 和 L1 均启用 VID + PI，页面映射有效，L2 正在运行</td>
+<td>物理 nested notification，CPU 直接 PIR → L2 VIRR</td>
+</tr>
+<tr>
+<td>L1 启用 PI，但通知未在 non-root 被硬件消费</td>
+<td><code>pi_pending</code> + <code>vmx_complete_nested_posted_interrupt()</code> 软件补完</td>
+</tr>
+<tr>
+<td>L1 只启用 VID、不启用 PI</td>
+<td>L0 按 L1 策略维护 RVI/事件，不使用 nested PID notification</td>
+</tr>
+<tr>
+<td>L1 未启用 VID</td>
+<td>L2 中断主要走退出/软件注入，EOI 被截获以维持状态</td>
+</tr>
+<tr>
+<td>L0 禁用 APICv或硬件不支持</td>
+<td>不向 L1 暴露对应 allowed-1 capability；L1 不能合法启用</td>
+</tr>
+<tr>
+<td>APIC/PID page 映射失效</td>
+<td>清硬件 control、VM-entry failure 或 KVM internal/memory failure，不能直接使用 L1 GPA</td>
+</tr>
+</tbody>
+</table>
+<p>调试 nested APICv 时至少同时记录：当前 active VMCS（01/02）、<code>is_guest_mode</code>、vmcs12 control、vmcs02 <code>GUEST_INTR_STATUS</code>、L0 PID、nested PID、两个 virtual-APIC page，以及 <code>nested.pi_pending</code>。只观察一个 PIR 或一个 RVI 很容易把正确的分层行为误判成丢中断。</p>
+<hr>
+<h2>11. 四条端到端时序</h2>
+<h3>11.1 虚拟设备向正在运行的 vCPU 注入中断</h3>
+<div class="highlight"><pre><span></span><code>虚拟设备/KVM irq routing
+        ↓
+找到目标 kvm_lapic
+        ↓
+vmx_deliver_interrupt
+        ↓
+PID.PIR[vector] = 1，PID.ON = 1
+        ↓
+向目标 pCPU 发送 POSTED_INTR_VECTOR
+        ↓
+CPU：PIR → VIRR，更新 RVI
+        ↓
+IF/优先级允许时，Virtual-interrupt delivery
+        ↓
+Guest IDT handler
+</code></pre></div>
+
+<p>正常快路径没有 VM Exit 到 KVM；通知是物理中断，Guest 最终收到的是 PID 中记录的虚拟向量。</p>
+<h3>11.2 直通设备 MSI-X 直投</h3>
+<div class="highlight"><pre><span></span><code>VFIO 设备发 MSI-X
+        ↓
+Intel IOMMU 查 posted-format IRTE
+        ↓
+IOMMU 原子设置 PID.PIR[guest_vector]
+        ↓
+必要时向 PID.NDST 发 PID.NV
+        ↓
+CPU Posted-Interrupt processing
+        ↓
+Virtual-interrupt delivery
+        ↓
+Guest 驱动中断处理程序
+</code></pre></div>
+
+<p>与上一条相比，设置 PIR 的主体从 KVM 软件变为 IOMMU；后半段 CPU 路径相同。</p>
+<h3>11.3 Guest vCPU0 向 vCPU1 发送 IPI</h3>
+<div class="highlight"><pre><span></span><code>Guest vCPU0 写 x2APIC ICR（目标 APIC ID = vCPU1）
+        ↓
+IPI virtualization 验证 ICR 形式
+        ↓
+用目标 ID 索引 PID-pointer table
+        ↓
+设置 vCPU1.PID.PIR[vector]
+        ↓
+必要时发通知到 vCPU1 当前所在 pCPU
+        ↓
+vCPU1 硬件接收并投递
+</code></pre></div>
+
+<p>如果 ICR 使用逻辑目标、非 fixed delivery、非法向量、目标超出表范围或 PID 表项无效，硬件产生 APIC-write VM Exit，由 KVM 软件完成。</p>
+<h3>11.4 L1 向 L2 发送 Nested Posted Interrupt</h3>
+<div class="highlight"><pre><span></span><code>L1 写 Nested PID.PIR[L2 vector]，设置 ON
+        ↓
+L1 产生 vmcs12.posted_intr_nv
+        ↓
+L0 识别为 nested PI notification，而非 L1 普通 IRQ
+        ↓
+L0 向当前 pCPU 发送 POSTED_INTR_NESTED_VECTOR
+        ↓
+CPU 读取 vmcs02.POSTED_INTR_DESC_ADDR 指向的 Nested PID
+        ↓
+PIR → L2 virtual-APIC IRR，更新 vmcs02.RVI
+        ↓
+L2 handler
+</code></pre></div>
+
+<p>若物理通知未被 L2 non-root 执行环境消费，L0 保留 <code>nested.pi_pending</code>，在下一次事件处理/VM-entry 前软件完成同样的 ON 清除、PIR 合并和 RVI 更新。L2 退出后，RVI/SVI 再从 vmcs02 回写 vmcs12，供 L1 观察。</p>
+<hr>
+<h2>12. 性能收益与边界</h2>
+<h3>12.1 主要收益来源</h3>
+<ul>
+<li>CR8/TPR、EOI、self-IPI 等高频访问少退出；</li>
+<li>大多数 APIC 寄存器读取无需指令模拟；</li>
+<li>KVM 软件注入可以用 PIR + 通知替代 kick + VM Exit/Entry；</li>
+<li>直通设备中断可以绕过 Host IRQ handler；</li>
+<li>多个 pending vector 通过 PIR bitmap 和 ON 位合并成一次物理通知；</li>
+<li>IPI-heavy workload 可借 IPI virtualization 减少 sender 侧退出。</li>
+</ul>
+<h3>12.2 APICv 不会消除的成本</h3>
+<ul>
+<li>vCPU 不运行时仍需要调度和唤醒；</li>
+<li>优先级、IF、STI/MOV-SS blocking 仍可能延迟投递；</li>
+<li>复杂 APIC 寄存器写、非法 ICR 形式仍需 VM Exit；</li>
+<li>level-triggered EOI、虚拟 IOAPIC 状态仍可能需要 KVM；</li>
+<li>vCPU 迁移要求更新 PID.NDST；</li>
+<li>嵌套虚拟化和某些 paravirtual interrupt 语义需要回退；</li>
+<li>PID cache line 会被 CPU、IOMMU、其他 vCPU 共同修改，极端中断压力下仍有一致性和缓存竞争成本。</li>
+</ul>
+<h3>12.3 “无 VM Exit”不等于“零软件参与”</h3>
+<p>APICv 的快路径依赖 KVM 预先正确配置：VMCS controls、virtual-APIC page、PID、EOI bitmap、MSR bitmap、IRTE、vCPU→pCPU 映射。调度、迁移、状态保存/恢复和异常回退仍由 KVM 完成。更准确的说法是“稳态中断投递可不进入 VMM”，不是“中断虚拟化完全由硬件接管”。</p>
+<hr>
+<h2>13. 对原始文章的校正与补充</h2>
+<h3>13.1 章节号和能力数量</h3>
+<p>原文标题为 “APIC Virtualization Chapter 29”，对应较早 SDM 排版。版本 092 中主体已是 <strong>Chapter 32: APIC Virtualization and Virtual Interrupts</strong>，并增加了 <strong>IPI virtualization</strong>，因此当前是七项相关控制。</p>
+<h3>13.2 “Virtualize APIC accesses 会导致 VM Exit”需要补全</h3>
+<p>它首先让 CPU 识别对 APIC-access page 的访问。一般访问会产生 APIC-access VM Exit，但 TPR shadow、APIC-register virtualization、Virtual-interrupt delivery 和 IPI virtualization 可以让一部分访问转到 virtual-APIC page 并由硬件完成。因此它既是“特殊退出机制”的入口，也是“硬件消除退出”的前提。</p>
+<h3>13.3 APIC-register virtualization 的写路径</h3>
+<p>它允许多数读取直接从 virtual-APIC page 满足。对 MMIO 写，硬件会先把数据转发到 virtual-APIC page；少量 TPR/EOI/self-IPI/IPI 可以继续由硬件处理，其他写再触发 trap-like APIC-write VM Exit。不能概括成“写完一定退出”，也不能概括成“所有写都不退出”。</p>
+<h3>13.4 EPT misconfiguration 不是普通 MMIO 截获的通称</h3>
+<p>软件模拟 MMIO 通常通过 EPT violation 或 KVM MMIO 路径实现。EPT misconfiguration 表示 EPT 表项存在非法组合，是另一类错误/退出。启用 APIC-access virtualization 后，对匹配页面的正常特殊退出是 APIC-access VM Exit。</p>
+<h3>13.5 Posted Interrupt 不只是“复制 pi_desc”</h3>
+<p>CPU 实际执行原子清 ON、物理 EOI、<code>VIRR |= PIR</code>、清 PIR、更新 RVI、重新评估并可能投递。PID 还包含通知合并、通知抑制和目标 pCPU 路由信息；调度器必须维护 NV/SN/NDST。</p>
+<h3>13.6 APIC-access page 与 virtual-APIC page 的所有权</h3>
+<p>“每 VM 一个 APIC-access page、每 vCPU 一个 virtual-APIC page”是正确的常用模型。更精确地说，APIC-access address 是每个 VMCS 的字段，但 VMM 通常让同一 VM 的所有 vCPU 指向同一个页面；virtual-APIC address 则必须指向各 vCPU 自己的状态页。</p>
+<hr>
+<h2>14. 验证与调试建议</h2>
+<h3>14.1 查看模块参数</h3>
+<div class="highlight"><pre><span></span><code>cat<span class="w"> </span>/sys/module/kvm_intel/parameters/enable_apicv
+cat<span class="w"> </span>/sys/module/kvm_intel/parameters/enable_ipiv
+cat<span class="w"> </span>/sys/module/kvm_intel/parameters/enable_device_posted_irqs
+</code></pre></div>
+
+<p>参数为 <code>Y</code> 只表示软件允许；最终是否激活还取决于 CPU capability、irqchip 配置和运行时 inhibit 状态。</p>
+<h3>14.2 对比开关前后的 VM Exit</h3>
+<p>可在可控测试机上分别加载：</p>
+<div class="highlight"><pre><span></span><code>kvm_intel.enable_apicv=1
+kvm_intel.enable_apicv=0
+</code></pre></div>
+
+<p>然后用 <code>perf kvm stat</code>、KVM tracepoints 或 VMM 统计比较：</p>
+<ul>
+<li>APIC access；</li>
+<li>APIC write；</li>
+<li>EOI induced；</li>
+<li>TPR below threshold；</li>
+<li>interrupt window；</li>
+<li>external interrupt。</li>
+</ul>
+<p>不要只看吞吐量；还应观察 p99 中断延迟、Host CPU 使用率、vCPU wakeup 次数和跨 NUMA/跨 socket 情况。</p>
+<h3>14.3 关键 tracepoint</h3>
+<p>当前 KVM 代码包含：</p>
+<ul>
+<li><code>kvm_apicv_accept_irq</code>：中断进入 APICv/PI 快路径；</li>
+<li><code>kvm_apicv_inhibit_changed</code>：记录 APICv inhibit reason 变化。</li>
+</ul>
+<p>如果出现“启动时启用，运行中突然退回软件注入”，优先检查 inhibit trace、Guest 是否修改 APIC base/APIC ID，以及 userspace irqchip 模式。</p>
+<h3>14.4 源码阅读顺序</h3>
+<p>推荐按以下顺序阅读，能避免在 VMCS 和 LAPIC 状态间迷失：</p>
+<ol>
+<li><code>arch/x86/include/asm/posted_intr.h</code>：PID 布局与原子操作；</li>
+<li><code>arch/x86/kvm/vmx/capabilities.h</code>：硬件能力组合；</li>
+<li><code>arch/x86/kvm/vmx/vmx.c::setup_vmcs_config()</code>：控制依赖；</li>
+<li><code>arch/x86/kvm/lapic.c::kvm_alloc_apic_access_page()</code>：APIC-access page；</li>
+<li><code>arch/x86/kvm/vmx/vmx.c::init_vmcs()</code>：VMCS 字段；</li>
+<li><code>arch/x86/kvm/vmx/common.h::__vmx_deliver_posted_interrupt()</code>：软件 posting；</li>
+<li><code>arch/x86/kvm/vmx/vmx.c::vmx_sync_pir_to_irr()</code>：硬件/软件交界；</li>
+<li><code>arch/x86/kvm/vmx/posted_intr.c</code>：调度、迁移、阻塞唤醒和 IRTE；</li>
+<li><code>drivers/iommu/intel/irq_remapping.c::intel_ir_set_vcpu_affinity()</code>：posted-format IRTE 的装载、恢复和 128-bit 原子更新；</li>
+<li><code>arch/x86/kvm/vmx/nested.c</code> 的 <code>prepare_vmcs02_early()</code>、<code>nested_get_vmcs12_pages()</code>、<code>vmx_complete_nested_posted_interrupt()</code>：Nested APICv；</li>
+<li><code>arch/x86/kvm/x86.c</code> 的 APICv inhibit 逻辑：动态回退。</li>
+</ol>
+<hr>
+<h2>15. 结论</h2>
+<p>Intel APICv 的设计不是简单地“把一个虚拟中断写进 VMCS”，而是建立了一套硬件可并发维护的虚拟 LAPIC 状态机：</p>
+<ul>
+<li>APIC-access page 负责识别 Guest 的 xAPIC MMIO 入口；</li>
+<li>virtual-APIC page 保存每 vCPU 的 APIC 寄存器和 VIRR/VISR；</li>
+<li>RVI/SVI 把最高优先级 pending/in-service 向量带入 VMCS；</li>
+<li>Virtual-interrupt delivery 在 VMX non-root 中完成优先级判断和 IDT 投递；</li>
+<li>PID 把异步生产者与目标 vCPU 解耦，并用 ON/SN/NV/NDST 解决通知合并、抑制、唤醒和迁移；</li>
+<li>VT-d 让直通设备直接成为 PID 的生产者；</li>
+<li>PID-pointer table 和 IPI virtualization 进一步让 Guest vCPU 间 IPI 进入同一硬件投递框架；</li>
+<li>Nested VMX 通过 vmcs12/vmcs02 合成、L1 GPA 到 HPA 映射和专用 nested notification vector，把同一机制安全地扩展到 L2；</li>
+<li>KVM 负责配置、生命周期、复杂语义和回退，使硬件快路径与软件 LAPIC 保持一致。</li>
+</ul>
+<p>从 KVM 实现看，APICv 最关键的工程难点不是设置几个 VMCS bit，而是保证 <strong>PIR、IRR/VIRR、RVI/SVI、EOI 状态、vCPU 调度状态与 IOMMU IRTE 在并发和动态切换下始终一致</strong>。这也是阅读代码时应抓住的主线。</p>
+<hr>
+<h2>16. 思考题</h2>
+<ol>
+<li>APICv 是一个单独的硬件功能，还是由多组相互依赖的 VM-execution controls 共同构成的能力集合？</li>
+<li>APIC-access page 与 virtual-APIC page 分别解决什么问题，二者的地址、所有权和内容为什么不能混为一谈？</li>
+<li>Guest 访问 xAPIC MMIO 时，什么情况下硬件可以直接完成访问，什么情况下会产生 APIC-access VM Exit，什么情况下会产生 APIC-write VM Exit？</li>
+<li><code>virtualize APIC accesses</code> 与 APIC-register virtualization 的功能边界是什么？为什么前者启用后并不意味着所有 APIC 访问都不会退出？</li>
+<li>xAPIC virtualization 与 x2APIC virtualization 分别拦截哪类访问？为什么 x2APIC virtualization 与 <code>virtualize APIC accesses</code> 不能同时启用？</li>
+<li>TPR shadow、APIC-register virtualization、Virtual-interrupt delivery 和 Posted Interrupt 之间有哪些控制依赖？</li>
+<li>TPR、PPR、RVI 和 SVI 分别描述什么状态？它们之间如何共同决定一个 pending interrupt 能否被识别？</li>
+<li>RVI 是“当前所有 pending interrupt 的完整集合”，还是某个摘要值？完整的 pending 状态实际保存在哪里？</li>
+<li>SVI 与 virtual-APIC page 中的 ISR 有什么关系？为什么只维护其中一个可能造成 EOI 或优先级判断错误？</li>
+<li>PIR、软件 LAPIC IRR、virtual-APIC IRR 和 VMCS.RVI 分别处于投递流水线的哪个阶段？</li>
+<li>为什么“PIR 中某个 bit 已经置位”不等价于“Guest 马上能够进入对应的中断处理程序”？</li>
+<li>为什么 PID.ON 已经为 1 时，新的 posted interrupt 通常只需要设置 PIR，而不需要再次发送 notification interrupt？</li>
+<li>PID.ON 表示“PIR 一定非空”，还是表示“已有通知尚未完成处理”？两种状态是否可能暂时不一致？</li>
+<li>PID.SN 与 Guest 的中断屏蔽位 RFLAGS.IF 有什么区别？二者分别作用于哪一层通知或投递过程？</li>
+<li>PID.NV 与 Guest vector 有什么区别？为什么把二者当成同一个向量会导致错误的中断路径分析？</li>
+<li>PID.NDST 保存的是 vCPU 的 virtual APIC ID，还是当前承载该 vCPU 的物理 CPU APIC ID？</li>
+<li>vCPU 从一个 pCPU 迁移到另一个 pCPU 时，为什么通常只需更新 PID.NDST，而不需要逐条修改指向该 PID 的 posted-format IRTE？</li>
+<li>vCPU 被抢占但仍可运行，与 vCPU 因 HLT 阻塞时，KVM 为什么要对 PID.NV 和 PID.SN 采用不同处理？</li>
+<li>在清除 PID.SN 与检查 PIR 之间存在怎样的竞态？KVM 为什么需要在清 SN 后重新检查 pending PIR？</li>
+<li><code>vmx_sync_pir_to_irr()</code> 为什么既是 Posted Interrupt 的回退路径，也是硬件状态与 KVM 软件 LAPIC 状态之间的同步点？</li>
+<li>APICv 被动态 inhibit 后，已经由设备写入 PID 的中断如何避免丢失？</li>
+<li>EOI virtualization 为什么需要 EOI-exit bitmap？哪些向量的 EOI 可以由硬件完成，哪些向量必须交回 KVM？</li>
+<li>对 level-triggered IOAPIC 中断启用 VT-d Interrupt Posting 后，为什么仍然需要 VMM 处理 Directed EOI？</li>
+<li>如果 level-triggered 中断的 EOI 没有正确回传给源 IOAPIC，系统可能表现出哪些不同类型的故障？</li>
+<li>CPU Posted-Interrupt processing 与 VT-d Interrupt Posting 各自位于中断路径的哪一段？哪个模块负责生产 PIR，哪个模块负责消费 PIR？</li>
+<li>posted-format IRTE 中的 <code>VV</code> 与 PID 中的 <code>NV</code>、<code>NDST</code> 分别有什么含义？</li>
+<li>普通 remapped-format IRTE 与 posted-format IRTE 的最终输出有什么根本差异？</li>
+<li>为什么 Intel IOMMU 驱动更新 posted-format IRTE 时需要使用 128-bit 原子 compare-exchange，而普通的两个 64-bit 写可能不安全？</li>
+<li>posted-format IRTE 为什么仍然需要保留 SID、SQ 和 SVT 等 source-validation 字段？</li>
+<li>IOMMU 在更新 PID.PIR 后，为什么必须先保证该更新全局可见，再发送 notification interrupt？</li>
+<li>设备在产生 MSI/MSI-X 之前完成的 DMA 写，与 PID 更新和 notification interrupt 之间应满足怎样的顺序关系？</li>
+<li>VT-d Interrupt Posting 为什么要求 PID 位于 coherent、write-back 内存，并阻止设备通过普通 DMA 修改 PID？</li>
+<li>IRQ bypass 建立时，KVM 传给 Intel IOMMU 的 <code>pi_desc_addr</code> 和 <code>vector</code> 分别属于 Host 地址域还是 Guest 地址域？</li>
+<li>解绑直通设备 IRQ 与 vCPU 的 posting 关系时，IOMMU 应如何从 posted mode 恢复到 Host interrupt remapping 路径？</li>
+<li>Intel IOMMU 驱动中的 <code>posted_msi</code> 与 <code>posted_vcpu</code> 分别表示什么场景？为什么二者不应混为一谈？</li>
+<li>IPI virtualization 与软件/KVM Posted Interrupt、VT-d Posted Interrupt 有哪些共同的数据结构，又有哪些不同的中断生产者？</li>
+<li>IPI virtualization 为什么需要 PID-pointer table，而普通的单目标 Posted Interrupt 只需要一个 PID 地址？</li>
+<li>Guest 写 ICR 时，哪些目标模式、delivery mode 或向量条件可能使硬件 IPI virtualization 回退到 APIC-write VM Exit？</li>
+<li>在嵌套虚拟化中，vmcs01、vmcs12 和 vmcs02 分别由谁维护，哪一份 VMCS 会被真实 CPU 直接执行？</li>
+<li>L1 在 vmcs12 中填写的 APIC-access page、virtual-APIC page 和 PID 地址属于哪一层地址空间？L0 为什么必须把它们转换后才能写入 vmcs02？</li>
+<li>L0 为 L1 启用了 APICv，是否意味着 L2 自动启用同样的 APICv controls？vmcs02 的相关 controls 应由谁的策略决定？</li>
+<li>L1 启用 Virtual-interrupt delivery 时，为什么 vmcs12 还必须启用 external-interrupt exiting？</li>
+<li>L1 启用 Nested Posted Interrupt 时，为什么还必须同时启用 VID 和 <code>acknowledge interrupt on exit</code>？</li>
+<li>L0 PID 与 L1 为 L2 分配的 Nested PID 分别保存哪一层的 pending interrupt？二者能否使用同一个 descriptor？</li>
+<li><code>vmcs12.posted_intr_nv</code> 与 <code>vmcs02.POSTED_INTR_NV</code> 为什么不是同一个值？它们分别处于虚拟向量域还是 Host 物理向量域？</li>
+<li>KVM 为什么要使用专用的 <code>POSTED_INTR_NESTED_VECTOR</code>，而不是把 L1 选择的 notification vector 原样写入真实 vmcs02？</li>
+<li>L1 已经设置 Nested PID.PIR 和 ON 后，L0 在 <code>vmx_deliver_nested_posted_interrupt()</code> 中为什么只转换通知，而不再次设置 PIR？</li>
+<li>Nested Posted Interrupt 的物理 notification 没有在 L2 non-root 状态下被硬件消费时，<code>nested.pi_pending</code> 如何帮助 KVM 避免丢中断？</li>
+<li><code>vmx_complete_nested_posted_interrupt()</code> 软件补完时，为什么既要清 Nested PID.ON、合并 PIR，又要更新 vmcs02.RVI？</li>
+<li>L2 正在运行时，一个真正属于 L1 的普通中断为什么不能直接更新 vmcs02.RVI？</li>
+<li>当 L1 LAPIC 中 pending 的向量恰好等于 <code>nested.posted_intr_nv</code> 时，KVM 为什么不应把它作为普通 external-interrupt VM Exit 交给 L1？</li>
+<li>L2 退出后，为什么需要把 vmcs02 的 <code>GUEST_INTR_STATUS</code> 回写到 vmcs12？如果遗漏 RVI 或 SVI 同步，L1 可能作出什么错误判断？</li>
+<li>vmcs02 中的 EOI-exit bitmap 应来自 L0、L1 还是二者的简单并集？这种选择如何影响 L2 EOI 的 nested VM Exit 语义？</li>
+<li>Nested PID 或 L2 virtual-APIC page 的 L1 GPA 暂时无法映射时，KVM 为什么不能直接让真实硬件继续使用该地址？</li>
+<li>分析嵌套环境中的“PIR 已置位但中断没有立即进入 Guest”问题时，至少需要同时检查哪些层级的 PID、IRR、RVI、VMCS 和运行状态？</li>
+<li>“启用了 APICv”与“这一次中断完全没有 VM Exit”是否等价？还需要检查哪些控制、Guest 状态和调度条件？</li>
+<li>“无 VM Exit”与“无软件参与”是否等价？KVM 在能力配置、IRQ 绑定、vCPU 调度和回退路径中仍承担哪些职责？</li>
+<li>如果只用吞吐量评价 APICv 效果，可能遗漏哪些中断延迟、调度、NUMA 或 Host CPU 开销问题？</li>
+<li>当系统出现偶发丢中断、重复中断或中断延迟尖峰时，如何判断问题位于 PIR 生产、notification、PIR→IRR 同步、Virtual-interrupt delivery 还是 EOI 阶段？</li>
+<li>为什么 APICv 实现中最困难的问题不是设置 VMCS control bit，而是维持 PID、IRR/VIRR、RVI/SVI、EOI、调度状态和 IRTE 之间的并发一致性？</li>
+</ol>
+<hr>
+<h2>参考资料</h2>
+<ol>
+<li>Intel, <a href="https://www.intel.com/content/www/us/en/content-details/922486/intel-64-and-ia-32-architectures-software-developer-s-manual-combined-volumes-3a-3b-3c-and-3d-system-programming-guide.html">Intel® 64 and IA-32 Architectures Software Developer's Manual, Combined Volumes 3A, 3B, 3C, and 3D</a>, Version 092。重点章节：13、27、28、29、32。</li>
+<li>Intel, <a href="https://www.intel.com/content/www/us/en/content-details/868911/intel-virtualization-technology-for-directed-i-o-architecture-specification.html">Intel® Virtualization Technology for Directed I/O Architecture Specification</a>, Version 5.2。重点章节：5.2、9.10、9.11。</li>
+<li>Linux Kernel, <a href="https://github.com/torvalds/linux/tree/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx">APICv/VMX implementation at commit 481ed5dd3ed7</a>。</li>
+<li>Linux Kernel, <a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/lapic.c"><code>arch/x86/kvm/lapic.c</code></a>：软件 LAPIC、APIC-access page 与 APICv 状态同步。</li>
+<li>Linux Kernel, <a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/include/asm/posted_intr.h"><code>arch/x86/include/asm/posted_intr.h</code></a>：PID 数据结构及原子操作。</li>
+<li>Linux Kernel, <a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/drivers/iommu/intel/irq_remapping.c"><code>drivers/iommu/intel/irq_remapping.c</code></a>：Intel IRTE、IRQ posting capability 与 vCPU affinity 回调。</li>
+<li>Linux Kernel, <a href="https://github.com/torvalds/linux/blob/481ed5dd3ed7136f627b8ec372ba39f5b2e7d27f/arch/x86/kvm/vmx/nested.c"><code>arch/x86/kvm/vmx/nested.c</code></a>：vmcs12/vmcs02 合成、Nested PI 页面映射与软件补完。</li>
+</ol>
+
+
+             
+ 
+                <p id="post-share-links">
+    Share on:
+      <a href="https://twitter.com/intent/tweet?text=Intel%20APICv%20%E7%9A%84%E8%AE%BE%E8%AE%A1%E5%92%8C%E5%AE%9E%E7%8E%B0%E5%88%86%E6%9E%90&url=https%3A//blog.kernel.love/intel-apicv-analysis.html&hashtags=virtualization,kvm,apicv,intel,posted-interrupt" target="_blank" rel="nofollow noopener noreferrer" title="Share on Twitter">Twitter</a>
+ ❄       <a href="https://www.facebook.com/sharer/sharer.php?u=https%3A//blog.kernel.love/intel-apicv-analysis.html" target="_blank" rel="nofollow noopener noreferrer" title="Share on Facebook">Facebook</a>
+ ❄       <a href="mailto:?subject=Intel%20APICv%20%E7%9A%84%E8%AE%BE%E8%AE%A1%E5%92%8C%E5%AE%9E%E7%8E%B0%E5%88%86%E6%9E%90&amp;body=https%3A//blog.kernel.love/intel-apicv-analysis.html" target="_blank" rel="nofollow noopener noreferrer" title="Share via Email">Email</a>
+
+            
+            
+
+
+
+
+
+
+
+            <hr/>
+<section>
+    <h2>Related Posts</h2>
+<ul class="related-posts-list">
+<li><a href="https://blog.kernel.love/x86-nested-virt-performance.html" title="x86 嵌套虚拟化性能优化项总结">x86 嵌套虚拟化性能优化项总结</a></li>
+<li><a href="https://blog.kernel.love/kvm-pv-steal-time.html" title="KVM PV Steal Time 机制分析">KVM PV Steal Time 机制分析</a></li>
+<li><a href="https://blog.kernel.love/mediated-vpmu.html" title="Mediated vPMU 特性分析">Mediated vPMU 特性分析</a></li>
+<li><a href="https://blog.kernel.love/vcpu-enter-guest.html" title="vcpu_enter_guest">vcpu_enter_guest</a></li>
+<li><a href="https://blog.kernel.love/x86-vmexit.html" title="x86 vmexit">x86 vmexit</a></li>
+</ul>
+<hr />
+</section>
+            <aside>
+            <nav>
+            <ul class="articles-timeline">
+                <li class="previous-article">« <a href="https://blog.kernel.love/x86-vmexit.html" title="Previous: x86 vmexit">x86 vmexit</a></li>
+            </ul>
+            </nav>
+            </aside>
+        </div>
+        <section id="article-sidebar" class="span2">
+            <h4>Published</h4>
+            <time itemprop="dateCreated" datetime="2026-07-17T17:00:00+08:00">Fri 17 July 2026</time>
+
+            <h4>Category</h4>
+            <a class="category-link" href="https://blog.kernel.love/categories.html#virt-ref">virt</a>
+            <h4>Tags</h4>
+            <ul class="list-of-tags tags-in-article">
+                <li><a href="https://blog.kernel.love/tags.html#apicv-ref">apicv
+                    <span class="superscript">1</span>
+</a></li>
+                <li><a href="https://blog.kernel.love/tags.html#intel-ref">intel
+                    <span class="superscript">1</span>
+</a></li>
+                <li><a href="https://blog.kernel.love/tags.html#kvm-ref">kvm
+                    <span class="superscript">5</span>
+</a></li>
+                <li><a href="https://blog.kernel.love/tags.html#posted-interrupt-ref">posted-interrupt
+                    <span class="superscript">1</span>
+</a></li>
+                <li><a href="https://blog.kernel.love/tags.html#virtualization-ref">virtualization
+                    <span class="superscript">21</span>
+</a></li>
+            </ul>
+<h4>Contact</h4>
+<div id="sidebar-social-link">
+    <a href="https://github.com/fangying" title="" target="_blank" rel="nofollow noopener noreferrer">
+        <svg xmlns="http://www.w3.org/2000/svg" aria-label="GitHub" role="img" viewBox="0 0 512 512"><rect width="512" height="512" rx="15%" fill="#1B1817"/><path fill="#fff" d="M335 499c14 0 12 17 12 17H165s-2-17 12-17c13 0 16-6 16-12l-1-50c-71 16-86-28-86-28-12-30-28-37-28-37-24-16 1-16 1-16 26 2 40 26 40 26 22 39 59 28 74 22 2-17 9-28 16-35-57-6-116-28-116-126 0-28 10-51 26-69-3-6-11-32 3-67 0 0 21-7 70 26 42-12 86-12 128 0 49-33 70-26 70-26 14 35 6 61 3 67 16 18 26 41 26 69 0 98-60 120-117 126 10 8 18 24 18 48l-1 70c0 6 3 12 16 12z"/></svg>
+    </a>
+</div>
+            
+
+
+
+
+
+            
+
+
+
+
+
+        </section>
+</div>
+</article>
+<!-- Root element of PhotoSwipe. Must have class pswp. -->
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    <!-- Background of PhotoSwipe.
+         It's a separate element as animating opacity is faster than rgba(). -->
+    <div class="pswp__bg"></div>
+
+    <!-- Slides wrapper with overflow:hidden. -->
+    <div class="pswp__scroll-wrap">
+
+        <!-- Container that holds slides.
+            PhotoSwipe keeps only 3 of them in the DOM to save memory.
+            Don't modify these 3 pswp__item elements, data is added later on. -->
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        <!-- Default (PhotoSwipeUI_Default) interface on top of sliding area. Can be changed. -->
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                <!--  Controls are self-explanatory. Order can be changed. -->
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                <!-- Preloader demo https://codepen.io/dimsemenov/pen/yyBWoR -->
+                <!-- element will get class pswp__preloader--active when preloader is running -->
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                      <div class="pswp__preloader__cut">
+                        <div class="pswp__preloader__donut"></div>
+                      </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>                    </div>
+                    <div class="span1"></div>
+                </div>
+            </div>
+        </div>
+<footer>
+    <div>
+        <span xmlns:dct="http://purl.org/dc/terms/" property="dct:title"> blog.kernel.love"</span> by <a xmlns:cc="http://creativecommons.org/ns#" href="https://blog.kernel.love" property="cc:attributionName" rel="cc:attributionURL">Yori Fang</a> is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/3.0/deed.en_US">Creative Commons Attribution-ShareAlike 3.0 Unported License</a>.
+    </div>
+
+
+
+
+    <div id="fpowered">
+        Powered by: <a href="http://getpelican.com/" title="Pelican Home Page" target="_blank" rel="nofollow noopener noreferrer">Pelican</a>
+        Theme: <a href="https://elegant.oncrashreboot.com/" title="Theme Elegant Home Page" target="_blank" rel="nofollow noopener noreferrer">Elegant</a>
+    </div>
+</footer>            <script src="//code.jquery.com/jquery.min.js"></script>
+        <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/js/bootstrap.min.js"></script>
+        <script src="https://blog.kernel.love/theme/js/elegant.prod.9e9d5ce754.js"></script>
+        <script>
+            function validateForm(query)
+            {
+                return (query.length > 0);
+            }
+        </script>
+
+    <script>
+    (function () {
+        if (window.location.hash.match(/^#comment-\d+$/)) {
+            $('#comment_thread').collapse('show');
+        }
+    })();
+    window.onhashchange=function(){
+        if (window.location.hash.match(/^#comment-\d+$/))
+            window.location.reload(true);
+    }
+    $('#comment_thread').on('shown', function () {
+        var link = document.getElementById('comment-accordion-toggle');
+        var old_innerHTML = link.innerHTML;
+        $(link).fadeOut(200, function() {
+            $(this).text('Click here to hide comments').fadeIn(200);
+        });
+        $('#comment_thread').on('hidden', function () {
+            $(link).fadeOut(200, function() {
+                $(this).text(old_innerHTML).fadeIn(200);
+            });
+        })
+    })
+</script>
+
+    </body>
+    <!-- Theme: Elegant built for Pelican
+        License : MIT -->
+</html>
