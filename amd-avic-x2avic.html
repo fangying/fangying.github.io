@@ -1,0 +1,1350 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://blog.kernel.love/theme/css/style.min.css?2fcac227">
+
+        <link rel="dns-prefetch" href="//fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin>
+
+        <meta name="author" content="Yori Fang" />
+
+        <meta name="description" content="AMD AVIC/x2AVIC hardware virtualization design and implementation analysis based on AMD APM Vol.2 and Linux KVM-SVM source code
+" />
+        <meta property="og:type" content="article" />
+        <meta name="twitter:card" content="summary">
+
+<meta name="keywords" content="virtualization, amd, avic, x2avic, virt, " />
+
+<meta property="og:title" content="AMD AVIC 的设计与实现分析文档 "/>
+<meta property="og:url" content="https://blog.kernel.love/amd-avic-x2avic.html" />
+<meta property="og:description" content="AMD AVIC/x2AVIC hardware virtualization design and implementation analysis based on AMD APM Vol.2 and Linux KVM-SVM source code" />
+<meta property="og:site_name" content="blog.kernel.love" />
+<meta property="og:article:author" content="Yori Fang" />
+<meta property="og:article:published_time" content="2026-07-30T23:00:00+08:00" />
+<meta property="og:article:modified_time" content="2026-07-30T23:00:00+08:00" />
+<meta name="twitter:title" content="AMD AVIC 的设计与实现分析文档 ">
+<meta name="twitter:description" content="AMD AVIC/x2AVIC hardware virtualization design and implementation analysis based on AMD APM Vol.2 and Linux KVM-SVM source code">
+
+        <title>AMD AVIC 的设计与实现分析文档  · blog.kernel.love
+</title>
+
+<script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+     (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+     m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+     })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+    ga('create', 'UA-107392039-2', 'auto');
+    ga('send', 'pageview');
+</script>
+
+
+    </head>
+    <body>
+        <div id="content">
+            <div class="navbar navbar-static-top">
+                <div class="navbar-inner">
+                    <div class="container-fluid">
+                        <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                        </a>
+                        <a class="brand" href="https://blog.kernel.love/"><span class=site-name>blog.kernel.love</span></a>
+                        <div class="nav-collapse collapse">
+                            <ul class="nav pull-right top-menu">
+                                <li >
+                                    <a href=
+                                       https://blog.kernel.love
+                                    >Home</a>
+                                </li>
+                                <li ><a href="https://blog.kernel.love/pages/about.html">About</a></li>
+                                <li ><a href="https://blog.kernel.love/categories.html">Categories</a></li>
+                                <li ><a href="https://blog.kernel.love/tags.html">Tags</a></li>
+                                <li ><a href="https://blog.kernel.love/archives.html">Archives</a></li>
+                                <li><form class="navbar-search" action="https://blog.kernel.love/search.html" onsubmit="return validateForm(this.elements['q'].value);"> <input type="text" class="search-query" placeholder="Search" name="q" id="tipue_search_input"></form></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="container-fluid">
+                <div class="row-fluid">
+                    <div class="span1"></div>
+                    <div class="span10">
+<article itemscope>
+<div class="row-fluid">
+    <header class="page-header span10 offset2">
+        <h1>
+            <a href="https://blog.kernel.love/amd-avic-x2avic.html">
+                AMD AVIC 的设计与实现分析文档
+            </a>
+        </h1>
+    </header>
+</div>
+
+<div class="row-fluid">
+        <div class="span8 offset2 article-content">
+            
+            <h1>AMD AVIC 的设计与实现分析文档</h1>
+<blockquote>
+<p>基于 AMD64 Architecture Programmer's Manual Volume 2 (Section 15.29) 及 Linux Kernel KVM-SVM 源码分析</p>
+<p>适用于系统虚拟化领域技术调研</p>
+</blockquote>
+<hr>
+<h2>目录</h2>
+<ol>
+<li><a href="#1-背景与动机">背景与动机</a></li>
+<li><a href="#2-avic-架构概览">AVIC 架构概览</a></li>
+<li><a href="#3-avic-核心数据结构">AVIC 核心数据结构</a></li>
+<li><a href="#4-vmcb-控制字段">VMCB 控制字段</a></li>
+<li><a href="#5-ipi-虚拟化流程">IPI 虚拟化流程</a></li>
+<li><a href="#6-设备中断虚拟化iommu-avic--ga-模式">设备中断虚拟化（IOMMU AVIC / GA 模式）</a></li>
+<li><a href="#7-x2avic-扩展">x2AVIC 扩展</a></li>
+<li><a href="#8-secure-avicsev-snp-环境">Secure AVIC（SEV-SNP 环境）</a></li>
+<li><a href="#9-kvm-代码实现详解">KVM 代码实现详解</a></li>
+<li><a href="#10-已知硬件-erratum">已知硬件 Erratum</a></li>
+<li><a href="#11-avic-vs-x2avic-vs-secure-avic-对比">AVIC vs x2AVIC vs Secure AVIC 对比</a></li>
+<li><a href="#12-参考文献">参考文献</a></li>
+</ol>
+<hr>
+<h2>1. 背景与动机</h2>
+<h3>1.1 传统中断虚拟化的瓶颈</h3>
+<p>在传统 AMD SVM（Secure Virtual Machine）虚拟化中，所有与 Local APIC 相关的操作（如读写 APIC 寄存器、发送 IPI）都会触发 <strong>VM-Exit</strong>，由 KVM 软件模拟。这种模式带来显著的性能开销：</p>
+<ul>
+<li><strong>每次 APIC 寄存器访问</strong> → VM-Exit → KVM 模拟 → VM-Entry 返回 Guest</li>
+<li><strong>每次 IPI 发送</strong> → VM-Exit → KVM 遍历目标 vCPU → 软件注入中断 → 可能再次 VM-Exit 唤醒目标 vCPU</li>
+<li><strong>设备中断投递</strong>（直通场景）→ IOMMU 中断到 Host → KVM 注入 → VM-Entry</li>
+</ul>
+<p>在高中断频率场景（如网络密集型 workload、多 vCPU 通信）下，VM-Exit 开销成为虚拟化性能的关键瓶颈。</p>
+<h3>1.2 AVIC 的设计目标</h3>
+<p>AMD AVIC（Advanced Virtual Interrupt Controller）通过<strong>硬件虚拟化 Local APIC</strong>，大幅减少 VM-Exit：</p>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>传统模式</th>
+<th>AVIC 模式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Guest 读 APIC 寄存器</td>
+<td>VM-Exit → KVM 模拟</td>
+<td>硬件直接从 vAPIC 页读取，无 VM-Exit</td>
+</tr>
+<tr>
+<td>Guest 写部分 APIC 寄存器</td>
+<td>VM-Exit → KVM 模拟</td>
+<td>硬件直接写入 vAPIC 页，无 VM-Exit</td>
+</tr>
+<tr>
+<td>Guest 发送 IPI（目标 vCPU 正在运行）</td>
+<td>VM-Exit → KVM 软件投递</td>
+<td>硬件直接设置目标 vAPIC 页的 IRR + Doorbell 通知</td>
+</tr>
+<tr>
+<td>设备中断投递（直通）</td>
+<td>IOMMU → Host → KVM 注入</td>
+<td>IOMMU GA 模式直接写入 vAPIC 页</td>
+</tr>
+</tbody>
+</table>
+<p><strong>CPUID 检测</strong>：<code>Fn8000_000A EDX[3]</code> 表示 AVIC 支持，<code>EDX[14]</code> 表示 x2AVIC 支持。</p>
+<blockquote>
+<p><strong>前提条件</strong>：AVIC 要求 NPT（Nested Page Table，嵌套页表）必须启用。AVIC 硬件需要通过 NPT 来检查权限并定位 vAPIC Backing Page。</p>
+</blockquote>
+<hr>
+<h2>2. AVIC 架构概览</h2>
+<p>AVIC 硬件通过以下机制实现 APIC 虚拟化：</p>
+<div class="highlight"><pre><span></span><code><span class="err">┌─────────────────────────────────────────────────────────────┐</span>
+<span class="err">│</span><span class="w">                      </span><span class="n">Guest</span><span class="w"> </span><span class="n">vCPU</span><span class="w">                              </span><span class="err">│</span>
+<span class="err">│</span><span class="w">                                                             </span><span class="err">│</span>
+<span class="err">│</span><span class="w">   </span><span class="err">┌─────────────┐</span><span class="w">    </span><span class="err">┌──────────────────────────┐</span><span class="w">           </span><span class="err">│</span>
+<span class="err">│</span><span class="w">   </span><span class="err">│</span><span class="w">  </span><span class="k">Local</span><span class="w"> </span><span class="n">APIC</span><span class="w">  </span><span class="err">│◄──►│</span><span class="w">  </span><span class="n">vAPIC</span><span class="w"> </span><span class="n">Backing</span><span class="w"> </span><span class="n">Page</span><span class="w">     </span><span class="err">│</span><span class="w">           </span><span class="err">│</span>
+<span class="err">│</span><span class="w">   </span><span class="err">│</span><span class="w">  </span><span class="p">(</span><span class="n">MMIO</span><span class="o">/</span><span class="n">MSR</span><span class="p">)</span><span class="w">  </span><span class="err">│</span><span class="w">    </span><span class="err">│</span><span class="w">  </span><span class="p">(</span><span class="n">per</span><span class="o">-</span><span class="n">vCPU</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="n">KB</span><span class="p">)</span><span class="w">        </span><span class="err">│</span><span class="w">           </span><span class="err">│</span>
+<span class="err">│</span><span class="w">   </span><span class="err">└──────┬───────┘</span><span class="w">    </span><span class="err">└──────────┬──────────────┘</span><span class="w">           </span><span class="err">│</span>
+<span class="err">│</span><span class="w">          </span><span class="err">│</span><span class="w">                        </span><span class="err">│</span><span class="w">                          </span><span class="err">│</span>
+<span class="err">└──────────┼────────────────────────┼──────────────────────────┘</span>
+<span class="w">           </span><span class="err">│</span><span class="w">                        </span><span class="err">│</span>
+<span class="w">     </span><span class="err">┌──────▼───────┐</span><span class="w">        </span><span class="err">┌──────▼──────────────────┐</span>
+<span class="w">     </span><span class="err">│</span><span class="w">  </span><span class="n">AVIC</span><span class="w"> </span><span class="n">硬件</span><span class="w">    </span><span class="err">│───────►│</span><span class="w">  </span><span class="n">Physical</span><span class="w"> </span><span class="n">APIC</span><span class="w"> </span><span class="n">ID</span><span class="w"> </span><span class="nc">Table</span><span class="w">  </span><span class="err">│</span>
+<span class="w">     </span><span class="err">│</span><span class="w">  </span><span class="p">(</span><span class="ow">in</span><span class="w"> </span><span class="n">CPU</span><span class="p">)</span><span class="w">    </span><span class="err">│</span><span class="w">        </span><span class="err">│</span><span class="w">  </span><span class="p">(</span><span class="n">per</span><span class="o">-</span><span class="n">VM</span><span class="p">)</span><span class="w">                </span><span class="err">│</span>
+<span class="w">     </span><span class="err">│</span><span class="w">              </span><span class="err">│</span><span class="w">        </span><span class="err">│</span><span class="w">  </span><span class="err">┌────────────────────┐</span><span class="w">   </span><span class="err">│</span>
+<span class="w">     </span><span class="err">│</span><span class="w">              </span><span class="err">│</span><span class="w">        </span><span class="err">│</span><span class="w">  </span><span class="err">│</span><span class="w"> </span><span class="n">Entry</span><span class="o">[</span><span class="n">0</span><span class="o">]</span><span class="w"> </span><span class="p">(</span><span class="n">vCPU</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w">  </span><span class="err">│</span><span class="w">   </span><span class="err">│</span>
+<span class="w">     </span><span class="err">│</span><span class="w">              </span><span class="err">│</span><span class="w">        </span><span class="err">│</span><span class="w">  </span><span class="err">│</span><span class="w"> </span><span class="n">Entry</span><span class="o">[</span><span class="n">1</span><span class="o">]</span><span class="w"> </span><span class="p">(</span><span class="n">vCPU</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="w">  </span><span class="err">│</span><span class="w">   </span><span class="err">│</span>
+<span class="w">     </span><span class="err">│</span><span class="w">              </span><span class="err">│</span><span class="w">        </span><span class="err">│</span><span class="w">  </span><span class="err">│</span><span class="w"> </span><span class="p">...</span><span class="w">                </span><span class="err">│</span><span class="w">   </span><span class="err">│</span>
+<span class="w">     </span><span class="err">│</span><span class="w">              </span><span class="err">│</span><span class="w">        </span><span class="err">│</span><span class="w">  </span><span class="err">│</span><span class="w"> </span><span class="n">Entry</span><span class="o">[</span><span class="n">N</span><span class="o">]</span><span class="w"> </span><span class="p">(</span><span class="n">vCPU</span><span class="w"> </span><span class="n">N</span><span class="p">)</span><span class="w">  </span><span class="err">│</span><span class="w">   </span><span class="err">│</span>
+<span class="w">     </span><span class="err">│</span><span class="w">              </span><span class="err">│</span><span class="w">        </span><span class="err">│</span><span class="w">  </span><span class="err">└────────────────────┘</span><span class="w">   </span><span class="err">│</span>
+<span class="w">     </span><span class="err">│</span><span class="w">              </span><span class="err">│</span><span class="w">        </span><span class="err">└──────────────────────────┘</span>
+<span class="w">     </span><span class="err">│</span><span class="w">              </span><span class="err">│</span>
+<span class="w">     </span><span class="err">│</span><span class="w">              </span><span class="err">│</span><span class="w">        </span><span class="err">┌──────────────────────────┐</span>
+<span class="w">     </span><span class="err">│</span><span class="w">              </span><span class="err">│───────►│</span><span class="w">  </span><span class="n">Logical</span><span class="w"> </span><span class="n">APIC</span><span class="w"> </span><span class="n">ID</span><span class="w"> </span><span class="nc">Table</span><span class="w">   </span><span class="err">│</span>
+<span class="w">     </span><span class="err">│</span><span class="w">              </span><span class="err">│</span><span class="w">        </span><span class="err">│</span><span class="w">  </span><span class="p">(</span><span class="n">per</span><span class="o">-</span><span class="n">VM</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="n">KB</span><span class="p">)</span><span class="w">           </span><span class="err">│</span>
+<span class="w">     </span><span class="err">│</span><span class="w">              </span><span class="err">│</span><span class="w">        </span><span class="err">│</span><span class="w">  </span><span class="p">(</span><span class="n">仅</span><span class="w"> </span><span class="n">xAPIC</span><span class="w"> </span><span class="n">模式使用</span><span class="p">)</span><span class="w">      </span><span class="err">│</span>
+<span class="w">     </span><span class="err">└──────────────┘</span><span class="w">        </span><span class="err">└──────────────────────────┘</span>
+<span class="w">            </span><span class="err">│</span>
+<span class="w">            </span><span class="err">│</span><span class="w"> </span><span class="n">Doorbell</span><span class="w"> </span><span class="p">(</span><span class="n">MSR</span><span class="p">)</span>
+<span class="w">            </span><span class="err">▼</span>
+<span class="w">     </span><span class="err">┌──────────────┐</span>
+<span class="w">     </span><span class="err">│</span><span class="w"> </span><span class="n">目标</span><span class="w"> </span><span class="n">pCPU</span><span class="w">    </span><span class="err">│</span>
+<span class="w">     </span><span class="err">│</span><span class="w"> </span><span class="p">(</span><span class="n">目标</span><span class="w"> </span><span class="n">vCPU</span><span class="w">   </span><span class="err">│</span>
+<span class="w">     </span><span class="err">│</span><span class="w">  </span><span class="n">正在运行</span><span class="p">)</span><span class="w">   </span><span class="err">│</span>
+<span class="w">     </span><span class="err">└──────────────┘</span>
+</code></pre></div>
+
+<h3>AVIC 硬件处理流程（Guest 发送 IPI 时）</h3>
+<div class="highlight"><pre><span></span><code>Guest 写 ICR (ICRL/ICRH)
+        │
+        ▼
+   ┌────────────────────┐
+   │ AVIC 硬件拦截      │
+   │ (不需 VM-Exit)    │
+   └────────┬───────────┘
+            │
+            ▼
+   ┌────────────────────────────────┐
+   │ 1. 解析 IPI 目标 (Physical/   │
+   │    Logical 地址模式)           │
+   │ 2. 查 Physical APIC ID Table  │
+   │    定位目标 vCPU               │
+   │ 3. 判断目标 vCPU 是否在运行    │
+   │    (IsRunning 位)              │
+   └────────┬───────────────────────┘
+            │
+     ┌──────┴──────┐
+     │             │
+     ▼             ▼
+ IsRunning=1    IsRunning=0
+     │             │
+     ▼             ▼
+ 设置目标 vAPIC  设置目标 vAPIC
+ IRR 位          IRR 位
+     │             │
+     ▼             ▼
+ 写 Doorbell MSR  触发
+ (目标 pCPU)      AVIC_INCOMPLETE_IPI
+     │             VM-Exit (源 vCPU)
+     ▼             │
+ 目标 pCPU         ▼
+ 收到 Doorbell    KVM 处理:
+ → 评估 vIRR      唤醒/调度目标 vCPU
+ → 注入中断
+</code></pre></div>
+
+<hr>
+<h2>3. AVIC 核心数据结构</h2>
+<p>AVIC 依赖三个关键数据结构，这些在 AMD APM Volume 2 Section 15.29 中有详细描述。</p>
+<h3>3.1 vAPIC Backing Page（虚拟 APIC 背ing页）</h3>
+<ul>
+<li><strong>粒度</strong>：per-vCPU，每个 vCPU 一个 4KB 页面</li>
+<li><strong>作用</strong>：作为 Guest Local APIC 寄存器的硬件级影子页面</li>
+<li><strong>物理位置</strong>：Host 物理内存，由 VMM 分配</li>
+<li><strong>VMCB 关联</strong>：通过 VMCB 的 <code>AVIC_BACKING_PAGE</code> 字段指向</li>
+</ul>
+<p>当 Guest 访问 APIC MMIO 地址（<code>0xFEE00000</code> 区域）或 x2APIC MSR 时，AVIC 硬件会：
+1. 拦截该访问（不触发 NPF #VMEXIT）
+2. 通过 NPT 验证权限
+3. <strong>不使用 NPT 中的物理地址</strong>，而是使用 VMCB 中 <code>AVIC_BACKING_PAGE</code> 指针指向的页面
+4. 直接读写 vAPIC Backing Page 中对应的 APIC 寄存器</p>
+<blockquote>
+<p>KVM 实现：<code>avic_get_backing_page_address()</code> 返回 <code>__pa(svm-&gt;vcpu.arch.apic-&gt;regs)</code>，即 KVM 的 LAPIC 寄存器页就是 AVIC 的 Backing Page。</p>
+</blockquote>
+<h3>3.2 Physical APIC ID Table（物理 APIC ID 表）</h3>
+<ul>
+<li><strong>粒度</strong>：per-VM，每个虚拟机一张表</li>
+<li><strong>作用</strong>：将 Guest Physical APIC ID 映射到 vAPIC Backing Page 物理地址和 Host Physical CPU ID</li>
+<li><strong>表大小</strong>：</li>
+<li>xAVIC 模式：256 个条目（APIC ID 0~255，占 2KB）</li>
+<li>x2AVIC 模式：512 个条目（APIC ID 0~511，占 4KB）</li>
+<li>x2AVIC EXT 模式：4096 个条目（APIC ID 0~4095，占 32KB）</li>
+<li><strong>VMCB 关联</strong>：通过 VMCB 的 <code>AVIC_PHYSICAL_ID</code> 字段指向表基址</li>
+</ul>
+<h4>Physical APIC ID Table Entry 格式（64-bit）</h4>
+<div class="highlight"><pre><span></span><code> 63  62  61  60          52  51                            12  11          0
+┌───┬───┬───┬─────────────┬──────────────────────────────────┬────────────┐
+│ V │ IR│GLI│   Reserved  │     Backing Page Address [51:12]  │Host Phys ID│
+└───┴───┴───┴─────────────┴──────────────────────────────────┴────────────┘
+</code></pre></div>
+
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>Bit</th>
+<th>描述</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>V (Valid)</strong></td>
+<td>63</td>
+<td>条目是否有效。为 0 时，硬件忽略该条目，广播 IPI 也不会投递到此 vCPU</td>
+</tr>
+<tr>
+<td><strong>IR (IsRunning)</strong></td>
+<td>62</td>
+<td>目标 vCPU 是否正在运行。为 1 时硬件通过 Doorbell 通知；为 0 时触发 INCOMPLETE_IPI VM-Exit</td>
+</tr>
+<tr>
+<td><strong>GLI (GA_LOG_INTR)</strong></td>
+<td>61</td>
+<td>置位时，IOMMU 收到设备中断后通过 GALog 通知 KVM 唤醒 vCPU</td>
+</tr>
+<tr>
+<td><strong>Backing Page Address</strong></td>
+<td>51:12</td>
+<td>vAPIC Backing Page 的物理地址（页对齐，40-bit）</td>
+</tr>
+<tr>
+<td><strong>Host Physical ID</strong></td>
+<td>11:0</td>
+<td>目标 vCPU 当前运行的 Host 物理 CPU ID</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>KVM 中 <code>svm.h</code> 定义：
+- <code>AVIC_PHYSICAL_ID_ENTRY_VALID_MASK</code> = <code>BIT_ULL(63)</code>
+- <code>AVIC_PHYSICAL_ID_ENTRY_IS_RUNNING_MASK</code> = <code>BIT_ULL(62)</code>
+- <code>AVIC_PHYSICAL_ID_ENTRY_GA_LOG_INTR</code> = <code>BIT_ULL(61)</code>
+- <code>AVIC_PHYSICAL_ID_ENTRY_BACKING_PAGE_MASK</code> = <code>GENMASK_ULL(51, 12)</code>
+- <code>AVIC_PHYSICAL_ID_ENTRY_HOST_PHYSICAL_ID_MASK</code> = <code>GENMASK_ULL(11, 0)</code></p>
+</blockquote>
+<h3>3.3 Logical APIC ID Table（逻辑 APIC ID 表）</h3>
+<ul>
+<li><strong>粒度</strong>：per-VM，每个虚拟机一张表</li>
+<li><strong>作用</strong>：支持 Logical 地址模式的 IPI 投递，将 Logical APIC ID 映射到 Guest Physical APIC ID</li>
+<li><strong>表大小</strong>：4KB（1024 个 32-bit 条目）</li>
+<li><strong>仅 xAPIC 模式使用</strong>：x2AVIC 模式下硬件通过算法直接从 x2APIC ID 推导 Logical ID，不使用此表</li>
+</ul>
+<h4>Logical APIC ID Table Entry 格式（32-bit）</h4>
+<div class="highlight"><pre><span></span><code> 31  30          8  7        0
+┌───┬────────────┬──────────┐
+│ V │ Reserved   │Guest Phys│
+│   │            │  APIC ID │
+└───┴────────────┴──────────┘
+</code></pre></div>
+
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>Bit</th>
+<th>描述</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>V (Valid)</strong></td>
+<td>31</td>
+<td>条目是否有效</td>
+</tr>
+<tr>
+<td><strong>Guest Physical APIC ID</strong></td>
+<td>7:0</td>
+<td>对应的 Guest Physical APIC ID</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>KVM 中 <code>svm.h</code> 定义：
+- <code>AVIC_LOGICAL_ID_ENTRY_VALID_MASK</code> = <code>BIT(31)</code>
+- <code>AVIC_LOGICAL_ID_ENTRY_GUEST_PHYSICAL_ID_MASK</code> = <code>GENMASK(7, 0)</code></p>
+</blockquote>
+<hr>
+<h2>4. VMCB 控制字段</h2>
+<p>AVIC 通过 VMCB（Virtual Machine Control Block）控制区域的多个字段进行配置。</p>
+<h3>4.1 关键 VMCB 字段</h3>
+<table>
+<thead>
+<tr>
+<th>VMCB 字段</th>
+<th>偏移</th>
+<th>描述</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>int_ctl</code></td>
+<td>0x60</td>
+<td>中断控制字段，包含 AVIC_ENABLE 和 X2APIC_MODE 位</td>
+</tr>
+<tr>
+<td><code>avic_backing_page</code></td>
+<td>0x78 (0xe0 in control area)</td>
+<td>vAPIC Backing Page 的物理地址</td>
+</tr>
+<tr>
+<td><code>avic_logical_id</code></td>
+<td>0x88 (0xf0)</td>
+<td>Logical APIC ID Table 的物理地址</td>
+</tr>
+<tr>
+<td><code>avic_physical_id</code></td>
+<td>0x90 (0xf8)</td>
+<td>Physical APIC ID Table 的物理地址 + MAX_INDEX</td>
+</tr>
+<tr>
+<td><code>avic_vapic_bar</code></td>
+<td>0x98</td>
+<td>vAPIC BAR 地址，通常设为 <code>0xFEE00000</code>（APIC 默认基址）</td>
+</tr>
+</tbody>
+</table>
+<h3>4.2 int_ctl 关键位</h3>
+<div class="highlight"><pre><span></span><code> 31  30  29                    0
+┌───┬───┬───────────────────────┐
+│AVC│X2M│      其他控制位        │
+└───┴───┴───────────────────────┘
+</code></pre></div>
+
+<table>
+<thead>
+<tr>
+<th>位</th>
+<th>名称</th>
+<th>描述</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Bit 31</td>
+<td><strong>AVIC_ENABLE</strong></td>
+<td>启用 AVIC 硬件虚拟化</td>
+</tr>
+<tr>
+<td>Bit 30</td>
+<td><strong>X2APIC_MODE</strong></td>
+<td>启用 x2AVIC 模式（x2APIC MSR 虚拟化）</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>KVM <code>svm.h</code>：
+- <code>AVIC_ENABLE_SHIFT</code> = 31
+- <code>X2APIC_MODE_SHIFT</code> = 30
+- <code>AVIC_ENABLE_MASK</code> = <code>BIT_ULL(31)</code>
+- <code>X2APIC_MODE_MASK</code> = <code>BIT_ULL(30)</code></p>
+</blockquote>
+<h3>4.3 avic_physical_id 字段中的 MAX_INDEX</h3>
+<p><code>VMCB.avic_physical_id</code> 的高位存储 Physical APIC ID Table 基址，低 12 位存储 <strong>MAX_INDEX</strong>（表中最大有效索引值）：</p>
+<div class="highlight"><pre><span></span><code> 63                              12  11          0
+┌──────────────────────────────────┬──────────────┐
+│  Physical APIC ID Table Base Addr │  MAX_INDEX  │
+└──────────────────────────────────┴──────────────┘
+</code></pre></div>
+
+<p>MAX_INDEX 告诉硬件表中有多少个有效条目，用于广播 IPI 时确定扫描范围。</p>
+<blockquote>
+<p>KVM：<code>avic_activate_vmcb()</code> 中设置 <code>vmcb-&gt;control.avic_physical_id |= avic_get_max_physical_id(vcpu)</code></p>
+</blockquote>
+<hr>
+<h2>5. IPI 虚拟化流程</h2>
+<h3>5.1 Guest 发送 IPI 时的硬件处理</h3>
+<p>当 Guest 写 APIC ICR（Interrupt Command Register）发送 IPI 时，AVIC 硬件执行以下步骤：</p>
+<p><strong>Step 1: 解析 IPI 目标</strong></p>
+<p>根据 ICR 中指定的目标地址模式（Physical / Logical）和交付模式：</p>
+<p><strong>Step 2: 查找目标 vCPU</strong></p>
+<ul>
+<li><strong>Physical 模式</strong>：直接使用目标 APIC ID 作为索引查找 Physical APIC ID Table</li>
+<li><strong>Logical 模式</strong>（xAPIC）：根据 DFR（Flat/Cluster）模式查找 Logical APIC ID Table，获取 Guest Physical APIC ID，再查 Physical APIC ID Table</li>
+</ul>
+<p><strong>Step 3: 检查目标 vCPU 运行状态</strong></p>
+<ul>
+<li>如果 <code>IsRunning=1</code>：硬件直接设置目标 vAPIC 页的 IRR 位，然后通过 <strong>Doorbell MSR</strong>（<code>MSR_AMD64_SVM_AVIC_DOORBELL</code>）通知目标 pCPU</li>
+<li>如果 <code>IsRunning=0</code>：硬件设置目标 vAPIC 页的 IRR 位，然后触发源 vCPU 的 <strong>AVIC_INCOMPLETE_IPI VM-Exit</strong></li>
+</ul>
+<p><strong>Step 4: 处理异常情况</strong></p>
+<p>以下情况会触发 AVIC_INCOMPLETE_IPI VM-Exit（exit code = <code>0x401</code>）：</p>
+<table>
+<thead>
+<tr>
+<th>IPI Failure Cause</th>
+<th>值</th>
+<th>含义</th>
+<th>KVM 处理方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>INVALID_INT_TYPE</code></td>
+<td>0</td>
+<td>交付模式不被 AVIC 支持（非 Fixed/Edge-Triggered INTR）</td>
+<td>软件模拟 IPI</td>
+</tr>
+<tr>
+<td><code>TARGET_NOT_RUNNING</code></td>
+<td>1</td>
+<td>目标 vCPU 未在运行（IsRunning=0）</td>
+<td>唤醒目标 vCPU</td>
+</tr>
+<tr>
+<td><code>INVALID_TARGET</code></td>
+<td>2</td>
+<td>目标 APIC ID 在 Physical ID Table 中无有效条目</td>
+<td>软件模拟 IPI</td>
+</tr>
+<tr>
+<td><code>INVALID_BACKING_PAGE</code></td>
+<td>3</td>
+<td>目标 vAPIC Backing Page 地址无效</td>
+<td>WARN + 忽略</td>
+</tr>
+<tr>
+<td><code>INVALID_IPI_VECTOR</code></td>
+<td>4</td>
+<td>IPI vector &lt; 16（保留向量）</td>
+<td>忽略</td>
+</tr>
+</tbody>
+</table>
+<h3>5.2 AVIC Doorbell 机制</h3>
+<p>当目标 vCPU 正在另一个 pCPU 上运行时，AVIC 硬件通过 <strong>Doorbell MSR</strong> 通知目标 pCPU：</p>
+<div class="highlight"><pre><span></span><code>MSR_AMD64_SVM_AVIC_DOORBELL
+    写入值 = 目标 pCPU 的物理 CPU ID
+</code></pre></div>
+
+<p>目标 pCPU 收到 Doorbell 后：
+1. 在下一次 VMRUN 之前检查 vIRR
+2. 如果有 pending 中断，注入到 Guest</p>
+<blockquote>
+<p>KVM 实现 <code>avic_ring_doorbell()</code>：
+<code>c
+void avic_ring_doorbell(struct kvm_vcpu *vcpu)
+{
+    int cpu = READ_ONCE(vcpu-&gt;cpu);
+    if (cpu != get_cpu()) {
+        wrmsrq(MSR_AMD64_SVM_AVIC_DOORBELL, cpu_physical_id(cpu));
+    }
+    put_cpu();
+}</code>
+注意：Doorbell 有可能发到错误的 pCPU（vCPU 迁移竞态），但这是无害的——vCPU 迁移后会执行 VMRUN 并处理 pending 中断。</p>
+</blockquote>
+<h3>5.3 VM-Exit 信息</h3>
+<p>AVIC_INCOMPLETE_IPI VM-Exit 提供以下信息：</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>exit_code</code></td>
+<td>0x401 (SVM_EXIT_AVIC_INCOMPLETE_IPI)</td>
+</tr>
+<tr>
+<td><code>exit_info_1</code></td>
+<td>ICR 的完整 64-bit 值（高 32-bit = ICRH，低 32-bit = ICRL）</td>
+</tr>
+<tr>
+<td><code>exit_info_2</code></td>
+<td>高 32-bit = IPI failure cause ID；低 12-bit = 目标索引（target index）</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><code>exit_info_2</code> 中的 target index 是硬件提供的关键优化信息：KVM 可以直接用此索引定位目标 vCPU，无需遍历所有 vCPU。</p>
+</blockquote>
+<hr>
+<h2>6. 设备中断虚拟化（IOMMU AVIC / GA 模式）</h2>
+<h3>6.1 传统模式 vs GA 模式</h3>
+<p>在 <strong>传统模式</strong>下，设备中断（如 PCI 直通设备的 MSIX 中断）的投递流程：</p>
+<div class="highlight"><pre><span></span><code>设备 → IOMMU → Host Physical IRQ → KVM → VM-Entry → 注入 Guest
+</code></pre></div>
+
+<p>在 <strong>GA（Guest APIC）模式</strong>下，AMD IOMMU 可以<strong>直接将中断注入 Guest 的 vAPIC Backing Page</strong>：</p>
+<div class="highlight"><pre><span></span><code>设备 → IOMMU (GA mode) → 直接写 vAPIC IRR → (如需唤醒) GALog → KVM
+</code></pre></div>
+
+<h3>6.2 IRTE（Interrupt Remapping Table Entry）</h3>
+<p>IOMMU 使用 IRTE 来配置中断重映射。在 GA 模式下，IRTE 包含：</p>
+<ul>
+<li><strong>Guest Mode</strong> 标志：启用 GA 模式</li>
+<li><strong>vAPIC Backing Page 地址</strong>：IOMMU 直接写入此页面的 IRR</li>
+<li><strong>GATag</strong>：用于 GALog 通知时标识目标 VM 和 vCPU</li>
+<li><strong>Vector</strong>：中断向量号</li>
+</ul>
+<blockquote>
+<p>KVM 实现 <code>avic_pi_update_irte()</code>：
+<code>c
+struct amd_iommu_pi_data pi_data = {
+    .ga_tag = AVIC_GATAG(to_kvm_svm(kvm)-&gt;avic_vm_id, vcpu-&gt;vcpu_idx),
+    .is_guest_mode = kvm_vcpu_apicv_active(vcpu),
+    .vapic_addr = avic_get_backing_page_address(to_svm(vcpu)),
+    .vector = vector,
+};</code></p>
+</blockquote>
+<h3>6.3 GATag 编码</h3>
+<p>GATag 是 32-bit 的不透明值（对硬件而言），用于 IOMMU ↔ SVM 之间的通信：</p>
+<div class="highlight"><pre><span></span><code> 31                   N+1  N                   0
+┌────────────────────────┬──────────────────────┐
+│      VM ID             │     vCPU Index       │
+└────────────────────────┴──────────────────────┘
+</code></pre></div>
+
+<p>其中 N 的值取决于 <code>AVIC_PHYSICAL_MAX_INDEX_MASK</code> 的位宽：
+- xAVIC：N = 7（支持 256 个 vCPU ID）
+- x2AVIC：N = 8（支持 512 个 vCPU ID）
+- x2AVIC EXT：N = 11（支持 4096 个 vCPU ID）</p>
+<blockquote>
+<p>KVM 使用 vCPU 的 <strong>index</strong>（而非 APIC ID）来编码 GATag，因为 KVM 对 index 有快速查找能力。</p>
+</blockquote>
+<h3>6.4 GALog（Guest APIC Log）</h3>
+<p>当 vCPU 不在运行状态时（IsRunning=0），IOMMU 无法通过 Doorbell 通知。此时使用 <strong>GALog</strong> 机制：</p>
+<ol>
+<li>IOMMU 在 vAPIC 页设置 IRR 位</li>
+<li>IOMMU 写入一条 GALog 条目（包含 GATag）</li>
+<li>IOMMU 触发 <strong>GALog Interrupt</strong>（Host 侧中断）</li>
+<li>KVM 的 <code>avic_ga_log_notifier()</code> 回调被调用</li>
+<li>从 GATag 解码出 VM ID 和 vCPU Index</li>
+<li>通过哈希表查找对应的 VM 和 vCPU</li>
+<li>调用 <code>kvm_vcpu_wake_up()</code> 唤醒目标 vCPU</li>
+</ol>
+<div class="highlight"><pre><span></span><code>┌──────────┐     IRTE (GA mode)      ┌──────────────┐
+│  PCI 设备 │ ──────────────────────► │   IOMMU      │
+└──────────┘                         │              │
+                                     │ 1. 写 vAPIC   │
+                                     │    IRR 位     │
+                                     │              │
+                                     │ 2. vCPU运行?  │
+                                     └──────┬───────┘
+                                   Yes │           │ No
+                                      ▼           ▼
+                                 Doorbell     GALog 条目
+                                 (无需KVM)         │
+                                              ▼
+                                         GALog IRQ
+                                              │
+                                              ▼
+                                     avic_ga_log_notifier()
+                                         │
+                                         ▼
+                                     kvm_vcpu_wake_up()
+</code></pre></div>
+
+<h3>6.5 IRTE 更新与 vCPU 迁移</h3>
+<p>当 vCPU 在不同 pCPU 间迁移时，KVM 需要更新所有关联的 IRTE：</p>
+<blockquote>
+<p>KVM 维护 per-vCPU 的 <code>ir_list</code>（中断重映射列表），记录所有投递到该 vCPU 的设备中断。</p>
+</blockquote>
+<p><code>avic_update_iommu_vcpu_affinity()</code> 遍历 <code>ir_list</code>，对每个 IRTE 调用：
+- <code>amd_iommu_update_ga()</code>：更新目标 pCPU 和 GA_LOG_INTR 标志
+- <code>amd_iommu_activate_guest_mode()</code>：激活 GA 模式
+- <code>amd_iommu_deactivate_guest_mode()</code>：退出 GA 模式</p>
+<hr>
+<h2>7. x2AVIC 扩展</h2>
+<h3>7.1 动机</h3>
+<p>传统 AVIC 仅支持 xAPIC 模式（MMIO 地址 <code>0xFEE00000</code> 区域访问 APIC 寄存器）。Guest 必须禁用 x2APIC 才能使用 AVIC 硬件加速。现代操作系统默认使用 x2APIC 模式，这导致 AVIC 无法被利用。</p>
+<p><strong>x2AVIC</strong> 扩展了 AVIC，支持 x2APIC 模式（通过 MSR <code>0x800-0x8FF</code> 访问 APIC 寄存器），使得 Guest 在 x2APIC 模式下也能获得硬件加速。</p>
+<h3>7.2 启用方式</h3>
+<p>x2AVIC 需要同时设置 VMCB <code>int_ctl</code> 的两个位：
+- <strong>Bit 31 (AVIC_ENABLE)</strong>：启用 AVIC 基础设施
+- <strong>Bit 30 (X2APIC_MODE)</strong>：启用 x2APIC MSR 虚拟化</p>
+<p>同时需要<strong>关闭 x2APIC MSR 范围的拦截</strong>，允许 AVIC 硬件直接处理 MSR 读写。</p>
+<blockquote>
+<p>CPUID 检测：<code>Fn8000_000A EDX[14]</code> 表示 x2AVIC 支持。</p>
+</blockquote>
+<h3>7.3 x2AVIC 的关键差异</h3>
+<table>
+<thead>
+<tr>
+<th>特性</th>
+<th>xAVIC</th>
+<th>x2AVIC</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>APIC 访问方式</td>
+<td>MMIO (0xFEE00000)</td>
+<td>MSR (0x800-0x8FF)</td>
+</tr>
+<tr>
+<td>最大 vCPU 数</td>
+<td>256</td>
+<td>512 (或 4096 with X2AVIC_EXT)</td>
+</tr>
+<tr>
+<td>Logical APIC ID Table</td>
+<td>使用</td>
+<td>不使用（硬件直接计算）</td>
+</tr>
+<tr>
+<td>Physical ID Table 大小</td>
+<td>2KB (256 entries)</td>
+<td>4KB (512 entries) 或 32KB (4096 entries)</td>
+</tr>
+<tr>
+<td>LDR/DFR 寄存器</td>
+<td>Guest 可写，需维护逻辑表</td>
+<td>LDR 只读，DFR 不存在</td>
+</tr>
+<tr>
+<td>MSR 拦截</td>
+<td>N/A</td>
+<td>需关闭 x2APIC MSR 范围拦截</td>
+</tr>
+</tbody>
+</table>
+<h3>7.4 动态模式切换</h3>
+<p>x2AVIC 支持运行时在 xAPIC 和 x2APIC 模式之间切换：</p>
+<ul>
+<li>Guest 从 xAPIC 切换到 x2APIC：设置 <code>X2APIC_MODE</code> 位，启用 MSR 不拦截，禁用 vAPIC BAR MMIO 重定向</li>
+<li>Guest 从 x2APIC 切换到 xAPIC：清除 <code>X2APIC_MODE</code> 位，启用 MSR 拦截，启用 vAPIC BAR MMIO 重定向</li>
+</ul>
+<blockquote>
+<p>KVM 实现 <code>avic_refresh_virtual_apic_mode()</code> 负责处理模式切换。</p>
+</blockquote>
+<h3>7.5 Hybrid AVIC 模式</h3>
+<p>KVM 支持 <strong>Hybrid AVIC 模式</strong>：当 Guest 启用 x2APIC 但硬件不支持 x2AVIC 时，KVM 可以：
+- 软件模拟 x2APIC MSR 读写（通过 MSR 拦截）
+- 同时利用 AVIC Doorbell 机制进行中断注入</p>
+<blockquote>
+<p>KVM 在 <code>avic_hardware_setup()</code> 中设置 <code>svm_x86_ops.allow_apicv_in_x2apic_without_x2apic_virtualization = true</code> 来启用此模式。</p>
+</blockquote>
+<hr>
+<h2>8. Secure AVIC（SEV-SNP 环境）</h2>
+<h3>8.1 概述</h3>
+<p>在 SEV-SNP（Secure Encrypted Virtualization - Secure Nested Paging）环境中，Guest 内存是加密的，Host 无法直接访问 Guest 的 APIC 寄存器页。Secure AVIC 为此设计：</p>
+<ul>
+<li><strong>Guest 拥有的 APIC Backing Page</strong>：Backing Page 位于 Guest 加密内存中</li>
+<li><strong>AllowedIRR / RequestedIRR</strong>：Host 和 IOMMU 通过这两个机制间接请求设置 IRR 位</li>
+<li>Host/IOMMU 设置 <code>RequestedIRR</code> 位</li>
+<li>Guest 硬件检查 <code>RequestedIRR</code>，如果 <code>AllowedIRR</code> 允许，则将其同步到实际 IRR</li>
+</ul>
+<h3>8.2 安全模型</h3>
+<div class="highlight"><pre><span></span><code>┌─────────────────────────────┐
+│<span class="w">       </span><span class="nv">Host</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="nv">IOMMU</span><span class="w">          </span>│
+│<span class="w">                             </span>│
+│<span class="w">  </span>设置<span class="w"> </span><span class="nv">RequestedIRR</span><span class="w"> </span>位<span class="w"> </span>──────┼──►<span class="w"> </span><span class="nv">RequestedIRR</span><span class="w"> </span><span class="ss">(</span><span class="nv">Guest</span><span class="w"> </span><span class="nv">encrypted</span><span class="w"> </span><span class="nv">page</span><span class="ss">)</span>
+│<span class="w">                             </span>│
+└─────────────────────────────┘
+<span class="w">                              </span>│
+<span class="w">                              </span>▼
+┌─────────────────────────────┐
+│<span class="w">       </span><span class="nv">Guest</span><span class="w"> </span><span class="nv">Hardware</span><span class="w">        </span>│
+│<span class="w">                             </span>│
+│<span class="w">  </span>检查<span class="w"> </span><span class="nv">AllowedIRR</span><span class="w"> </span>权限<span class="w">        </span>│
+│<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="nv">allowed</span>:<span class="w">                </span>│
+│<span class="w">    </span><span class="nv">IRR</span><span class="w"> </span><span class="o">|=</span><span class="w"> </span><span class="nv">RequestedIRR</span><span class="w">      </span>│
+│<span class="w">    </span><span class="nv">clear</span><span class="w"> </span><span class="nv">RequestedIRR</span><span class="w">       </span>│
+│<span class="w">                             </span>│
+└─────────────────────────────┘
+</code></pre></div>
+
+<blockquote>
+<p>KVM 检查：<code>avic_hardware_setup()</code> 中检查 <code>X86_FEATURE_HV_INUSE_WR_ALLOWED</code>（即 <code>HvInUseWrAllowed</code>），确保 Host 有权写入 Guest 的加密 APIC 页。</p>
+</blockquote>
+<hr>
+<h2>9. KVM 代码实现详解</h2>
+<p>以下基于 Linux kernel master 分支 <code>arch/x86/kvm/svm/avic.c</code> 进行分析。</p>
+<h3>9.1 硬件检测与初始化</h3>
+<div class="highlight"><pre><span></span><code><span class="kt">bool</span><span class="w"> </span><span class="n">__init</span><span class="w"> </span><span class="nf">avic_hardware_setup</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">avic</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">avic_want_avic_enabled</span><span class="p">();</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">avic</span><span class="p">)</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1">// AVIC 是 x2AVIC 的前提</span>
+<span class="w">    </span><span class="n">x2avic_enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">boot_cpu_has</span><span class="p">(</span><span class="n">X86_FEATURE_X2AVIC</span><span class="p">);</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">x2avic_enabled</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">cpu_feature_enabled</span><span class="p">(</span><span class="n">X86_FEATURE_X2AVIC_EXT</span><span class="p">))</span>
+<span class="w">            </span><span class="n">x2avic_max_physical_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">X2AVIC_4K_MAX_PHYSICAL_ID</span><span class="p">;</span><span class="w"> </span><span class="c1">// 0xFFF</span>
+<span class="w">        </span><span class="k">else</span>
+<span class="w">            </span><span class="n">x2avic_max_physical_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">X2AVIC_MAX_PHYSICAL_ID</span><span class="p">;</span><span class="w">    </span><span class="c1">// 0x1FF</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="c1">// Erratum 1235: Zen1/Zen2 禁用 IPI virtualization</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">boot_cpu_data</span><span class="p">.</span><span class="n">x86</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mh">0x17</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="n">boot_cpu_data</span><span class="p">.</span><span class="n">x86</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mh">0x18</span><span class="p">)</span>
+<span class="w">        </span><span class="n">enable_ipiv</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1">// 注册 IOMMU GALog 回调</span>
+<span class="w">    </span><span class="n">amd_iommu_register_ga_log_notifier</span><span class="p">(</span><span class="o">&amp;</span><span class="n">avic_ga_log_notifier</span><span class="p">);</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><strong>自动启用逻辑</strong>（<code>avic_want_avic_enabled()</code>）：
+- 默认 <code>avic = AVIC_AUTO_MODE (-1)</code>
+- Auto 模式下：仅 Zen4+ 且支持 x2AVIC 时自动启用
+- 必须启用 NPT
+- 必须支持 AVIC CPUID bit（或 force_avic）
+- SNP 环境下需要 <code>HvInUseWrAllowed</code></p>
+<h3>9.2 VMCB 初始化</h3>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">avic_init_vmcb</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">vcpu_svm</span><span class="w"> </span><span class="o">*</span><span class="n">svm</span><span class="p">,</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">vmcb</span><span class="w"> </span><span class="o">*</span><span class="n">vmcb</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="c1">// 设置 vAPIC Backing Page 地址</span>
+<span class="w">    </span><span class="n">vmcb</span><span class="o">-&gt;</span><span class="n">control</span><span class="p">.</span><span class="n">avic_backing_page</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">avic_get_backing_page_address</span><span class="p">(</span><span class="n">svm</span><span class="p">);</span>
+<span class="w">    </span><span class="c1">// 设置 Logical APIC ID Table 地址</span>
+<span class="w">    </span><span class="n">vmcb</span><span class="o">-&gt;</span><span class="n">control</span><span class="p">.</span><span class="n">avic_logical_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">__sme_set</span><span class="p">(</span><span class="n">__pa</span><span class="p">(</span><span class="n">kvm_svm</span><span class="o">-&gt;</span><span class="n">avic_logical_id_table</span><span class="p">));</span>
+<span class="w">    </span><span class="c1">// 设置 Physical APIC ID Table 地址</span>
+<span class="w">    </span><span class="n">vmcb</span><span class="o">-&gt;</span><span class="n">control</span><span class="p">.</span><span class="n">avic_physical_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">__sme_set</span><span class="p">(</span><span class="n">__pa</span><span class="p">(</span><span class="n">kvm_svm</span><span class="o">-&gt;</span><span class="n">avic_physical_id_table</span><span class="p">));</span>
+<span class="w">    </span><span class="c1">// 设置 vAPIC BAR</span>
+<span class="w">    </span><span class="n">vmcb</span><span class="o">-&gt;</span><span class="n">control</span><span class="p">.</span><span class="n">avic_vapic_bar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">APIC_DEFAULT_PHYS_BASE</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1">// 根据 APICv 状态激活/停用</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_vcpu_apicv_active</span><span class="p">(</span><span class="o">&amp;</span><span class="n">svm</span><span class="o">-&gt;</span><span class="n">vcpu</span><span class="p">))</span>
+<span class="w">        </span><span class="n">avic_activate_vmcb</span><span class="p">(</span><span class="n">svm</span><span class="p">);</span>
+<span class="w">    </span><span class="k">else</span>
+<span class="w">        </span><span class="n">avic_deactivate_vmcb</span><span class="p">(</span><span class="n">svm</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<h3>9.3 avic_activate_vmcb() — 激活 AVIC</h3>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">avic_activate_vmcb</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">vcpu_svm</span><span class="w"> </span><span class="o">*</span><span class="n">svm</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="c1">// 清除旧配置，设置 AVIC_ENABLE</span>
+<span class="w">    </span><span class="n">vmcb</span><span class="o">-&gt;</span><span class="n">control</span><span class="p">.</span><span class="n">int_ctl</span><span class="w"> </span><span class="o">&amp;=</span><span class="w"> </span><span class="o">~</span><span class="p">(</span><span class="n">AVIC_ENABLE_MASK</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">X2APIC_MODE_MASK</span><span class="p">);</span>
+<span class="w">    </span><span class="n">vmcb</span><span class="o">-&gt;</span><span class="n">control</span><span class="p">.</span><span class="n">avic_physical_id</span><span class="w"> </span><span class="o">&amp;=</span><span class="w"> </span><span class="o">~</span><span class="n">AVIC_PHYSICAL_MAX_INDEX_MASK</span><span class="p">;</span>
+<span class="w">    </span><span class="n">vmcb</span><span class="o">-&gt;</span><span class="n">control</span><span class="p">.</span><span class="n">avic_physical_id</span><span class="w"> </span><span class="o">|=</span><span class="w"> </span><span class="n">avic_get_max_physical_id</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
+<span class="w">    </span><span class="n">vmcb</span><span class="o">-&gt;</span><span class="n">control</span><span class="p">.</span><span class="n">int_ctl</span><span class="w"> </span><span class="o">|=</span><span class="w"> </span><span class="n">AVIC_ENABLE_MASK</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1">// CR8 写拦截不需要（AVIC 硬件处理）</span>
+<span class="w">    </span><span class="n">svm_clr_intercept</span><span class="p">(</span><span class="n">svm</span><span class="p">,</span><span class="w"> </span><span class="n">INTERCEPT_CR8_WRITE</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// TLB 刷新：切换 xAVIC/x2AVIC 模式时需要</span>
+<span class="w">    </span><span class="n">kvm_make_request</span><span class="p">(</span><span class="n">KVM_REQ_TLB_FLUSH_CURRENT</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">svm</span><span class="o">-&gt;</span><span class="n">vcpu</span><span class="p">);</span>
+
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">x2avic_enabled</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">apic_x2apic_mode</span><span class="p">(</span><span class="n">svm</span><span class="o">-&gt;</span><span class="n">vcpu</span><span class="p">.</span><span class="n">arch</span><span class="p">.</span><span class="n">apic</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// x2AVIC 模式：设置 X2APIC_MODE，关闭 MSR 拦截</span>
+<span class="w">        </span><span class="n">vmcb</span><span class="o">-&gt;</span><span class="n">control</span><span class="p">.</span><span class="n">int_ctl</span><span class="w"> </span><span class="o">|=</span><span class="w"> </span><span class="n">X2APIC_MODE_MASK</span><span class="p">;</span>
+<span class="w">        </span><span class="n">avic_set_x2apic_msr_interception</span><span class="p">(</span><span class="n">svm</span><span class="p">,</span><span class="w"> </span><span class="nb">false</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// xAVIC 模式：启用 MSR 拦截（KVM 软件模拟 x2APIC MSR）</span>
+<span class="w">        </span><span class="n">avic_set_x2apic_msr_interception</span><span class="p">(</span><span class="n">svm</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><strong>TLB 刷新的原因</strong>：</p>
+<p>KVM 使用 per-VM 的 "scratch" 页面来支持 APIC memslot。当 AVIC 启用时，硬件忽略 NPT 中的物理地址，转而使用 VMCB 中的 Backing Page 指针。因此 TLB 中可能缓存了指向 scratch 页面的旧映射，需要刷新。</p>
+<h3>9.4 Backing Page 初始化</h3>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="nf">avic_init_backing_page</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">u32</span><span class="w"> </span><span class="n">max_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">x2avic_enabled</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">x2avic_max_physical_id</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">AVIC_MAX_PHYSICAL_ID</span><span class="p">;</span>
+<span class="w">    </span><span class="n">u32</span><span class="w"> </span><span class="n">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">vcpu_id</span><span class="p">;</span>
+<span class="w">    </span><span class="n">u64</span><span class="w"> </span><span class="n">new_entry</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1">// vCPU ID 超出硬件支持范围时禁用 AVIC</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">id</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">max_id</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">kvm_set_apicv_inhibit</span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">kvm</span><span class="p">,</span><span class="w"> </span><span class="n">APICV_INHIBIT_REASON_PHYSICAL_ID_TOO_BIG</span><span class="p">);</span>
+<span class="w">        </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">arch</span><span class="p">.</span><span class="n">apic</span><span class="o">-&gt;</span><span class="n">apicv_active</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="c1">// 构建 Physical ID Table 条目</span>
+<span class="w">    </span><span class="n">new_entry</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">avic_get_backing_page_address</span><span class="p">(</span><span class="n">svm</span><span class="p">)</span><span class="w"> </span><span class="o">|</span>
+<span class="w">                </span><span class="n">AVIC_PHYSICAL_ID_ENTRY_VALID_MASK</span><span class="p">;</span>
+<span class="w">    </span><span class="n">svm</span><span class="o">-&gt;</span><span class="n">avic_physical_id_entry</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">new_entry</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1">// 写入实际表（广播 IPI 需要有效条目）</span>
+<span class="w">    </span><span class="n">WRITE_ONCE</span><span class="p">(</span><span class="n">kvm_svm</span><span class="o">-&gt;</span><span class="n">avic_physical_id_table</span><span class="p">[</span><span class="n">id</span><span class="p">],</span><span class="w"> </span><span class="n">new_entry</span><span class="p">);</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<h3>9.5 vCPU Load/Put — IsRunning 管理</h3>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">__avic_vcpu_load</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">cpu</span><span class="p">,</span>
+<span class="w">                             </span><span class="k">enum</span><span class="w"> </span><span class="n">avic_vcpu_action</span><span class="w"> </span><span class="n">action</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">h_physical_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cpu_physical_id</span><span class="p">(</span><span class="n">cpu</span><span class="p">);</span>
+<span class="w">    </span><span class="n">u64</span><span class="w"> </span><span class="n">entry</span><span class="p">;</span>
+
+<span class="w">    </span><span class="n">entry</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">svm</span><span class="o">-&gt;</span><span class="n">avic_physical_id_entry</span><span class="p">;</span>
+<span class="w">    </span><span class="c1">// 清除旧的 Host Physical ID 和 GA_LOG_INTR</span>
+<span class="w">    </span><span class="n">entry</span><span class="w"> </span><span class="o">&amp;=</span><span class="w"> </span><span class="o">~</span><span class="p">(</span><span class="n">AVIC_PHYSICAL_ID_ENTRY_HOST_PHYSICAL_ID_MASK</span><span class="w"> </span><span class="o">|</span>
+<span class="w">               </span><span class="n">AVIC_PHYSICAL_ID_ENTRY_GA_LOG_INTR</span><span class="p">);</span>
+<span class="w">    </span><span class="c1">// 设置新的 Host Physical ID</span>
+<span class="w">    </span><span class="n">entry</span><span class="w"> </span><span class="o">|=</span><span class="w"> </span><span class="p">(</span><span class="n">h_physical_id</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">AVIC_PHYSICAL_ID_ENTRY_HOST_PHYSICAL_ID_MASK</span><span class="p">);</span>
+<span class="w">    </span><span class="c1">// 设置 IsRunning = 1</span>
+<span class="w">    </span><span class="n">entry</span><span class="w"> </span><span class="o">|=</span><span class="w"> </span><span class="n">AVIC_PHYSICAL_ID_ENTRY_IS_RUNNING_MASK</span><span class="p">;</span>
+
+<span class="w">    </span><span class="n">svm</span><span class="o">-&gt;</span><span class="n">avic_physical_id_entry</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">entry</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1">// 如果 IPI virtualization 被禁用（erratum 1235），</span>
+<span class="w">    </span><span class="c1">// 写入实际表时清除 IsRunning</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">enable_ipiv</span><span class="p">)</span>
+<span class="w">        </span><span class="n">entry</span><span class="w"> </span><span class="o">&amp;=</span><span class="w"> </span><span class="o">~</span><span class="n">AVIC_PHYSICAL_ID_ENTRY_IS_RUNNING_MASK</span><span class="p">;</span>
+
+<span class="w">    </span><span class="n">WRITE_ONCE</span><span class="p">(</span><span class="n">kvm_svm</span><span class="o">-&gt;</span><span class="n">avic_physical_id_table</span><span class="p">[</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">vcpu_id</span><span class="p">],</span><span class="w"> </span><span class="n">entry</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// 更新 IOMMU IRTE</span>
+<span class="w">    </span><span class="n">avic_update_iommu_vcpu_affinity</span><span class="p">(</span><span class="n">vcpu</span><span class="p">,</span><span class="w"> </span><span class="n">h_physical_id</span><span class="p">,</span><span class="w"> </span><span class="n">action</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><strong>关键设计点</strong>：
+- <code>svm-&gt;avic_physical_id_entry</code> 是 KVM 的缓存值（含 GA_LOG_INTR）
+- 实际写入 Physical ID Table 的值可能不同（erratum 1235 时不含 IsRunning）
+- <code>enable_ipiv=false</code> 时，IsRunning 永远为 0，强制走 INCOMPLETE_IPI 路径</p>
+<h3>9.6 vCPU Blocking/Unblocking</h3>
+<div class="highlight"><pre><span></span><code><span class="kt">void</span><span class="w"> </span><span class="nf">avic_vcpu_blocking</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="c1">// vCPU 即将阻塞时，清除 IsRunning，设置 GA_LOG_INTR</span>
+<span class="w">    </span><span class="n">__avic_vcpu_put</span><span class="p">(</span><span class="n">vcpu</span><span class="p">,</span><span class="w"> </span><span class="n">AVIC_START_BLOCKING</span><span class="p">);</span>
+<span class="w">    </span><span class="c1">// 此时 IOMMU 设备中断会通过 GALog 通知 KVM 唤醒</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">avic_vcpu_unblocking</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="c1">// vCPU 被唤醒时，恢复 IsRunning</span>
+<span class="w">    </span><span class="n">avic_vcpu_load</span><span class="p">(</span><span class="n">vcpu</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">cpu</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><strong>Blocking 时的内存屏障问题</strong>：</p>
+<div class="highlight"><pre><span></span><code>vCPU Blocking:                    中断投递:
+  1. IsRunning = 0                  1. 写 vAPIC IRR 位
+  2. 读 vIRR (检查 pending)         2. 读 IsRunning
+     → 决定是否真正阻塞               → 决定是否触发 INCOMPLETE_IPI
+</code></pre></div>
+
+<p>KVM 使用 <code>set_current_state()</code> 中的隐式内存屏障来保证 Step 1 在 Step 2 之前完成。但 CPU 端需要匹配的屏障（在中断投递时先写 IRR 后读 IsRunning），<strong>erratum 1235</strong> 正是此屏障缺失导致的。</p>
+<h3>9.7 Incomplete IPI 处理</h3>
+<div class="highlight"><pre><span></span><code><span class="kt">int</span><span class="w"> </span><span class="nf">avic_incomplete_ipi_interception</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">u32</span><span class="w"> </span><span class="n">icrh</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">svm</span><span class="o">-&gt;</span><span class="n">vmcb</span><span class="o">-&gt;</span><span class="n">control</span><span class="p">.</span><span class="n">exit_info_1</span><span class="w"> </span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="mi">32</span><span class="p">;</span>
+<span class="w">    </span><span class="n">u32</span><span class="w"> </span><span class="n">icrl</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">svm</span><span class="o">-&gt;</span><span class="n">vmcb</span><span class="o">-&gt;</span><span class="n">control</span><span class="p">.</span><span class="n">exit_info_1</span><span class="p">;</span>
+<span class="w">    </span><span class="n">u32</span><span class="w"> </span><span class="n">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">svm</span><span class="o">-&gt;</span><span class="n">vmcb</span><span class="o">-&gt;</span><span class="n">control</span><span class="p">.</span><span class="n">exit_info_2</span><span class="w"> </span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="mi">32</span><span class="p">;</span><span class="w">      </span><span class="c1">// failure cause</span>
+<span class="w">    </span><span class="n">u32</span><span class="w"> </span><span class="n">index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">svm</span><span class="o">-&gt;</span><span class="n">vmcb</span><span class="o">-&gt;</span><span class="n">control</span><span class="p">.</span><span class="n">exit_info_2</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">AVIC_PHYSICAL_MAX_INDEX_MASK</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">switch</span><span class="w"> </span><span class="p">(</span><span class="n">id</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">case</span><span class="w"> </span><span class="no">AVIC_IPI_FAILURE_INVALID_TARGET</span><span class="p">:</span>
+<span class="w">    </span><span class="k">case</span><span class="w"> </span><span class="no">AVIC_IPI_FAILURE_INVALID_INT_TYPE</span><span class="p">:</span>
+<span class="w">        </span><span class="c1">// AVIC 不支持的 IPI 类型，软件模拟</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">icrl</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">APIC_ICR_BUSY</span><span class="p">)</span>
+<span class="w">            </span><span class="n">kvm_apic_write_nodecode</span><span class="p">(</span><span class="n">vcpu</span><span class="p">,</span><span class="w"> </span><span class="n">APIC_ICR</span><span class="p">);</span>
+<span class="w">        </span><span class="k">else</span>
+<span class="w">            </span><span class="n">kvm_apic_send_ipi</span><span class="p">(</span><span class="n">apic</span><span class="p">,</span><span class="w"> </span><span class="n">icrl</span><span class="p">,</span><span class="w"> </span><span class="n">icrh</span><span class="p">);</span>
+<span class="w">        </span><span class="k">break</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">case</span><span class="w"> </span><span class="no">AVIC_IPI_FAILURE_TARGET_NOT_RUNNING</span><span class="p">:</span>
+<span class="w">        </span><span class="c1">// 目标 vCPU 未运行，需要唤醒</span>
+<span class="w">        </span><span class="n">avic_kick_target_vcpus</span><span class="p">(</span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">kvm</span><span class="p">,</span><span class="w"> </span><span class="n">apic</span><span class="p">,</span><span class="w"> </span><span class="n">icrl</span><span class="p">,</span><span class="w"> </span><span class="n">icrh</span><span class="p">,</span><span class="w"> </span><span class="n">index</span><span class="p">);</span>
+<span class="w">        </span><span class="k">break</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">case</span><span class="w"> </span><span class="no">AVIC_IPI_FAILURE_INVALID_BACKING_PAGE</span><span class="p">:</span>
+<span class="w">        </span><span class="n">WARN_ONCE</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Invalid backing page</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+<span class="w">        </span><span class="k">break</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">case</span><span class="w"> </span><span class="no">AVIC_IPI_FAILURE_INVALID_IPI_VECTOR</span><span class="p">:</span>
+<span class="w">        </span><span class="c1">// vector &lt; 16，忽略</span>
+<span class="w">        </span><span class="k">break</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<h3>9.8 快速路径 IPI Kick</h3>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="nf">avic_kick_target_vcpus_fast</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm</span><span class="w"> </span><span class="o">*</span><span class="n">kvm</span><span class="p">,</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_lapic</span><span class="w"> </span><span class="o">*</span><span class="n">source</span><span class="p">,</span>
+<span class="w">                                       </span><span class="n">u32</span><span class="w"> </span><span class="n">icrl</span><span class="p">,</span><span class="w"> </span><span class="n">u32</span><span class="w"> </span><span class="n">icrh</span><span class="p">,</span><span class="w"> </span><span class="n">u32</span><span class="w"> </span><span class="n">index</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="c1">// 利用 exit_info_2 中的 index 直接定位目标 vCPU</span>
+<span class="w">    </span><span class="c1">// 避免遍历所有 vCPU</span>
+
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">dest_mode</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">APIC_DEST_PHYSICAL</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// 物理模式：index 就是目标 APIC ID</span>
+<span class="w">        </span><span class="n">avic_kick_vcpu_by_physical_id</span><span class="p">(</span><span class="n">kvm</span><span class="p">,</span><span class="w"> </span><span class="n">dest</span><span class="p">,</span><span class="w"> </span><span class="n">icrl</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// 逻辑模式：解析 cluster + bitmap</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">apic_x2apic_mode</span><span class="p">(</span><span class="n">source</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">bitmap</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">dest</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="mh">0xFFFF</span><span class="p">;</span>
+<span class="w">            </span><span class="n">cluster</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">dest</span><span class="w"> </span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="mi">16</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="mi">4</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">        </span><span class="c1">// 遍历 bitmap 中的每个 bit</span>
+<span class="w">        </span><span class="n">for_each_set_bit</span><span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">bitmap</span><span class="p">,</span><span class="w"> </span><span class="mi">16</span><span class="p">)</span>
+<span class="w">            </span><span class="n">avic_kick_vcpu_by_logical_id</span><span class="p">(</span><span class="n">kvm</span><span class="p">,</span><span class="w"> </span><span class="p">...,</span><span class="w"> </span><span class="n">cluster</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">i</span><span class="p">,</span><span class="w"> </span><span class="n">icrl</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><strong>慢速路径</strong>（<code>avic_kick_target_vcpus()</code>）：当 fast path 返回 <code>-EINVAL</code>（如广播 IPI 或 shorthand 非 NOSHORT）时，遍历所有 vCPU 进行匹配。</p>
+<h3>9.9 Unaccelerated Access 处理</h3>
+<p>当 Guest 访问的 APIC 寄存器不被 AVIC 硬件直接支持时，触发 <code>SVM_EXIT_AVIC_UNACCELERATED_ACCESS</code>（0x402）：</p>
+<div class="highlight"><pre><span></span><code><span class="kt">int</span><span class="w"> </span><span class="nf">avic_unaccelerated_access_interception</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">u32</span><span class="w"> </span><span class="n">offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">exit_info_1</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">AVIC_UNACCEL_ACCESS_OFFSET_MASK</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">bool</span><span class="w"> </span><span class="n">trap</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">is_avic_unaccelerated_access_trap</span><span class="p">(</span><span class="n">offset</span><span class="p">);</span>
+
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">trap</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Trap：硬件已执行了操作，KVM 只需更新副作用</span>
+<span class="w">        </span><span class="c1">// 涉及 LDR/DFR 等需要维护 Logical APIC ID Table 的寄存器</span>
+<span class="w">        </span><span class="n">avic_unaccel_trap_write</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Fault：硬件未执行，KVM 需要模拟指令</span>
+<span class="w">        </span><span class="n">kvm_emulate_instruction</span><span class="p">(</span><span class="n">vcpu</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><strong>Trap vs Fault 的区别</strong>：
+- <strong>Trap</strong>：AVIC 硬件已完成寄存器写入到 vAPIC 页，但需要 KVM 处理副作用（如更新 Logical APIC ID Table）
+- <strong>Fault</strong>：AVIC 硬件未完成操作，需要 KVM 完整模拟</p>
+<p>Trap 类型的寄存器包括：APIC_ID, EOI, LDR, DFR, SPIV, ESR, ICR, LVT*, TMICT, TDCR 等。</p>
+<h3>9.10 GALog 通知回调</h3>
+<div class="highlight"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="nf">avic_ga_log_notifier</span><span class="p">(</span><span class="n">u32</span><span class="w"> </span><span class="n">ga_tag</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">u32</span><span class="w"> </span><span class="n">vm_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">AVIC_GATAG_TO_VMID</span><span class="p">(</span><span class="n">ga_tag</span><span class="p">);</span>
+<span class="w">    </span><span class="n">u32</span><span class="w"> </span><span class="n">vcpu_idx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">AVIC_GATAG_TO_VCPUIDX</span><span class="p">(</span><span class="n">ga_tag</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// 通过哈希表查找 VM</span>
+<span class="w">    </span><span class="n">hash_for_each_possible</span><span class="p">(</span><span class="n">svm_vm_data_hash</span><span class="p">,</span><span class="w"> </span><span class="n">kvm_svm</span><span class="p">,</span><span class="w"> </span><span class="n">hnode</span><span class="p">,</span><span class="w"> </span><span class="n">vm_id</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">kvm_svm</span><span class="o">-&gt;</span><span class="n">avic_vm_id</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">vm_id</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="c1">// 通过 index 快速获取 vCPU</span>
+<span class="w">            </span><span class="n">vcpu</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">kvm_get_vcpu</span><span class="p">(</span><span class="o">&amp;</span><span class="n">kvm_svm</span><span class="o">-&gt;</span><span class="n">kvm</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu_idx</span><span class="p">);</span>
+<span class="w">            </span><span class="k">break</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="c1">// IOMMU 已经在 vAPIC 页设置了 IRR，只需唤醒 vCPU</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">vcpu</span><span class="p">)</span>
+<span class="w">        </span><span class="n">kvm_vcpu_wake_up</span><span class="p">(</span><span class="n">vcpu</span><span class="p">);</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<h3>9.11 IRTE 更新</h3>
+<div class="highlight"><pre><span></span><code><span class="kt">int</span><span class="w"> </span><span class="nf">avic_pi_update_irte</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_kernel_irqfd</span><span class="w"> </span><span class="o">*</span><span class="n">irqfd</span><span class="p">,</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm</span><span class="w"> </span><span class="o">*</span><span class="n">kvm</span><span class="p">,</span>
+<span class="w">                       </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">host_irq</span><span class="p">,</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">guest_irq</span><span class="p">,</span>
+<span class="w">                       </span><span class="k">struct</span><span class="w"> </span><span class="nc">kvm_vcpu</span><span class="w"> </span><span class="o">*</span><span class="n">vcpu</span><span class="p">,</span><span class="w"> </span><span class="n">u32</span><span class="w"> </span><span class="n">vector</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">amd_iommu_pi_data</span><span class="w"> </span><span class="n">pi_data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="p">.</span><span class="n">ga_tag</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">AVIC_GATAG</span><span class="p">(</span><span class="n">to_kvm_svm</span><span class="p">(</span><span class="n">kvm</span><span class="p">)</span><span class="o">-&gt;</span><span class="n">avic_vm_id</span><span class="p">,</span><span class="w"> </span><span class="n">vcpu</span><span class="o">-&gt;</span><span class="n">vcpu_idx</span><span class="p">),</span>
+<span class="w">        </span><span class="p">.</span><span class="n">is_guest_mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">kvm_vcpu_apicv_active</span><span class="p">(</span><span class="n">vcpu</span><span class="p">),</span>
+<span class="w">        </span><span class="p">.</span><span class="n">vapic_addr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">avic_get_backing_page_address</span><span class="p">(</span><span class="n">to_svm</span><span class="p">(</span><span class="n">vcpu</span><span class="p">)),</span>
+<span class="w">        </span><span class="p">.</span><span class="n">vector</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vector</span><span class="p">,</span>
+<span class="w">    </span><span class="p">};</span>
+
+<span class="w">    </span><span class="c1">// 从 Physical ID Entry 获取当前 pCPU 和运行状态</span>
+<span class="w">    </span><span class="n">entry</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">svm</span><span class="o">-&gt;</span><span class="n">avic_physical_id_entry</span><span class="p">;</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">entry</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">AVIC_PHYSICAL_ID_ENTRY_IS_RUNNING_MASK</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">pi_data</span><span class="p">.</span><span class="n">cpu</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">entry</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">AVIC_PHYSICAL_ID_ENTRY_HOST_PHYSICAL_ID_MASK</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">pi_data</span><span class="p">.</span><span class="n">cpu</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span>
+<span class="w">        </span><span class="n">pi_data</span><span class="p">.</span><span class="n">ga_log_intr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">entry</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">AVIC_PHYSICAL_ID_ENTRY_GA_LOG_INTR</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="c1">// 调用 IOMMU 驱动更新 IRTE</span>
+<span class="w">    </span><span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">irq_set_vcpu_affinity</span><span class="p">(</span><span class="n">host_irq</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">pi_data</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// 将 IRTE 元数据加入 vCPU 的 ir_list</span>
+<span class="w">    </span><span class="n">list_add</span><span class="p">(</span><span class="o">&amp;</span><span class="n">irqfd</span><span class="o">-&gt;</span><span class="n">vcpu_list</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">svm</span><span class="o">-&gt;</span><span class="n">ir_list</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<hr>
+<h2>10. 已知硬件 Erratum</h2>
+<h3>10.1 Erratum 1235（Family 17h / 18h）</h3>
+<p><strong>影响范围</strong>：AMD Zen1 (Family 0x17) 和 Hygon (Family 0x18)</p>
+<p><strong>问题</strong>：CPU 在中断投递时，写入 IRR 和读取 IsRunning 之间缺少内存屏障，导致：
+- 源 vCPU 设置了目标 vAPIC 的 IRR 位
+- 但目标 vCPU 的 IsRunning 位的更新未被可靠检测
+- 导致目标 vCPU 错过 VM-Exit（INCOMPLETE_IPI），中断被延迟或丢失</p>
+<p><strong>KVM 解决方案</strong>：</p>
+<div class="highlight"><pre><span></span><code><span class="c1">// 在 avic_hardware_setup() 中</span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">boot_cpu_data</span><span class="p">.</span><span class="n">x86</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mh">0x17</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="n">boot_cpu_data</span><span class="p">.</span><span class="n">x86</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mh">0x18</span><span class="p">)</span>
+<span class="w">    </span><span class="n">enable_ipiv</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+</code></pre></div>
+
+<p>禁用 IPI virtualization 后：
+- Physical ID Table 中 IsRunning 永远为 0
+- 所有 IPI 都会触发 INCOMPLETE_IPI VM-Exit
+- KVM 完全软件模拟 IPI 投递
+- 但设备中断投递（IOMMU GA 模式）不受影响</p>
+<hr>
+<h2>11. AVIC vs x2AVIC vs Secure AVIC 对比</h2>
+<table>
+<thead>
+<tr>
+<th>特性</th>
+<th>AVIC (xAVIC)</th>
+<th>x2AVIC</th>
+<th>Secure AVIC</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>APIC 模式</strong></td>
+<td>xAPIC (MMIO)</td>
+<td>x2APIC (MSR)</td>
+<td>xAPIC/x2APIC</td>
+</tr>
+<tr>
+<td><strong>CPUID 检测</strong></td>
+<td>Fn8000_000A EDX[3]</td>
+<td>Fn8000_000A EDX[14]</td>
+<td>HV_INUSE_WR_ALLOWED</td>
+</tr>
+<tr>
+<td><strong>最大 vCPU 数</strong></td>
+<td>256</td>
+<td>512 (4096 with EXT)</td>
+<td>同 x2AVIC</td>
+</tr>
+<tr>
+<td><strong>VMCB 控制位</strong></td>
+<td>AVIC_ENABLE (bit 31)</td>
+<td>AVIC_ENABLE + X2APIC_MODE (bit 31+30)</td>
+<td>AVIC_ENABLE + 加密支持</td>
+</tr>
+<tr>
+<td><strong>vAPIC Backing Page</strong></td>
+<td>Host 分配，Guest 可见</td>
+<td>Host 分配，Guest 可见</td>
+<td>Guest 加密内存</td>
+</tr>
+<tr>
+<td><strong>IOMMU GA 模式</strong></td>
+<td>支持</td>
+<td>支持</td>
+<td>支持（受限）</td>
+</tr>
+<tr>
+<td><strong>Logical APIC ID Table</strong></td>
+<td>使用</td>
+<td>不使用</td>
+<td>使用/不使用</td>
+</tr>
+<tr>
+<td><strong>中断注入安全模型</strong></td>
+<td>直接写 IRR</td>
+<td>直接写 IRR</td>
+<td>RequestedIRR → AllowedIRR → IRR</td>
+</tr>
+<tr>
+<td><strong>适用场景</strong></td>
+<td>传统虚拟化</td>
+<td>现代操作系统（默认 x2APIC）</td>
+<td>SEV-SNP 加密虚拟机</td>
+</tr>
+<tr>
+<td><strong>首个支持 CPU</strong></td>
+<td>Family 15h (Carrizo)</td>
+<td>Zen4 (Family 19h)</td>
+<td>SEV-SNP 平台</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>12. 参考文献</h2>
+<ol>
+<li><strong>AMD64 Architecture Programmer's Manual Volume 2: System Programming</strong> (Publication 24593), Section 15.29 — AMD AVIC 架构规范</li>
+<li><strong>AMD I/O Virtualization Technology (IOMMU) Specification</strong> (Publication 48882) — IOMMU GA 模式和 IRTE 格式</li>
+<li><strong>Linux Kernel Source</strong> — <code>arch/x86/kvm/svm/avic.c</code>, <code>arch/x86/include/asm/svm.h</code> (master branch, <a href="https://github.com/torvalds/linux/blob/master/arch/x86/kvm/svm/avic.c">GitHub</a>)</li>
+<li><strong>[RFCv2 PATCH 00/12] Introducing AMD x2APIC Virtualization (x2AVIC) support</strong> — Suravee Suthikulpanit, <a href="https://lwn.net/Articles/887196/">LWN</a></li>
+<li><strong>[PART1 RFC v2 00/10] KVM: x86: Introduce SVM AVIC support</strong> — KVM AVIC 初始 patch series, <a href="https://fa.linux.kernel.narkive.com/zH000A6k/part1-rfc-v2-00-10-kvm-x86-introduce-svm-avic-support">kernel archive</a></li>
+<li><strong>AMD64 Technology CPUID Specification</strong> — Fn8000_000A EDX bit 定义</li>
+<li><strong>AMD Processor Revision Guide for Family 17h</strong> — Erratum 1235 详细说明</li>
+</ol>
+<hr>
+<blockquote>
+<p><strong>文档版本</strong>：基于 Linux Kernel master 分支（2024-2025）和 AMD APM Rev 3.30+ 分析</p>
+<p><strong>作者</strong>：系统虚拟化团队 — AVIC 技术调研</p>
+</blockquote>
+
+
+             
+ 
+                <p id="post-share-links">
+    Share on:
+      <a href="https://twitter.com/intent/tweet?text=AMD%20AVIC%20%E7%9A%84%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%AE%9E%E7%8E%B0%E5%88%86%E6%9E%90%E6%96%87%E6%A1%A3&url=https%3A//blog.kernel.love/amd-avic-x2avic.html&hashtags=virtualization,amd,avic,x2avic" target="_blank" rel="nofollow noopener noreferrer" title="Share on Twitter">Twitter</a>
+ ❄       <a href="https://www.facebook.com/sharer/sharer.php?u=https%3A//blog.kernel.love/amd-avic-x2avic.html" target="_blank" rel="nofollow noopener noreferrer" title="Share on Facebook">Facebook</a>
+ ❄       <a href="mailto:?subject=AMD%20AVIC%20%E7%9A%84%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%AE%9E%E7%8E%B0%E5%88%86%E6%9E%90%E6%96%87%E6%A1%A3&amp;body=https%3A//blog.kernel.love/amd-avic-x2avic.html" target="_blank" rel="nofollow noopener noreferrer" title="Share via Email">Email</a>
+
+            
+            
+
+
+
+
+
+
+
+            <hr/>
+<section>
+    <h2>Related Posts</h2>
+<ul class="related-posts-list">
+<li><a href="https://blog.kernel.love/kvm-pv-steal-time.html" title="KVM PV Steal Time 机制分析">KVM PV Steal Time 机制分析</a></li>
+<li><a href="https://blog.kernel.love/mediated-vpmu.html" title="Mediated vPMU 特性分析">Mediated vPMU 特性分析</a></li>
+<li><a href="https://blog.kernel.love/vcpu-enter-guest.html" title="vcpu_enter_guest">vcpu_enter_guest</a></li>
+<li><a href="https://blog.kernel.love/x86-vmexit.html" title="x86 vmexit">x86 vmexit</a></li>
+<li><a href="https://blog.kernel.love/intel-apicv-analysis.html" title="Intel APICv Review">Intel APICv Review</a></li>
+</ul>
+<hr />
+</section>
+            <aside>
+            <nav>
+            <ul class="articles-timeline">
+                <li class="previous-article">« <a href="https://blog.kernel.love/intel-apicv-analysis.html" title="Previous: Intel APICv Review">Intel APICv Review</a></li>
+            </ul>
+            </nav>
+            </aside>
+        </div>
+        <section id="article-sidebar" class="span2">
+            <h4>Published</h4>
+            <time itemprop="dateCreated" datetime="2026-07-30T23:00:00+08:00">Thu 30 July 2026</time>
+
+            <h4>Category</h4>
+            <a class="category-link" href="https://blog.kernel.love/categories.html#virt-ref">virt</a>
+            <h4>Tags</h4>
+            <ul class="list-of-tags tags-in-article">
+                <li><a href="https://blog.kernel.love/tags.html#amd-ref">amd
+                    <span class="superscript">1</span>
+</a></li>
+                <li><a href="https://blog.kernel.love/tags.html#avic-ref">avic
+                    <span class="superscript">1</span>
+</a></li>
+                <li><a href="https://blog.kernel.love/tags.html#virtualization-ref">virtualization
+                    <span class="superscript">22</span>
+</a></li>
+                <li><a href="https://blog.kernel.love/tags.html#x2avic-ref">x2avic
+                    <span class="superscript">1</span>
+</a></li>
+            </ul>
+<h4>Contact</h4>
+<div id="sidebar-social-link">
+    <a href="https://github.com/fangying" title="" target="_blank" rel="nofollow noopener noreferrer">
+        <svg xmlns="http://www.w3.org/2000/svg" aria-label="GitHub" role="img" viewBox="0 0 512 512"><rect width="512" height="512" rx="15%" fill="#1B1817"/><path fill="#fff" d="M335 499c14 0 12 17 12 17H165s-2-17 12-17c13 0 16-6 16-12l-1-50c-71 16-86-28-86-28-12-30-28-37-28-37-24-16 1-16 1-16 26 2 40 26 40 26 22 39 59 28 74 22 2-17 9-28 16-35-57-6-116-28-116-126 0-28 10-51 26-69-3-6-11-32 3-67 0 0 21-7 70 26 42-12 86-12 128 0 49-33 70-26 70-26 14 35 6 61 3 67 16 18 26 41 26 69 0 98-60 120-117 126 10 8 18 24 18 48l-1 70c0 6 3 12 16 12z"/></svg>
+    </a>
+</div>
+            
+
+
+
+
+
+            
+
+
+
+
+
+        </section>
+</div>
+</article>
+<!-- Root element of PhotoSwipe. Must have class pswp. -->
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    <!-- Background of PhotoSwipe.
+         It's a separate element as animating opacity is faster than rgba(). -->
+    <div class="pswp__bg"></div>
+
+    <!-- Slides wrapper with overflow:hidden. -->
+    <div class="pswp__scroll-wrap">
+
+        <!-- Container that holds slides.
+            PhotoSwipe keeps only 3 of them in the DOM to save memory.
+            Don't modify these 3 pswp__item elements, data is added later on. -->
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        <!-- Default (PhotoSwipeUI_Default) interface on top of sliding area. Can be changed. -->
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                <!--  Controls are self-explanatory. Order can be changed. -->
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                <!-- Preloader demo https://codepen.io/dimsemenov/pen/yyBWoR -->
+                <!-- element will get class pswp__preloader--active when preloader is running -->
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                      <div class="pswp__preloader__cut">
+                        <div class="pswp__preloader__donut"></div>
+                      </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>                    </div>
+                    <div class="span1"></div>
+                </div>
+            </div>
+        </div>
+<footer>
+    <div>
+        <span xmlns:dct="http://purl.org/dc/terms/" property="dct:title"> blog.kernel.love"</span> by <a xmlns:cc="http://creativecommons.org/ns#" href="https://blog.kernel.love" property="cc:attributionName" rel="cc:attributionURL">Yori Fang</a> is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/3.0/deed.en_US">Creative Commons Attribution-ShareAlike 3.0 Unported License</a>.
+    </div>
+
+
+
+
+    <div id="fpowered">
+        Powered by: <a href="http://getpelican.com/" title="Pelican Home Page" target="_blank" rel="nofollow noopener noreferrer">Pelican</a>
+        Theme: <a href="https://elegant.oncrashreboot.com/" title="Theme Elegant Home Page" target="_blank" rel="nofollow noopener noreferrer">Elegant</a>
+    </div>
+</footer>            <script src="//code.jquery.com/jquery.min.js"></script>
+        <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/js/bootstrap.min.js"></script>
+        <script src="https://blog.kernel.love/theme/js/elegant.prod.9e9d5ce754.js"></script>
+        <script>
+            function validateForm(query)
+            {
+                return (query.length > 0);
+            }
+        </script>
+
+    <script>
+    (function () {
+        if (window.location.hash.match(/^#comment-\d+$/)) {
+            $('#comment_thread').collapse('show');
+        }
+    })();
+    window.onhashchange=function(){
+        if (window.location.hash.match(/^#comment-\d+$/))
+            window.location.reload(true);
+    }
+    $('#comment_thread').on('shown', function () {
+        var link = document.getElementById('comment-accordion-toggle');
+        var old_innerHTML = link.innerHTML;
+        $(link).fadeOut(200, function() {
+            $(this).text('Click here to hide comments').fadeIn(200);
+        });
+        $('#comment_thread').on('hidden', function () {
+            $(link).fadeOut(200, function() {
+                $(this).text(old_innerHTML).fadeIn(200);
+            });
+        })
+    })
+</script>
+
+    </body>
+    <!-- Theme: Elegant built for Pelican
+        License : MIT -->
+</html>
