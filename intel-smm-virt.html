@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://blog.kernel.love/theme/css/style.min.css?fc5adb95">
+
+        <link rel="dns-prefetch" href="//fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin>
+
+        <meta name="author" content="Yori Fang" />
+
+        <meta name="description" content="Intel SMM 模式详解及其在虚拟化场景下的实现
+" />
+        <meta property="og:type" content="article" />
+        <meta name="twitter:card" content="summary">
+
+<meta name="keywords" content="Intel SMM, virtualization, KVM, QEMU, OVMF, virt, " />
+
+<meta property="og:title" content="Intel SMM "/>
+<meta property="og:url" content="https://blog.kernel.love/intel-smm-virt.html" />
+<meta property="og:description" content="Intel SMM 模式详解及其在虚拟化场景下的实现" />
+<meta property="og:site_name" content="blog.kernel.love" />
+<meta property="og:article:author" content="Yori Fang" />
+<meta property="og:article:published_time" content="2026-07-31T23:00:00+08:00" />
+<meta property="og:article:modified_time" content="2026-07-31T23:00:00+08:00" />
+<meta name="twitter:title" content="Intel SMM ">
+<meta name="twitter:description" content="Intel SMM 模式详解及其在虚拟化场景下的实现">
+
+        <title>Intel SMM  · blog.kernel.love
+</title>
+<script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+     (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+     m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+     })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+    ga('create', 'UA-107392039-2', 'auto');
+    ga('send', 'pageview');
+</script>
+
+
+    </head>
+    <body>
+        <div id="content">
+            <div class="navbar navbar-static-top">
+                <div class="navbar-inner">
+                    <div class="container-fluid">
+                        <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                        </a>
+                        <a class="brand" href="https://blog.kernel.love/"><span class=site-name>blog.kernel.love</span></a>
+                        <div class="nav-collapse collapse">
+                            <ul class="nav pull-right top-menu">
+                                <li >
+                                    <a href=
+                                       https://blog.kernel.love
+                                    >Home</a>
+                                </li>
+                                <li ><a href="https://blog.kernel.love/pages/about.html">About</a></li>
+                                <li ><a href="https://blog.kernel.love/categories.html">Categories</a></li>
+                                <li ><a href="https://blog.kernel.love/tags.html">Tags</a></li>
+                                <li ><a href="https://blog.kernel.love/archives.html">Archives</a></li>
+                                <li><form class="navbar-search" action="https://blog.kernel.love/search.html" onsubmit="return validateForm(this.elements['q'].value);"> <input type="text" class="search-query" placeholder="Search" name="q" id="tipue_search_input"></form></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="container-fluid">
+                <div class="row-fluid">
+                    <div class="span1"></div>
+                    <div class="span10">
+<article itemscope>
+<div class="row-fluid">
+    <header class="page-header span10 offset2">
+        <h1>
+            <a href="https://blog.kernel.love/intel-smm-virt.html">
+                Intel SMM
+            </a>
+        </h1>
+    </header>
+</div>
+
+<div class="row-fluid">
+        <div class="span8 offset2 article-content">
+            
+            <h1>Intel SMM 模式详解及虚拟化场景下的实现</h1>
+<blockquote>
+<p>本文分两部分：第一部分介绍 Intel x86 架构的系统管理模式（System Management Mode, SMM）的原理与关键机制；第二部分介绍在虚拟化场景下（以 KVM + QEMU + OVMF 为例）如何为虚拟机提供 SMM 能力。</p>
+</blockquote>
+<hr>
+<h2>目录</h2>
+<ul>
+<li><a href="#一intel-smm-模式详解">一、Intel SMM 模式详解</a></li>
+<li><a href="#11-什么是-smm">1.1 什么是 SMM</a></li>
+<li><a href="#12-smm-的典型用途">1.2 SMM 的典型用途</a></li>
+<li><a href="#13-进入-smmsmi-中断">1.3 进入 SMM：SMI 中断</a></li>
+<li><a href="#14-smram-与-smbase">1.4 SMRAM 与 SMBASE</a></li>
+<li><a href="#15-smm-的执行环境与状态保存区">1.5 SMM 的执行环境与状态保存区</a></li>
+<li><a href="#16-退出-smmrsm-指令">1.6 退出 SMM：RSM 指令</a></li>
+<li><a href="#17-smram-的保护与锁定">1.7 SMRAM 的保护与锁定</a></li>
+<li><a href="#18-smm-的安全问题">1.8 SMM 的安全问题</a></li>
+<li><a href="#二虚拟化场景如何为虚拟机提供-smm">二、虚拟化场景如何为虚拟机提供 SMM</a></li>
+<li><a href="#21-为什么虚拟机需要-smm">2.1 为什么虚拟机需要 SMM</a></li>
+<li><a href="#22-整体架构kvm--qemu--ovmf-的三方协作">2.2 整体架构：KVM + QEMU + OVMF 的三方协作</a></li>
+<li><a href="#23-kvm-侧世界切换与-smram-隔离">2.3 KVM 侧：世界切换与 SMRAM 隔离</a></li>
+<li><a href="#24-qemu-侧芯片组模拟与-tseg">2.4 QEMU 侧：芯片组模拟与 TSEG</a></li>
+<li><a href="#25-ovmfedk2-侧smm-驱动栈">2.5 OVMF/EDK2 侧：SMM 驱动栈</a></li>
+<li><a href="#26-一次完整的虚拟机-smi-流程">2.6 一次完整的虚拟机 SMI 流程</a></li>
+<li><a href="#27-配置示例">2.7 配置示例</a></li>
+<li><a href="#28-限制与注意事项">2.8 限制与注意事项</a></li>
+<li><a href="#三总结">三、总结</a></li>
+<li><a href="#参考资料">参考资料</a></li>
+</ul>
+<hr>
+<h2>一、Intel SMM 模式详解</h2>
+<h3>1.1 什么是 SMM</h3>
+<p>系统管理模式（System Management Mode, SMM）是 x86 处理器的一种特殊运行模式，它提供一个<strong>对操作系统透明、隔离的执行环境</strong>，用于执行电源管理、硬件错误处理等关键系统管理任务，且只能通过系统管理中断（System Management Interrupt, SMI）进入 [1]。</p>
+<p>SMM 由 Intel 在 20 世纪 90 年代初随 386SL 处理器引入，此后成为所有 Intel 处理器统一的标准体系结构特性 [1]。它是 x86 处理器四种主要运行模式（实模式、保护模式、虚拟 8086 模式、系统管理模式）之一，但相较其他模式一直较为"隐蔽"。</p>
+<p>SMM 的核心特点可以概括为：</p>
+<ul>
+<li><strong>最高特权</strong>：SMM 常被称为"Ring -2"，其权限高于操作系统内核（Ring 0）和 Hypervisor（Ring -1）。</li>
+<li><strong>OS 透明</strong>：进入/退出 SMM 对操作系统完全不可见，OS 无法感知或拦截。</li>
+<li><strong>代码来源于固件</strong>：在 SMM 中执行的代码（称为 SMI handler）由 BIOS/UEFI 固件在启动时装载 [4]。</li>
+<li><strong>独立地址空间</strong>：SMM 代码运行在受保护的专用内存区域 SMRAM 中 [2]。</li>
+</ul>
+<h3>1.2 SMM 的典型用途</h3>
+<p>SMM 主要被固件（BIOS/UEFI）用于处理需要脱离操作系统、直接与硬件交互的敏感任务，典型场景包括：</p>
+<ul>
+<li>电源管理（如 ACPI 之前/之外的电源状态切换、设备待机/唤醒）</li>
+<li>热管理与风扇控制（温度监控）</li>
+<li>硬件错误处理（如 RAS、内存 ECC 错误处理）</li>
+<li>传统硬件的仿真与兼容（如 USB 键盘模拟 PS/2、legacy 设备支持）</li>
+<li>OEM 专有代码执行</li>
+<li><strong>UEFI 安全启动中的变量保护</strong>（在启用 SMM 的固件中，认证变量的写入由 SMM 内的特权驱动完成，见第二部分）[4]</li>
+</ul>
+<p>在 SMM 中，所有 I/O 和系统指令都可用，SMI handler 可以读取和修改被保存的处理器上下文，因为该上下文就存放在 SMRAM 内 [3]。</p>
+<h3>1.3 进入 SMM：SMI 中断</h3>
+<p>进入 SMM 的<strong>唯一途径</strong>是 SMI（System Management Interrupt）。SMI 是一种独立于普通可屏蔽中断（INTR）和不可屏蔽中断（NMI）之外的最高优先级中断，通常有两种触发来源 [1]：</p>
+<ul>
+<li><strong>硬件 SMI</strong>：由主板逻辑/芯片组通过专用的 SMI# 引脚（或消息）触发，例如温度告警、电源事件等。</li>
+<li><strong>软件 SMI</strong>：由系统软件通过对某个被主板逻辑视为特殊的 I/O 端口进行写操作触发，最常见的是写 <code>0x0B2</code> 端口（APM 控制端口）[1]。这也是 OS/固件"主动调用"SMI handler 的常用方式。</li>
+</ul>
+<p>当处理器接收到 SMI 后，会：</p>
+<ol>
+<li>保存当前处理器完整上下文（寄存器状态）到 SMRAM 的状态保存区；</li>
+<li>切换到 SMM 的执行环境；</li>
+<li>从 <code>SMBASE + 0x8000</code> 处取第一条指令开始执行 SMI handler（默认 SMBASE 为 <code>0x30000</code>，因此默认入口为 <code>0x38000</code>，此时 <code>CS = 0x3000</code>、<code>EIP = 0x8000</code>）[1]。</li>
+</ol>
+<h3>1.4 SMRAM 与 SMBASE</h3>
+<p><strong>SMRAM</strong> 是一段专用的、受保护的物理内存区域，用于存放 SMI handler 的代码、数据、堆栈，以及被中断时保存的处理器上下文 [2]。其关键属性：</p>
+<ul>
+<li>SMRAM 映射到处理器的物理地址空间。处理器用它来保存上下文、存放 SMI handler 代码/数据/堆栈，以及系统管理信息和 OEM 专有信息。</li>
+<li><strong>可被锁定</strong>：SMRAM 一旦锁定，即使是运行在保护模式最高特权级（Ring 0）的软件也无法访问它 [2]。这是 SMM 隔离性的关键。</li>
+</ul>
+<p><strong>SMBASE</strong> 是 CPU 内部寄存器，保存了该处理器 SMRAM 的基地址 [2][3]。</p>
+<ul>
+<li>默认 SMBASE 为 <code>0x30000</code>，SMI handler 入口位于 <code>SMBASE + 0x8000</code>。早期 386 要求 SMM handler 从 <code>0x38000</code> 开始执行且不可重定位；<code>0x3FE00</code>–<code>0x3FFFF</code>（512 字节）保留给 CPU 且必须是 RAM [10]。</li>
+<li>SMBASE 是可被修改（重定位）的。在多核系统中，固件通常为每个逻辑处理器设置<strong>各自独立的 SMBASE</strong>，从而让每个核心拥有自己的状态保存区，避免多核同时进入 SMM 时相互覆盖上下文。</li>
+</ul>
+<h3>1.5 SMM 的执行环境与状态保存区</h3>
+<p>进入 SMM 后，处理器切换到一个类似实模式（big real mode）的执行环境：段寄存器行为、地址空间访问方式都与保护模式不同，寻址范围可达 4GB。</p>
+<p><strong>状态保存区（State Save Map / State Save Area）</strong> 是 SMRAM 中的一块固定布局区域，位于 SMRAM 的高地址端。进入 SMM 时，CPU 自动把通用寄存器、段寄存器、控制寄存器、EFLAGS、EIP、以及各类隐藏描述符等上下文写入该区域。SMI handler 可以直接读写这块区域，从而：</p>
+<ul>
+<li>检查是谁/什么原因触发了 SMI；</li>
+<li>修改即将恢复的执行上下文（例如改写返回地址、寄存器值），这也是 SMM 被用作 rootkit 载体的原因之一 [3]。</li>
+</ul>
+<p>状态保存区在 32 位和 64 位下有不同的字段布局与偏移（例如 KVM 源码中对 SMRAM64 各字段偏移做了严格校验）[8]。</p>
+<h3>1.6 退出 SMM：RSM 指令</h3>
+<p>SMI handler 处理完毕后，通过执行 <strong><code>RSM</code>（Resume from System Management Mode）</strong> 指令退出 SMM [2]。<code>RSM</code> 会：</p>
+<ol>
+<li>从 SMRAM 状态保存区恢复此前保存的处理器上下文（可能是被 handler 修改过的版本）；</li>
+<li>将处理器切换回进入 SMM 之前的运行模式（实模式/保护模式等）；</li>
+<li>从被中断处继续执行。</li>
+</ol>
+<p><code>RSM</code> 是一条<strong>只能在 SMM 内执行</strong>的特权指令；在 SMM 之外执行会触发 <code>#UD</code>（无效操作码异常）。</p>
+<h3>1.7 SMRAM 的保护与锁定</h3>
+<p>SMRAM 的隔离依赖芯片组/内存控制器提供的一组控制位，典型的有：</p>
+<ul>
+<li><strong>D_OPEN</strong>：置位时，SMRAM 对非 SMM 的普通访问也"打开"，通常仅在固件初始化阶段用于装载 SMI handler。</li>
+<li><strong>D_CLOSE</strong>：控制 SMRAM 在非 SMM 状态下的可见性。</li>
+<li><strong>D_LCK（Lock）</strong>：一旦置位，SMRAM 的配置（包括 D_OPEN 等）被锁死，直到下次复位才能改变。固件在启动后期会置位 D_LCK，之后任何非 SMM 代码都无法再打开或篡改 SMRAM [12]。</li>
+</ul>
+<p><strong>TSEG（Top of Memory Segment）</strong> 是现代芯片组（如 Intel Q35）提供的一种更大、更灵活的 SMRAM 区域：</p>
+<ul>
+<li>TSEG 位于低端内存的顶部，其位置相对于 TOLUD（Top of Low Usable DRAM，即 4GB 以下内存的分界线）确定 [6]。</li>
+<li>相比传统的固定小 SMRAM（如 A/B segment 只有几十 KB），TSEG 可以容纳更大的 SMI handler 与数据。</li>
+<li>SMRAM 的 LCK 位在锁定 SMRAM 的同时也会锁定 TSEG 配置；但需要注意，LCK 并不锁定 TOLUD [6]。</li>
+</ul>
+<h3>1.8 SMM 的安全问题</h3>
+<p>由于 SMM 权限极高且对 OS 透明，它天然是攻击者觊觎的目标：</p>
+<ul>
+<li><strong>SMM Rootkit（SMBR）</strong>：学术界很早就指出，基于 SMM 的 rootkit 是一种"OS 无关"的恶意软件，因为它运行在比 OS 更底层、且 OS 无法检测的环境中 [14]。</li>
+<li>保护 SMM 需要同时保护<strong>运行中的 SMRAM 地址空间</strong>和<strong>其代码来源（Flash 芯片）</strong>，包括保护 SMBASE 位置、SMRAM 权限，以及对 Flash 进行写保护 [12]。</li>
+<li>Intel 后来引入 <strong>STM（SMI Transfer Monitor）</strong> 等机制，尝试在 SMM 之上再加一层监控/降权，以约束 SMI handler 的行为 [16]。</li>
+</ul>
+<blockquote>
+<p>关键结论：SMM 的安全性建立在"SMRAM 锁定 + Flash 保护 + handler 代码可信"之上。这一安全模型在虚拟化场景下同样需要被完整复刻，否则虚拟机内的 SMM（以及依赖它的安全启动）就形同虚设。</p>
+</blockquote>
+<hr>
+<h2>二、虚拟化场景如何为虚拟机提供 SMM</h2>
+<h3>2.1 为什么虚拟机需要 SMM</h3>
+<p>在纯虚拟化场景中，虚拟机长期以来可以不需要 SMM。但随着 <strong>UEFI 安全启动（Secure Boot）</strong> 在虚拟机中的落地，SMM 变得不可或缺：</p>
+<ul>
+<li>安全启动的核心是一组<strong>认证变量</strong>（PK、KEK、db、dbx 等），它们必须<strong>防止运行中的操作系统随意篡改</strong>。</li>
+<li>在物理机 UEFI 固件中，这些变量的写入被限制在 SMM 内的特权驱动中完成，非特权（非 SMM）代码只能通过 <code>EFI_SMM_COMMUNICATION_PROTOCOL</code> 发起请求，由 SMM 侧的特权驱动校验后代为执行 [4]。</li>
+<li>因此，若要在虚拟机中实现"真正安全"的 Secure Boot（OS 无法伪造/绕过对认证变量的保护），就必须为虚拟机提供一个具备隔离性的 SMM 环境 [2]。</li>
+</ul>
+<p>换言之，虚拟机 SMM 的主要驱动力是 <strong>Secure Boot 的变量保护</strong>，其安全模型要求：即使 guest 内核被攻破，也无法访问 guest 的 SMRAM、无法伪造对认证变量的写入。</p>
+<h3>2.2 整体架构：KVM + QEMU + OVMF 的三方协作</h3>
+<p>在 QEMU/KVM 虚拟化栈中，为虚拟机提供 SMM 需要三个层次协同完成 [2]：</p>
+<table>
+<thead>
+<tr>
+<th>组件</th>
+<th>角色</th>
+<th>主要职责</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>KVM</strong>（内核 Hypervisor）</td>
+<td>CPU 虚拟化</td>
+<td>执行 SMM 的"世界切换"（SMI 进入、RSM 退出）；向非 SMM 状态的 vCPU 隐藏 SMRAM</td>
+</tr>
+<tr>
+<td><strong>QEMU</strong>（用户态 VMM）</td>
+<td>平台/芯片组模拟</td>
+<td>模拟 Q35 芯片组所需的 SMRAM/TSEG 相关寄存器；向非 SMM 处理器保护 Flash</td>
+</tr>
+<tr>
+<td><strong>OVMF/EDK2</strong>（虚拟固件）</td>
+<td>Guest 固件</td>
+<td>提供完整的 SMM 驱动栈，在 SMM 中实现 Secure Boot 变量保护等特权服务</td>
+</tr>
+</tbody>
+</table>
+<p>Paolo Bonzini 在 KVM Forum 2015 上把三方职责总结为 [2]：</p>
+<ul>
+<li><strong>KVM 必须</strong>：执行 SMM 世界切换（SMI、RSM）；对不处于 SMM 的处理器隐藏 SMRAM。</li>
+<li><strong>QEMU 必须</strong>：实现所需的芯片组寄存器；对不处于 SMM 的处理器保护 Flash；支持 KVM 的 SMM 扩展（TCG 软件模拟同理）。</li>
+<li><strong>目标平台是 Q35</strong>：因为老的 440FX（i440fx）芯片组的 SMRAM 太小，不足以承载完整的 SMM 驱动栈 [2]。</li>
+</ul>
+<h3>2.3 KVM 侧：世界切换与 SMRAM 隔离</h3>
+<p>KVM 负责 CPU 层面的 SMM 语义模拟，核心工作有两块 [2]：</p>
+<ol>
+<li><strong>世界切换（world switch）</strong>：</li>
+<li>当虚拟机收到 SMI 时，KVM 负责将 vCPU 状态保存到 guest 的 SMRAM 状态保存区，把 vCPU 切入 SMM 执行环境，并从 <code>SMBASE + 0x8000</code> 开始执行。</li>
+<li>当 guest 执行 <code>RSM</code> 时，KVM 负责从状态保存区恢复上下文并切回原模式。</li>
+<li>
+<p>为此 KVM 在 <code>arch/x86/kvm/smm.c</code> 中实现了 32/64 位的状态保存布局，并对各字段偏移做了严格校验以保证与真实硬件一致 [8]。</p>
+</li>
+<li>
+<p><strong>SMRAM 的按 vCPU 可见性隔离</strong>：</p>
+</li>
+<li>KVM 必须保证只有处于 SMM 的 vCPU 才能访问 SMRAM；非 SMM 状态的 vCPU 对该物理地址范围的访问要被重定向/拒绝 [2]。</li>
+<li>在对称多处理（SMP）guest 中，还必须避免 SMRAM 可见性切换时的竞态（race），保证每个 vCPU 独立、正确地进出 SMM [2]。</li>
+</ol>
+<p>KVM 通过 <code>KVM_CAP_X86_SMM</code> 能力向用户态（QEMU）暴露 SMM 支持；QEMU 检测到该能力后才会启用相应的 SMM 模拟路径。</p>
+<h3>2.4 QEMU 侧：芯片组模拟与 TSEG</h3>
+<p>QEMU 负责把"物理平台"这一侧补齐，重点是 Q35 芯片组的 SMRAM 相关行为 [2]：</p>
+<ul>
+<li><strong>实现 Q35 专属的 SMRAM 特性</strong>：包括 SMRAM 控制寄存器（对应真实芯片组中控制 SMRAM 打开/关闭/锁定的位）。</li>
+<li><strong>实现 TSEG</strong>：把一段低端内存顶部区域划为 TSEG（SMRAM），并根据锁定位控制其可见性 [2][5]。</li>
+<li><strong>实现 SMRAM 锁定（locking）</strong>：模拟 D_LCK 等锁定语义，锁定后非 SMM 无法再更改配置 [2]。</li>
+<li><strong>保护 Flash</strong>：对不处于 SMM 的处理器保护固件 Flash（pflash），防止 guest OS 直接改写固件/变量存储 [2]。</li>
+</ul>
+<p>早期 QEMU 只有对位于 <code>0x0</code> 附近的基础 SMRAM 支持，缺失的正是 Q35 专属 SMRAM 特性、TSEG、SMRAM 锁定、按 CPU 的 SMRAM 可见性、以及 Flash 保护等能力，这些随后被逐步补齐 [2]。</p>
+<blockquote>
+<p>⚠️ 一个历史上的实现差异：TSEG 的锁定位（LCK）会锁定 TSEG 配置，但<strong>不锁定 TOLUD</strong>。攻击者虽然不能关闭 TSEG，却有可能通过移动 TOLUD 把 TSEG"挪开"。QEMU 早期并未完整实现 TOLUD 相关寄存器，这类边界需要在实现虚拟 SMM 时特别关注 [6]。</p>
+</blockquote>
+<h3>2.5 OVMF/EDK2 侧：SMM 驱动栈</h3>
+<p>OVMF（Open Virtual Machine Firmware）是基于 EDK2 的、面向虚拟机的 UEFI 固件，它在 guest 内提供完整的 SMM 软件栈 [4]：</p>
+<ul>
+<li><strong>SMM 驱动是特权驱动</strong>：它们运行在 SMM 中、能访问 SMRAM，并通过 SMI 与其他非 SMM 驱动隔离、切换 [4]。</li>
+<li><strong>安全通信</strong>：非特权（非 SMM）驱动与特权（SMM）驱动之间通过 <code>EFI_SMM_COMMUNICATION_PROTOCOL</code> 通信，该协议由 SMM Core 实现 [4]。这正是 Secure Boot 变量写入请求从普通环境安全地转交到 SMM 内特权代码的通道。</li>
+<li><strong>内存布局调整（TSEG carve-out）</strong>：当平台配置了 SMM 支持时，OVMF 的 Platform PEI 阶段会修改内存映射，把 SMRAM 区域（TSEG）从通用可用 RAM 池中"抠出来"，并通过创建 <code>EfiReservedMemoryType</code> 类型的 HOB 将其标记为对操作系统不可访问 [5]。</li>
+</ul>
+<p><strong>构建开关 <code>SMM_REQUIRE</code></strong>：OVMF 需要以打开 SMM 支持的方式构建（构建时定义 <code>-D SMM_REQUIRE</code>）。只有这样构建出的 OVMF 才会包含并要求 SMM 驱动栈，从而与 KVM/QEMU 的 SMM 能力配合，实现受保护的 Secure Boot。tianocore 的官方 wiki 专门给出了在 QEMU/KVM/libvirt 上测试该 SMM 驱动栈的完整环境搭建方法 [3][7]。</p>
+<h3>2.6 一次完整的虚拟机 SMI 流程</h3>
+<p>以 guest 内一次 Secure Boot 认证变量写入（软件 SMI）为例，串联三方协作：</p>
+<ol>
+<li><strong>触发</strong>：guest 中的非 SMM UEFI 驱动想写认证变量，通过 <code>EFI_SMM_COMMUNICATION_PROTOCOL</code> 准备好请求，然后写 <code>0x0B2</code> 端口触发软件 SMI [1][4]。</li>
+<li><strong>陷入 KVM</strong>：写该 I/O 端口被 QEMU/KVM 识别为 SMI 源，KVM 对目标 vCPU 发起 SMM 世界切换 [2]。</li>
+<li><strong>切入 SMM</strong>：KVM 保存 vCPU 上下文到 guest SMRAM 状态保存区，切换执行环境，从 <code>SMBASE + 0x8000</code> 开始执行 OVMF 的 SMI handler [1][8]。</li>
+<li><strong>SMRAM 隔离生效</strong>：此时只有该 vCPU 处于 SMM，能看到 SMRAM；其他 vCPU 与 guest OS 都无法访问 SMRAM，QEMU 侧也保护着 Flash [2]。</li>
+<li><strong>特权处理</strong>：SMM 内的特权变量驱动校验请求合法性后，真正写入受保护的认证变量存储 [4]。</li>
+<li><strong>退出 SMM</strong>：handler 执行 <code>RSM</code>，KVM 从状态保存区恢复上下文，vCPU 切回原运行模式，guest 继续执行 [2]。</li>
+</ol>
+<p>整个过程对 guest OS 透明，且 guest OS 无法绕过 SMM 直接篡改变量——这正是虚拟机 Secure Boot 安全性的基础。</p>
+<h3>2.7 配置示例</h3>
+<p>在实际使用中，通常通过 libvirt/QEMU 启用带 SMM 的 Q35 虚拟机，要点是：<strong>使用 Q35 机型 + 打开 SMM + 使用 <code>SMM_REQUIRE</code> 构建的 OVMF + 开启 Secure Boot</strong>。</p>
+<p>QEMU 命令行关键参数（示意）：</p>
+<div class="highlight"><pre><span></span><code>qemu-system-x86_64<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-machine<span class="w"> </span>q35,smm<span class="o">=</span>on<span class="w"> </span><span class="se">\ </span><span class="w">                      </span><span class="c1"># Q35 芯片组，开启 SMM</span>
+<span class="w">  </span>-global<span class="w"> </span><span class="nv">driver</span><span class="o">=</span>cfi.pflash01,property<span class="o">=</span>secure,value<span class="o">=</span>on<span class="w"> </span><span class="se">\ </span><span class="w"> </span><span class="c1"># 保护固件 Flash</span>
+<span class="w">  </span>-drive<span class="w"> </span><span class="k">if</span><span class="o">=</span>pflash,format<span class="o">=</span>raw,unit<span class="o">=</span><span class="m">0</span>,readonly<span class="o">=</span>on,file<span class="o">=</span>OVMF_CODE.secboot.fd<span class="w"> </span><span class="se">\ </span><span class="w"> </span><span class="c1"># SMM_REQUIRE 构建的固件</span>
+<span class="w">  </span>-drive<span class="w"> </span><span class="k">if</span><span class="o">=</span>pflash,format<span class="o">=</span>raw,unit<span class="o">=</span><span class="m">1</span>,file<span class="o">=</span>OVMF_VARS.fd<span class="w"> </span><span class="se">\ </span><span class="w"> </span><span class="c1"># 变量存储</span>
+<span class="w">  </span>...
+</code></pre></div>
+
+<p>libvirt domain XML 关键片段（示意）：</p>
+<div class="highlight"><pre><span></span><code><span class="nt">&lt;domain</span><span class="w"> </span><span class="na">type=</span><span class="s">&#39;kvm&#39;</span><span class="nt">&gt;</span>
+<span class="w">  </span><span class="nt">&lt;os</span><span class="w"> </span><span class="na">firmware=</span><span class="s">&#39;efi&#39;</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;type</span><span class="w"> </span><span class="na">arch=</span><span class="s">&#39;x86_64&#39;</span><span class="w"> </span><span class="na">machine=</span><span class="s">&#39;q35&#39;</span><span class="nt">&gt;</span>hvm<span class="nt">&lt;/type&gt;</span>
+<span class="w">    </span><span class="nt">&lt;loader</span><span class="w"> </span><span class="na">secure=</span><span class="s">&#39;yes&#39;</span><span class="nt">/&gt;</span><span class="w">          </span><span class="cm">&lt;!-- 启用受 SMM 保护的固件 --&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/os&gt;</span>
+<span class="w">  </span><span class="nt">&lt;features&gt;</span>
+<span class="w">    </span><span class="nt">&lt;smm</span><span class="w"> </span><span class="na">state=</span><span class="s">&#39;on&#39;</span><span class="nt">/&gt;</span><span class="w">               </span><span class="cm">&lt;!-- 开启 SMM --&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/features&gt;</span>
+<span class="nt">&lt;/domain&gt;</span>
+</code></pre></div>
+
+<blockquote>
+<p>具体路径与文件名依发行版而定，官方推荐参照 tianocore 的 "Testing SMM with QEMU, KVM and libvirt" 指南进行端到端验证 [3][7]。</p>
+</blockquote>
+<h3>2.8 限制与注意事项</h3>
+<ul>
+<li><strong>必须用 Q35</strong>：i440fx 的 SMRAM 太小，无法承载完整 SMM 驱动栈，虚拟 SMM 只在 Q35 上支持 [2]。</li>
+<li><strong>SMM 与安全的耦合</strong>：只有 KVM（世界切换 + SMRAM 隐藏）、QEMU（芯片组寄存器 + Flash 保护）、OVMF（SMM 驱动栈）三者都正确实现，虚拟机 Secure Boot 才真正安全；任一环节缺失都会削弱保护 [2]。</li>
+<li><strong>SMM 本身的安全历史包袱</strong>：SMM 在设计之初并未以安全为目标，历史上有不良记录，虚拟化实现时必须谨慎，避免把物理机上的 SMM 漏洞模式带进虚拟机 [1]。</li>
+<li><strong>TSEG/TOLUD 边界</strong>：需完整实现锁定语义，注意 LCK 不锁 TOLUD 带来的"挪走 TSEG"风险 [6]。</li>
+<li><strong>迁移与嵌套</strong>：启用 SMM 会增加 vCPU 状态（SMRAM、SMBASE 等）的迁移复杂度；在嵌套虚拟化下，SMM 状态保存区还需处理 SVM/VMX guest 相关字段 [8]。</li>
+</ul>
+<hr>
+<h2>三、总结</h2>
+<ul>
+<li><strong>SMM 是什么</strong>：x86 的最高特权、OS 透明的系统管理模式，只能由 SMI 进入、由 <code>RSM</code> 退出，代码（SMI handler）由固件装载并运行在受保护的 SMRAM 中，SMBASE 决定其入口 [1][2]。</li>
+<li><strong>SMM 靠什么保证隔离</strong>：SMRAM 锁定（D_LCK）、Flash 写保护、handler 可信；TSEG 提供了更大的现代 SMRAM 区域 [6][12]。</li>
+<li><strong>虚拟机为什么要 SMM</strong>：主要为 UEFI Secure Boot 的认证变量提供 OS 无法绕过的保护 [4]。</li>
+<li><strong>虚拟化如何提供 SMM</strong>：KVM 做 CPU 世界切换与 SMRAM 隔离，QEMU 模拟 Q35 芯片组的 SMRAM/TSEG/锁定并保护 Flash，OVMF（以 <code>SMM_REQUIRE</code> 构建）提供 SMM 驱动栈并通过 <code>EFI_SMM_COMMUNICATION_PROTOCOL</code> 完成特权/非特权交互，三方协作在 Q35 机型上复刻物理机的 SMM 安全模型 [2][4][5]。</li>
+</ul>
+<hr>
+<h2>参考资料</h2>
+<ol>
+<li>System Management Mode — Wikipedia：<a href="https://en.wikipedia.org/wiki/System_Management_Mode">https://en.wikipedia.org/wiki/System_Management_Mode</a></li>
+<li>Paolo Bonzini, <em>Securing secure boot with System Management Mode</em>, KVM Forum 2015：<a href="http://events17.linuxfoundation.org/sites/events/files/slides/kvmforum15-smm.pdf">http://events17.linuxfoundation.org/sites/events/files/slides/kvmforum15-smm.pdf</a></li>
+<li>Testing SMM with QEMU, KVM and libvirt — tianocore wiki：<a href="https://github.com/tianocore/tianocore.github.io/wiki/Testing-SMM-with-QEMU,-KVM-and-libvirt">https://github.com/tianocore/tianocore.github.io/wiki/Testing-SMM-with-QEMU,-KVM-and-libvirt</a></li>
+<li>Open Virtual Machine Firmware (OVMF) Status Report (Laszlo Ersek)：<a href="https://www.linux-kvm.org/downloads/lersek/ovmf-whitepaper-c770f8c.txt">https://www.linux-kvm.org/downloads/lersek/ovmf-whitepaper-c770f8c.txt</a></li>
+<li>What is OVMF (UEFI Firmware for Virtual Machines)：<a href="https://termbasehub.com/ovmf/">https://termbasehub.com/ovmf/</a></li>
+<li>Gerd Hoffmann (kraxel), <em>Virtual secure boot — Secure boot support in qemu, kvm and ovmf</em>：<a href="https://www.kraxel.org/slides/virtual-secure-boot.pdf">https://www.kraxel.org/slides/virtual-secure-boot.pdf</a></li>
+<li>Testing SMM with QEMU, KVM, and libvirt（tianocore 文档站）：<a href="https://www.tianocore.org/tianocore-wiki.github.io/development/tutorials-howto/testing_smm_with_qemu,_kvm_and_libvirt.html">https://www.tianocore.org/tianocore-wiki.github.io/development/tutorials-howto/testing_smm_with_qemu,_kvm_and_libvirt.html</a></li>
+<li>Linux 内核 KVM SMM 实现 <code>arch/x86/kvm/smm.c</code>：<a href="https://cgit.freedesktop.org/drm/drm-tip/tree/arch/x86/kvm/smm.c">https://cgit.freedesktop.org/drm/drm-tip/tree/arch/x86/kvm/smm.c</a></li>
+<li>Firmware security 3: Digging into System Management Mode (SMM)：<a href="https://nixhacker.com/digging-into-smm/">https://nixhacker.com/digging-into-smm/</a></li>
+<li>Intel 386 User Manual — SMM Active Output / SMRAM：<a href="https://www.manualslib.com/manual/77671/Intel-386.html?page=161">https://www.manualslib.com/manual/77671/Intel-386.html?page=161</a></li>
+<li>SMMMmmmm — when root is not enough：<a href="https://barbieauglend.re/2019-08-15-system-managing-god/">https://barbieauglend.re/2019-08-15-system-managing-god/</a></li>
+<li>Advanced x86: BIOS and System Management Mode Internals（OpenSecurityTraining）：<a href="https://opensecuritytraining.info/IntroBIOS_files/Day1_07_Advanced%20x86%20-%20BIOS%20and%20SMM%20Internals%20-%20SMM.pdf">https://opensecuritytraining.info/IntroBIOS_files/Day1_07_Advanced%20x86%20-%20BIOS%20and%20SMM%20Internals%20-%20SMM.pdf</a></li>
+<li>A Tour Beyond BIOS: Launching STM to Monitor SMM in EFI Developer Kit II (Intel)：<a href="https://www.intel.co.za/content/dam/develop/external/us/en/documents/a-tour-beyond-bios-launching-stm-to-monitor-smm-in-efi-developer-kit-ii-819978.pdf">https://www.intel.co.za/content/dam/develop/external/us/en/documents/a-tour-beyond-bios-launching-stm-to-monitor-smm-in-efi-developer-kit-ii-819978.pdf</a></li>
+<li>SMM Rootkits: A New Breed of OS Independent Malware：<a href="https://dl.acm.org/doi/pdf/10.1145/1460877.1460892">https://dl.acm.org/doi/pdf/10.1145/1460877.1460892</a></li>
+</ol>
+
+
+             
+ 
+                <p id="post-share-links">
+    Share on:
+      <a href="https://twitter.com/intent/tweet?text=Intel%20SMM&url=https%3A//blog.kernel.love/intel-smm-virt.html&hashtags=intel-smm,virtualization,kvm,qemu,ovmf" target="_blank" rel="nofollow noopener noreferrer" title="Share on Twitter">Twitter</a>
+ ❄       <a href="https://www.facebook.com/sharer/sharer.php?u=https%3A//blog.kernel.love/intel-smm-virt.html" target="_blank" rel="nofollow noopener noreferrer" title="Share on Facebook">Facebook</a>
+ ❄       <a href="mailto:?subject=Intel%20SMM&amp;body=https%3A//blog.kernel.love/intel-smm-virt.html" target="_blank" rel="nofollow noopener noreferrer" title="Share via Email">Email</a>
+
+            
+            
+
+
+
+
+
+
+
+            <hr/>
+<section>
+    <h2>Related Posts</h2>
+<ul class="related-posts-list">
+<li><a href="https://blog.kernel.love/kvm-pv-steal-time.html" title="KVM PV Steal Time 机制分析">KVM PV Steal Time 机制分析</a></li>
+<li><a href="https://blog.kernel.love/mediated-vpmu.html" title="Mediated vPMU 特性分析">Mediated vPMU 特性分析</a></li>
+<li><a href="https://blog.kernel.love/vcpu-enter-guest.html" title="vcpu_enter_guest">vcpu_enter_guest</a></li>
+<li><a href="https://blog.kernel.love/x86-vmexit.html" title="x86 vmexit">x86 vmexit</a></li>
+<li><a href="https://blog.kernel.love/intel-apicv-analysis.html" title="Intel APICv Review">Intel APICv Review</a></li>
+</ul>
+<hr />
+</section>
+            <aside>
+            <nav>
+            <ul class="articles-timeline">
+                <li class="previous-article">« <a href="https://blog.kernel.love/amd-avic-x2avic.html" title="Previous: AMD AVIC and X2AVIC">AMD AVIC and X2AVIC</a></li>
+            </ul>
+            </nav>
+            </aside>
+        </div>
+        <section id="article-sidebar" class="span2">
+            <h4>Published</h4>
+            <time itemprop="dateCreated" datetime="2026-07-31T23:00:00+08:00">Fri 31 July 2026</time>
+
+            <h4>Category</h4>
+            <a class="category-link" href="https://blog.kernel.love/categories.html#virt-ref">virt</a>
+            <h4>Tags</h4>
+            <ul class="list-of-tags tags-in-article">
+                <li><a href="https://blog.kernel.love/tags.html#intel-smm-ref">Intel SMM
+                    <span class="superscript">1</span>
+</a></li>
+                <li><a href="https://blog.kernel.love/tags.html#kvm-ref">KVM
+                    <span class="superscript">6</span>
+</a></li>
+                <li><a href="https://blog.kernel.love/tags.html#ovmf-ref">OVMF
+                    <span class="superscript">1</span>
+</a></li>
+                <li><a href="https://blog.kernel.love/tags.html#qemu-ref">QEMU
+                    <span class="superscript">1</span>
+</a></li>
+                <li><a href="https://blog.kernel.love/tags.html#virtualization-ref">virtualization
+                    <span class="superscript">23</span>
+</a></li>
+            </ul>
+<h4>Contact</h4>
+<div id="sidebar-social-link">
+    <a href="https://github.com/fangying" title="" target="_blank" rel="nofollow noopener noreferrer">
+        <svg xmlns="http://www.w3.org/2000/svg" aria-label="GitHub" role="img" viewBox="0 0 512 512"><rect width="512" height="512" rx="15%" fill="#1B1817"/><path fill="#fff" d="M335 499c14 0 12 17 12 17H165s-2-17 12-17c13 0 16-6 16-12l-1-50c-71 16-86-28-86-28-12-30-28-37-28-37-24-16 1-16 1-16 26 2 40 26 40 26 22 39 59 28 74 22 2-17 9-28 16-35-57-6-116-28-116-126 0-28 10-51 26-69-3-6-11-32 3-67 0 0 21-7 70 26 42-12 86-12 128 0 49-33 70-26 70-26 14 35 6 61 3 67 16 18 26 41 26 69 0 98-60 120-117 126 10 8 18 24 18 48l-1 70c0 6 3 12 16 12z"/></svg>
+    </a>
+</div>
+            
+
+
+
+
+
+            
+
+
+
+
+
+        </section>
+</div>
+</article>
+<!-- Root element of PhotoSwipe. Must have class pswp. -->
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    <!-- Background of PhotoSwipe.
+         It's a separate element as animating opacity is faster than rgba(). -->
+    <div class="pswp__bg"></div>
+
+    <!-- Slides wrapper with overflow:hidden. -->
+    <div class="pswp__scroll-wrap">
+
+        <!-- Container that holds slides.
+            PhotoSwipe keeps only 3 of them in the DOM to save memory.
+            Don't modify these 3 pswp__item elements, data is added later on. -->
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        <!-- Default (PhotoSwipeUI_Default) interface on top of sliding area. Can be changed. -->
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                <!--  Controls are self-explanatory. Order can be changed. -->
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                <!-- Preloader demo https://codepen.io/dimsemenov/pen/yyBWoR -->
+                <!-- element will get class pswp__preloader--active when preloader is running -->
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                      <div class="pswp__preloader__cut">
+                        <div class="pswp__preloader__donut"></div>
+                      </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>                    </div>
+                    <div class="span1"></div>
+                </div>
+            </div>
+        </div>
+<footer>
+    <div>
+        <span xmlns:dct="http://purl.org/dc/terms/" property="dct:title"> blog.kernel.love"</span> by <a xmlns:cc="http://creativecommons.org/ns#" href="https://blog.kernel.love" property="cc:attributionName" rel="cc:attributionURL">Yori Fang</a> is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/3.0/deed.en_US">Creative Commons Attribution-ShareAlike 3.0 Unported License</a>.
+    </div>
+
+
+
+
+    <div id="fpowered">
+        Powered by: <a href="http://getpelican.com/" title="Pelican Home Page" target="_blank" rel="nofollow noopener noreferrer">Pelican</a>
+        Theme: <a href="https://elegant.oncrashreboot.com/" title="Theme Elegant Home Page" target="_blank" rel="nofollow noopener noreferrer">Elegant</a>
+    </div>
+</footer>            <script src="//code.jquery.com/jquery.min.js"></script>
+        <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/js/bootstrap.min.js"></script>
+        <script src="https://blog.kernel.love/theme/js/elegant.prod.9e9d5ce754.js"></script>
+        <script>
+            function validateForm(query)
+            {
+                return (query.length > 0);
+            }
+        </script>
+
+    <script>
+    (function () {
+        if (window.location.hash.match(/^#comment-\d+$/)) {
+            $('#comment_thread').collapse('show');
+        }
+    })();
+    window.onhashchange=function(){
+        if (window.location.hash.match(/^#comment-\d+$/))
+            window.location.reload(true);
+    }
+    $('#comment_thread').on('shown', function () {
+        var link = document.getElementById('comment-accordion-toggle');
+        var old_innerHTML = link.innerHTML;
+        $(link).fadeOut(200, function() {
+            $(this).text('Click here to hide comments').fadeIn(200);
+        });
+        $('#comment_thread').on('hidden', function () {
+            $(link).fadeOut(200, function() {
+                $(this).text(old_innerHTML).fadeIn(200);
+            });
+        })
+    })
+</script>
+
+    </body>
+    <!-- Theme: Elegant built for Pelican
+        License : MIT -->
+</html>
